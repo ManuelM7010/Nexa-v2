@@ -1,0 +1,6 @@
+{
+  "name": "NEXA Finance",
+  "description": "Personal Finance & Daily Cash Flow - Control de presupuesto, liquidez diaria y obligaciones financieras.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
