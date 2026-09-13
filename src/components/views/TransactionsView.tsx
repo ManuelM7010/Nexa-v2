@@ -35,6 +35,7 @@ export const TransactionsView: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<string>('all');
 
@@ -51,6 +52,11 @@ export const TransactionsView: React.FC = () => {
       if (filterType !== 'all' && tx.type !== filterType) {
         return false;
       }
+      // Category filter
+      if (filterCategory !== 'all') {
+        if (filterCategory === 'uncategorized' && tx.categoryId) return false;
+        if (filterCategory !== 'uncategorized' && tx.categoryId !== filterCategory) return false;
+      }
       // Status
       if (filterStatus !== 'all' && tx.status !== filterStatus) {
         return false;
@@ -61,7 +67,37 @@ export const TransactionsView: React.FC = () => {
       }
       return true;
     });
-  }, [allMonthTransactions, searchTerm, filterType, filterStatus, filterPayment]);
+  }, [allMonthTransactions, searchTerm, filterType, filterCategory, filterStatus, filterPayment]);
+
+  // Quick stats of filtered transactions
+  const filteredStats = useMemo(() => {
+    let totalExpense = 0;
+    let totalIncome = 0;
+    let executedCount = 0;
+    let pendingCount = 0;
+
+    filteredTransactions.forEach((tx) => {
+      if (tx.type === 'gasto') {
+        totalExpense += tx.amount;
+      } else if (tx.type === 'ingreso') {
+        totalIncome += tx.amount;
+      }
+      if (tx.status === 'realizado') {
+        executedCount++;
+      } else {
+        pendingCount++;
+      }
+    });
+
+    return {
+      count: filteredTransactions.length,
+      totalExpense,
+      totalIncome,
+      net: totalIncome - totalExpense,
+      executedCount,
+      pendingCount,
+    };
+  }, [filteredTransactions]);
 
   const getCategoryName = (catId?: string) => {
     if (!catId) return 'General';
@@ -126,6 +162,33 @@ export const TransactionsView: React.FC = () => {
             <option value="transferencia">Transferencias</option>
           </select>
 
+          {/* Category Filter */}
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-300 focus:outline-none cursor-pointer max-w-[200px] truncate"
+          >
+            <option value="all">Todas las categorías</option>
+            <optgroup label="Gastos">
+              {categories
+                .filter((c) => c.type === 'gasto')
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </optgroup>
+            <optgroup label="Ingresos">
+              {categories
+                .filter((c) => c.type === 'ingreso')
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </optgroup>
+          </select>
+
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
@@ -147,11 +210,16 @@ export const TransactionsView: React.FC = () => {
             <option value="tarjeta_credito">Tarjetas de Crédito</option>
           </select>
 
-          {(searchTerm || filterType !== 'all' || filterStatus !== 'all' || filterPayment !== 'all') && (
+          {(searchTerm ||
+            filterType !== 'all' ||
+            filterCategory !== 'all' ||
+            filterStatus !== 'all' ||
+            filterPayment !== 'all') && (
             <button
               onClick={() => {
                 setSearchTerm('');
                 setFilterType('all');
+                setFilterCategory('all');
                 setFilterStatus('all');
                 setFilterPayment('all');
               }}
@@ -160,6 +228,55 @@ export const TransactionsView: React.FC = () => {
               Limpiar filtros
             </button>
           )}
+        </div>
+
+        {/* Dynamic Summary bar for filtered results */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-[11px] text-slate-400 border-t border-slate-800/60">
+          <div className="flex items-center gap-3">
+            <span>
+              Mostrando <strong className="text-white">{filteredStats.count}</strong> movimientos
+            </span>
+            <span className="text-slate-600">•</span>
+            <span>
+              <span className="text-emerald-400 font-semibold">{filteredStats.executedCount}</span> realizados
+            </span>
+            <span className="text-slate-600">•</span>
+            <span>
+              <span className="text-amber-400 font-semibold">{filteredStats.pendingCount}</span> planificados
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {filteredStats.totalExpense > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">Total Gastos:</span>
+                <span className="text-rose-400 font-bold">
+                  -{formatMoney(filteredStats.totalExpense, settings.currencySymbol)}
+                </span>
+              </div>
+            )}
+            {filteredStats.totalIncome > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">Total Ingresos:</span>
+                <span className="text-emerald-400 font-bold">
+                  +{formatMoney(filteredStats.totalIncome, settings.currencySymbol)}
+                </span>
+              </div>
+            )}
+            {(filteredStats.totalExpense > 0 || filteredStats.totalIncome > 0) && (
+              <div className="flex items-center gap-1.5 border-l border-slate-800 pl-3">
+                <span className="text-slate-400">Neto:</span>
+                <span
+                  className={`font-bold ${
+                    filteredStats.net >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  }`}
+                >
+                  {filteredStats.net >= 0 ? '+' : ''}
+                  {formatMoney(filteredStats.net, settings.currencySymbol)}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

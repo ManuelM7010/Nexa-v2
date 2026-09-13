@@ -4,6 +4,8 @@ import {
   Transaction,
   Category,
   Budget,
+  ItemBudget,
+  DetailedBudgetItem,
   InstallmentPurchase,
   Loan,
   Subscription,
@@ -462,6 +464,268 @@ export class NexaFinancialEngine {
         status,
         transactions: catTxs,
       };
+    });
+  }
+
+  /**
+   * Calculates Itemized / Detailed Budget (Gasto por Gasto e Ingreso por Ingreso)
+   */
+  static calculateDetailedBudget(
+    year: number,
+    month: number,
+    itemBudgets: ItemBudget[],
+    allMonthTransactions: Transaction[],
+    categories: Category[],
+    subscriptions: Subscription[],
+    services: ServiceItem[]
+  ): DetailedBudgetItem[] {
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+    const itemMap = new Map<string, DetailedBudgetItem>();
+
+    const getCat = (catId?: string, fallbackType: 'gasto' | 'ingreso' = 'gasto') => {
+      const found = categories.find((c) => c.id === catId);
+      if (found) return found;
+      return {
+        id: 'general',
+        name: 'General',
+        type: fallbackType,
+        color: fallbackType === 'ingreso' ? '#10b981' : '#3b82f6',
+        icon: 'Tag',
+        subcategories: [],
+      };
+    };
+
+    // 1. Register explicit user-defined item budgets for this period
+    const activeItemBudgets = (itemBudgets || []).filter(
+      (ib) => ib.year === year && ib.month === month
+    );
+
+    activeItemBudgets.forEach((ib) => {
+      const cat = getCat(ib.categoryId, ib.type);
+      const key = ib.name.trim().toLowerCase();
+      itemMap.set(key, {
+        id: ib.id,
+        name: ib.name,
+        type: ib.type,
+        categoryId: cat.id,
+        categoryName: cat.name,
+        categoryColor: cat.color,
+        categoryIcon: cat.icon,
+        budgetedAmount: ib.budgetedAmount,
+        projectedAmount: ib.projectedAmount || ib.budgetedAmount,
+        realAmount: 0,
+        plannedPendingAmount: 0,
+        variation: 0,
+        variationPct: 0,
+        executionPct: 0,
+        status: 'favorable',
+        transactions: [],
+        isCustom: true,
+        itemBudgetId: ib.id,
+      });
+    });
+
+    // 2. Include active subscriptions for this month as line items
+    (subscriptions || []).forEach((sub) => {
+      const isPaused = sub.monthlyExceptions?.[monthKey]?.paused || sub.status === 'cancelada';
+      if (isPaused) return;
+      const subAmount = sub.monthlyExceptions?.[monthKey]?.overrideAmount ?? sub.amount;
+      const key = sub.concept.trim().toLowerCase();
+
+      if (!itemMap.has(key)) {
+        const cat = getCat(sub.categoryId, 'gasto');
+        itemMap.set(key, {
+          id: `sub_${sub.id}`,
+          name: sub.concept,
+          type: 'gasto',
+          categoryId: cat.id,
+          categoryName: cat.name,
+          categoryColor: cat.color,
+          categoryIcon: cat.icon,
+          budgetedAmount: subAmount,
+          projectedAmount: subAmount,
+          realAmount: 0,
+          plannedPendingAmount: 0,
+          variation: 0,
+          variationPct: 0,
+          executionPct: 0,
+          status: 'favorable',
+          transactions: [],
+          isCustom: false,
+        });
+      } else {
+        // If an explicit item budget exists but was set to 0, default to subscription amount
+        const existing = itemMap.get(key)!;
+        if (existing.budgetedAmount === 0) {
+          existing.budgetedAmount = subAmount;
+        }
+      }
+    });
+
+    // 3. Include monthly services as line items
+    (services || []).forEach((srv) => {
+      const record = srv.monthlyRecords?.[monthKey];
+      const srvAmount = record?.budgetedAmount ?? srv.budgetedAmount;
+      const srvName = `${srv.company} - ${srv.serviceName}`;
+      const key = srvName.trim().toLowerCase();
+      const altKey = srv.company.trim().toLowerCase();
+
+      const targetKey = itemMap.has(key) ? key : itemMap.has(altKey) ? altKey : key;
+
+      if (!itemMap.has(targetKey)) {
+        const cat = getCat(srv.categoryId, 'gasto');
+        itemMap.set(targetKey, {
+          id: `srv_${srv.id}`,
+          name: srvName,
+          type: 'gasto',
+          categoryId: cat.id,
+          categoryName: cat.name,
+          categoryColor: cat.color,
+          categoryIcon: cat.icon,
+          budgetedAmount: srvAmount,
+          projectedAmount: srvAmount,
+          realAmount: 0,
+          plannedPendingAmount: 0,
+          variation: 0,
+          variationPct: 0,
+          executionPct: 0,
+          status: 'favorable',
+          transactions: [],
+          isCustom: false,
+        });
+      }
+    });
+
+    // 4. Map and accumulate all transactions for this month
+    const validTxs = (allMonthTransactions || []).filter(
+      (tx) => (tx.type === 'gasto' || tx.type === 'ingreso') && tx.date.startsWith(monthKey)
+    );
+
+    validTxs.forEach((tx) => {
+      const cleanConcept = tx.concept.trim();
+      const txKey = cleanConcept.toLowerCase();
+
+      // Look for match: exact key or contains key
+      let matchedItem: DetailedBudgetItem | undefined = itemMap.get(txKey);
+
+      if (!matchedItem) {
+        for (const [key, item] of itemMap.entries()) {
+          if (txKey.includes(key) || key.includes(txKey)) {
+            matchedItem = item;
+            break;
+          }
+        }
+      }
+
+      // If still not found, create an unbudgeted line item for this concept
+      if (!matchedItem) {
+        const txType = tx.type as 'gasto' | 'ingreso';
+        const cat = getCat(tx.categoryId, txType);
+        matchedItem = {
+          id: `tx_line_${cleanConcept.replace(/\s+/g, '_')}_${txType}`,
+          name: cleanConcept,
+          type: txType,
+          categoryId: cat.id,
+          categoryName: cat.name,
+          categoryColor: cat.color,
+          categoryIcon: cat.icon,
+          budgetedAmount: 0,
+          projectedAmount: 0,
+          realAmount: 0,
+          plannedPendingAmount: 0,
+          variation: 0,
+          variationPct: 0,
+          executionPct: 0,
+          status: 'sin_presupuesto',
+          transactions: [],
+          isCustom: false,
+        };
+        itemMap.set(txKey, matchedItem);
+      }
+
+      matchedItem.transactions.push(tx);
+
+      if (tx.status === 'realizado') {
+        matchedItem.realAmount += tx.amount;
+      } else if (tx.status === 'planificado') {
+        matchedItem.plannedPendingAmount += tx.amount;
+      }
+    });
+
+    // 5. Final calculations: Projected, Variation, Percentages & Status
+    const results: DetailedBudgetItem[] = Array.from(itemMap.values()).map((item) => {
+      const projected = item.realAmount + item.plannedPendingAmount;
+      const finalProjected = projected > 0 ? projected : item.projectedAmount;
+
+      let variation = 0;
+      let executionPct = 0;
+      let variationPct = 0;
+      let status: DetailedBudgetItem['status'] = 'favorable';
+
+      if (item.type === 'gasto') {
+        // For expense: positive variation = savings (budgeted > real), negative = overrun
+        variation = item.budgetedAmount - item.realAmount;
+        executionPct =
+          item.budgetedAmount > 0
+            ? Math.round((item.realAmount / item.budgetedAmount) * 100)
+            : item.realAmount > 0
+            ? 100
+            : 0;
+        variationPct =
+          item.budgetedAmount > 0
+            ? Math.round(((item.budgetedAmount - item.realAmount) / item.budgetedAmount) * 100)
+            : 0;
+
+        if (item.budgetedAmount === 0) {
+          status = 'sin_presupuesto';
+        } else if (item.realAmount > item.budgetedAmount) {
+          status = 'sobregiro';
+        } else if (executionPct >= 80) {
+          status = 'alerta';
+        } else {
+          status = 'favorable';
+        }
+      } else {
+        // For income: positive variation = surplus (real > budgeted), negative = deficit
+        variation = item.realAmount - item.budgetedAmount;
+        executionPct =
+          item.budgetedAmount > 0
+            ? Math.round((item.realAmount / item.budgetedAmount) * 100)
+            : item.realAmount > 0
+            ? 100
+            : 0;
+        variationPct =
+          item.budgetedAmount > 0
+            ? Math.round(((item.realAmount - item.budgetedAmount) / item.budgetedAmount) * 100)
+            : 0;
+
+        if (item.budgetedAmount === 0) {
+          status = 'sin_presupuesto';
+        } else if (item.realAmount >= item.budgetedAmount) {
+          status = 'favorable';
+        } else {
+          status = 'en_meta';
+        }
+      }
+
+      return {
+        ...item,
+        projectedAmount: finalProjected,
+        variation,
+        executionPct,
+        variationPct,
+        status,
+      };
+    });
+
+    // Sort: Gastos first, then Ingresos. Inside each group, sort by higher of budgeted or real amount
+    return results.sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'gasto' ? -1 : 1;
+      }
+      const valA = Math.max(a.budgetedAmount, a.realAmount);
+      const valB = Math.max(b.budgetedAmount, b.realAmount);
+      return valB - valA;
     });
   }
 

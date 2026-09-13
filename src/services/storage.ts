@@ -4,6 +4,7 @@ import {
   Transaction,
   Category,
   Budget,
+  ItemBudget,
   InstallmentPurchase,
   Loan,
   LoanExtraPayment,
@@ -12,10 +13,11 @@ import {
   InitialPosition,
   MonthlyClose,
   AppSettings,
+  GroceryItem,
 } from '../types';
 
 const DB_NAME = 'NexaFinanceDB';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 export interface NexaFullBackup {
   version: number;
@@ -27,6 +29,8 @@ export interface NexaFullBackup {
     transactions: Transaction[];
     categories: Category[];
     budgets: Budget[];
+    itemBudgets?: ItemBudget[];
+    groceryItems?: GroceryItem[];
     installmentPurchases: InstallmentPurchase[];
     loans: Loan[];
     loanPayments: LoanExtraPayment[];
@@ -61,6 +65,8 @@ class NexaStorageService {
           'transactions',
           'categories',
           'budgets',
+          'itemBudgets',
+          'groceryItems',
           'installmentPurchases',
           'loans',
           'loanPayments',
@@ -198,6 +204,8 @@ class NexaStorageService {
       'transactions',
       'categories',
       'budgets',
+      'itemBudgets',
+      'groceryItems',
       'installmentPurchases',
       'loans',
       'loanPayments',
@@ -218,6 +226,8 @@ class NexaStorageService {
       transactions,
       categories,
       budgets,
+      itemBudgets,
+      groceryItems,
       installmentPurchases,
       loans,
       loanPayments,
@@ -232,6 +242,8 @@ class NexaStorageService {
       this.getAll<Transaction>('transactions'),
       this.getAll<Category>('categories'),
       this.getAll<Budget>('budgets'),
+      this.getAll<ItemBudget>('itemBudgets'),
+      this.getAll<GroceryItem>('groceryItems'),
       this.getAll<InstallmentPurchase>('installmentPurchases'),
       this.getAll<Loan>('loans'),
       this.getAll<LoanExtraPayment>('loanPayments'),
@@ -243,7 +255,7 @@ class NexaStorageService {
     ]);
 
     const backup: NexaFullBackup = {
-      version: 1,
+      version: 3,
       appName: 'NEXA Finance',
       exportDate: new Date().toISOString(),
       data: {
@@ -252,6 +264,8 @@ class NexaStorageService {
         transactions,
         categories,
         budgets,
+        itemBudgets,
+        groceryItems,
         installmentPurchases,
         loans,
         loanPayments,
@@ -298,6 +312,8 @@ class NexaStorageService {
     if (data.transactions?.length) await this.putBatch('transactions', data.transactions);
     if (data.categories?.length) await this.putBatch('categories', data.categories);
     if (data.budgets?.length) await this.putBatch('budgets', data.budgets);
+    if (data.itemBudgets?.length) await this.putBatch('itemBudgets', data.itemBudgets);
+    if (data.groceryItems?.length) await this.putBatch('groceryItems', data.groceryItems);
     if (data.installmentPurchases?.length)
       await this.putBatch('installmentPurchases', data.installmentPurchases);
     if (data.loans?.length) await this.putBatch('loans', data.loans);

@@ -62,6 +62,41 @@ export interface Budget {
   notes?: string;
 }
 
+export interface ItemBudget {
+  id: string;
+  year: number;
+  month: number; // 1-12
+  name: string; // Specific item or concept, e.g. "Supermercado", "Renta", "Salario Principal"
+  type: 'gasto' | 'ingreso';
+  categoryId: string;
+  budgetedAmount: number; // in cents
+  projectedAmount?: number; // in cents (optional custom override)
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DetailedBudgetItem {
+  id: string;
+  name: string;
+  type: 'gasto' | 'ingreso';
+  categoryId: string;
+  categoryName: string;
+  categoryColor: string;
+  categoryIcon: string;
+  budgetedAmount: number; // in cents
+  projectedAmount: number; // in cents (real + planned pending)
+  realAmount: number; // in cents (executed transactions)
+  plannedPendingAmount: number; // in cents (planned pending)
+  variation: number; // in cents (for expense: budget - real; for income: real - budget)
+  variationPct: number; // %
+  executionPct: number; // %
+  status: 'favorable' | 'en_meta' | 'alerta' | 'sobregiro' | 'sin_presupuesto';
+  transactions: Transaction[];
+  isCustom: boolean;
+  itemBudgetId?: string;
+}
+
 export interface Transaction {
   id: string;
   date: string; // YYYY-MM-DD
@@ -206,6 +241,23 @@ export interface MonthlyClose {
   initialBalance: number;
   finalBalance: number;
   notes?: string;
+}
+
+export interface GroceryItem {
+  id: string;
+  year: number;
+  month: number;
+  name: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  projectedPrice: number; // in cents (precio unitario estimado)
+  realPrice: number; // in cents (precio unitario real pagado)
+  isPurchased: boolean;
+  notes?: string;
+  supermarket?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AppSettings {

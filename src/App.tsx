@@ -11,6 +11,8 @@ import { DashboardView } from './components/views/DashboardView';
 import { DailyCashFlowView } from './components/views/DailyCashFlowView';
 import { TransactionsView } from './components/views/TransactionsView';
 import { BudgetView } from './components/views/BudgetView';
+import { DetailedMonthlyBudgetView } from './components/views/DetailedMonthlyBudgetView';
+import { GroceryView } from './components/views/GroceryView';
 import { CreditCardsView } from './components/views/CreditCardsView';
 import { InstallmentsView } from './components/views/InstallmentsView';
 import { LoansView } from './components/views/LoansView';
@@ -35,6 +37,10 @@ const MainAppContent: React.FC = () => {
         return <TransactionsView />;
       case 'presupuesto':
         return <BudgetView />;
+      case 'tabla-mensual':
+        return <DetailedMonthlyBudgetView />;
+      case 'super':
+        return <GroceryView />;
       case 'tarjetas':
         return <CreditCardsView />;
       case 'cuotas':

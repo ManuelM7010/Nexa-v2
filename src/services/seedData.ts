@@ -3,6 +3,7 @@ import {
   CreditCard,
   Category,
   Budget,
+  ItemBudget,
   InstallmentPurchase,
   Loan,
   Subscription,
@@ -132,6 +133,7 @@ export function generateDemoSeedData(): {
   creditCards: CreditCard[];
   categories: Category[];
   budgets: Budget[];
+  itemBudgets: ItemBudget[];
   installmentPurchases: InstallmentPurchase[];
   loans: Loan[];
   subscriptions: Subscription[];
@@ -527,11 +529,93 @@ export function generateDemoSeedData(): {
     },
   ];
 
+  const itemBudgets: ItemBudget[] = [
+    {
+      id: 'ibgt_demo_walmart',
+      year: 2026,
+      month: 9,
+      name: 'Supermercado Walmart',
+      type: 'gasto',
+      categoryId: 'cat_alimentacion',
+      budgetedAmount: 22000, // $220.00
+      projectedAmount: 22000,
+      notes: 'Compras de despensa para el mes',
+      createdAt: '2026-09-12T00:00:00.000Z',
+      updatedAt: '2026-09-12T00:00:00.000Z',
+    },
+    {
+      id: 'ibgt_demo_renta',
+      year: 2026,
+      month: 9,
+      name: 'Renta Apartamento',
+      type: 'gasto',
+      categoryId: 'cat_vivienda',
+      budgetedAmount: 35000, // $350.00
+      projectedAmount: 35000,
+      notes: 'Alquiler mensual con dueño directo',
+      createdAt: '2026-09-12T00:00:00.000Z',
+      updatedAt: '2026-09-12T00:00:00.000Z',
+    },
+    {
+      id: 'ibgt_demo_gasolina',
+      year: 2026,
+      month: 9,
+      name: 'Gasolina Puma',
+      type: 'gasto',
+      categoryId: 'cat_transporte',
+      budgetedAmount: 6000, // $60.00
+      projectedAmount: 6000,
+      notes: 'Combustible mensual para traslados',
+      createdAt: '2026-09-12T00:00:00.000Z',
+      updatedAt: '2026-09-12T00:00:00.000Z',
+    },
+    {
+      id: 'ibgt_demo_restaurantes',
+      year: 2026,
+      month: 9,
+      name: 'Almuerzo Restaurante Don Li',
+      type: 'gasto',
+      categoryId: 'cat_alimentacion',
+      budgetedAmount: 5000, // $50.00
+      projectedAmount: 5000,
+      notes: 'Salidas y comidas fuera de casa',
+      createdAt: '2026-09-12T00:00:00.000Z',
+      updatedAt: '2026-09-12T00:00:00.000Z',
+    },
+    {
+      id: 'ibgt_demo_quincena1',
+      year: 2026,
+      month: 9,
+      name: 'Pago 1ra Quincena Septiembre',
+      type: 'ingreso',
+      categoryId: 'cat_salario',
+      budgetedAmount: 68500, // $685.00
+      projectedAmount: 68500,
+      notes: 'Nómina quincenal esperada',
+      createdAt: '2026-09-12T00:00:00.000Z',
+      updatedAt: '2026-09-12T00:00:00.000Z',
+    },
+    {
+      id: 'ibgt_demo_quincena2',
+      year: 2026,
+      month: 9,
+      name: 'Pago 2da Quincena Septiembre',
+      type: 'ingreso',
+      categoryId: 'cat_salario',
+      budgetedAmount: 68500, // $685.00
+      projectedAmount: 68500,
+      notes: 'Nómina quincenal esperada',
+      createdAt: '2026-09-12T00:00:00.000Z',
+      updatedAt: '2026-09-12T00:00:00.000Z',
+    },
+  ];
+
   return {
     accounts,
     creditCards,
     categories,
     budgets,
+    itemBudgets,
     installmentPurchases,
     loans,
     subscriptions,

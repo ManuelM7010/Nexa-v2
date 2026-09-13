@@ -5,6 +5,8 @@ import {
   Transaction,
   Category,
   Budget,
+  ItemBudget,
+  DetailedBudgetItem,
   InstallmentPurchase,
   Loan,
   LoanExtraPayment,
@@ -14,6 +16,7 @@ import {
   MonthlyClose,
   AppSettings,
   DailyCashFlowItem,
+  GroceryItem,
 } from '../types';
 import { storage, NexaFullBackup } from '../services/storage';
 import {
@@ -57,6 +60,8 @@ interface FinanceContextType {
   transactions: Transaction[];
   categories: Category[];
   budgets: Budget[];
+  itemBudgets: ItemBudget[];
+  groceryItems: GroceryItem[];
   installmentPurchases: InstallmentPurchase[];
   loans: Loan[];
   loanPayments: LoanExtraPayment[];
@@ -70,6 +75,7 @@ interface FinanceContextType {
   // Calculated Engine Data
   dailyCashFlow: DailyCashFlowItem[];
   budgetAnalysis: BudgetAnalysisItem[];
+  detailedBudget: DetailedBudgetItem[];
   executiveSummary: ExecutiveSummary;
   allMonthTransactions: Transaction[];
 
@@ -90,6 +96,30 @@ interface FinanceContextType {
 
   saveBudget: (budget: Budget) => Promise<void>;
   deleteBudget: (id: string) => Promise<void>;
+
+  saveItemBudget: (
+    itemData: Partial<ItemBudget> & {
+      name: string;
+      budgetedAmount: number;
+      type?: 'gasto' | 'ingreso';
+      categoryId?: string;
+    }
+  ) => Promise<void>;
+  deleteItemBudget: (id: string) => Promise<void>;
+
+  // Grocery (Súper) Module Actions
+  saveGroceryItem: (
+    itemData: Partial<GroceryItem> & { name: string; quantity: number }
+  ) => Promise<void>;
+  deleteGroceryItem: (id: string) => Promise<void>;
+  toggleGroceryItemPurchased: (id: string) => Promise<void>;
+  copyGroceryListToMonth: (
+    fromYear: number,
+    fromMonth: number,
+    toYear: number,
+    toMonth: number
+  ) => Promise<{ copiedCount: number }>;
+  clearGroceryMonth: (year: number, month: number) => Promise<void>;
 
   saveInstallmentPurchase: (item: Partial<InstallmentPurchase> & { concept: string; totalAmount: number }) => Promise<void>;
   deleteInstallmentPurchase: (id: string) => Promise<void>;
@@ -117,9 +147,13 @@ interface FinanceContextType {
 
   // Data Lifecycle & Backup
   loadDemoData: () => Promise<void>;
+  clearAllData: () => Promise<void>;
   startFromScratch: () => Promise<void>;
   exportBackup: () => Promise<NexaFullBackup>;
   importBackup: (backup: NexaFullBackup) => Promise<boolean>;
+  exportBackupJSON: () => Promise<void>;
+  importBackupJSON: (jsonStr: string) => Promise<boolean>;
+  exportTransactionsCSV: () => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -142,6 +176,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [itemBudgets, setItemBudgets] = useState<ItemBudget[]>([]);
+  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [installmentPurchases, setInstallmentPurchases] = useState<InstallmentPurchase[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loanPayments, setLoanPayments] = useState<LoanExtraPayment[]>([]);
@@ -156,12 +192,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const loadAllData = useCallback(async () => {
     try {
       setIsLoading(true);
+      const isCleanSlate = typeof window !== 'undefined' && localStorage.getItem('nexa_clean_slate') === 'true';
+
       const [
         accList,
         cardList,
         txList,
         catList,
         bgtList,
+        itemBgtList,
+        groceryList,
         instList,
         loanList,
         payList,
@@ -176,6 +216,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storage.getAll<Transaction>('transactions'),
         storage.getAll<Category>('categories'),
         storage.getAll<Budget>('budgets'),
+        storage.getAll<ItemBudget>('itemBudgets'),
+        storage.getAll<GroceryItem>('groceryItems'),
         storage.getAll<InstallmentPurchase>('installmentPurchases'),
         storage.getAll<Loan>('loans'),
         storage.getAll<LoanExtraPayment>('loanPayments'),
@@ -186,13 +228,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storage.getAll<AppSettings>('appSettings'),
       ]);
 
-      if (accList.length === 0 && posList.length === 0 && txList.length === 0) {
+      if (!isCleanSlate && accList.length === 0 && posList.length === 0 && txList.length === 0) {
         // First run: load default categories and initial position, or demo data
         const demo = generateDemoSeedData();
         await storage.putBatch('categories', demo.categories);
         await storage.putBatch('accounts', demo.accounts);
         await storage.putBatch('creditCards', demo.creditCards);
         await storage.putBatch('budgets', demo.budgets);
+        if (demo.itemBudgets?.length) await storage.putBatch('itemBudgets', demo.itemBudgets);
         await storage.putBatch('installmentPurchases', demo.installmentPurchases);
         await storage.putBatch('loans', demo.loans);
         await storage.putBatch('subscriptions', demo.subscriptions);
@@ -205,6 +248,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setAccounts(demo.accounts);
         setCreditCards(demo.creditCards);
         setBudgets(demo.budgets);
+        setItemBudgets(demo.itemBudgets || []);
+        setGroceryItems([]);
         setInstallmentPurchases(demo.installmentPurchases);
         setLoans(demo.loans);
         setSubscriptions(demo.subscriptions);
@@ -218,6 +263,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setTransactions(txList);
         setCategories(catList.length > 0 ? catList : getDefaultCategories());
         setBudgets(bgtList);
+        setItemBudgets(itemBgtList);
+        setGroceryItems(groceryList || []);
         setInstallmentPurchases(instList);
         setLoans(loanList);
         setLoanPayments(payList);
@@ -296,6 +343,27 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       allMonthTransactions
     );
   }, [selectedYear, selectedMonth, categories, budgets, allMonthTransactions]);
+
+  // Detailed Itemized Budget (Gasto por Gasto e Ingreso por Ingreso)
+  const detailedBudget = useMemo(() => {
+    return NexaFinancialEngine.calculateDetailedBudget(
+      selectedYear,
+      selectedMonth,
+      itemBudgets,
+      allMonthTransactions,
+      categories,
+      subscriptions,
+      services
+    );
+  }, [
+    selectedYear,
+    selectedMonth,
+    itemBudgets,
+    allMonthTransactions,
+    categories,
+    subscriptions,
+    services,
+  ]);
 
   // Executive Summary
   const executiveSummary = useMemo(() => {
@@ -513,6 +581,52 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const deleteBudget = async (id: string) => {
     await storage.delete('budgets', id);
     setBudgets((prev) => prev.filter((b) => b.id !== id));
+  };
+
+  const saveItemBudget = async (
+    itemData: Partial<ItemBudget> & {
+      name: string;
+      budgetedAmount: number;
+      type?: 'gasto' | 'ingreso';
+      categoryId?: string;
+    }
+  ) => {
+    const now = new Date().toISOString();
+    const id =
+      itemData.id ||
+      `ibgt_${selectedYear}_${selectedMonth}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newItem: ItemBudget = {
+      id,
+      year: itemData.year || selectedYear,
+      month: itemData.month || selectedMonth,
+      name: itemData.name.trim(),
+      type: itemData.type || 'gasto',
+      categoryId: itemData.categoryId || categories[0]?.id || 'general',
+      budgetedAmount: Math.round(itemData.budgetedAmount),
+      projectedAmount:
+        itemData.projectedAmount !== undefined
+          ? Math.round(itemData.projectedAmount)
+          : Math.round(itemData.budgetedAmount),
+      notes: itemData.notes,
+      createdAt: itemData.createdAt || now,
+      updatedAt: now,
+    };
+
+    await storage.put('itemBudgets', newItem);
+    setItemBudgets((prev) => {
+      const idx = prev.findIndex((b) => b.id === id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = newItem;
+        return next;
+      }
+      return [...prev, newItem];
+    });
+  };
+
+  const deleteItemBudget = async (id: string) => {
+    await storage.delete('itemBudgets', id);
+    setItemBudgets((prev) => prev.filter((b) => b.id !== id));
   };
 
   const saveInstallmentPurchase = async (
@@ -832,6 +946,103 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setMonthlyCloses((prev) => prev.filter((c) => c.id !== monthKey));
   };
 
+  // Grocery (Súper) Module Actions
+  const saveGroceryItem = async (
+    itemData: Partial<GroceryItem> & { name: string; quantity: number }
+  ) => {
+    const id = itemData.id || `grocery_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`;
+    const now = new Date().toISOString();
+    const existing = groceryItems.find((g) => g.id === id);
+
+    const item: GroceryItem = {
+      id,
+      year: itemData.year ?? selectedYear,
+      month: itemData.month ?? selectedMonth,
+      name: itemData.name.trim(),
+      category: itemData.category || 'Granos y Despensa',
+      unit: itemData.unit || 'unid',
+      quantity: Math.max(0.01, itemData.quantity),
+      projectedPrice: Math.max(0, itemData.projectedPrice ?? existing?.projectedPrice ?? 0),
+      realPrice: Math.max(0, itemData.realPrice ?? existing?.realPrice ?? 0),
+      isPurchased: itemData.isPurchased ?? existing?.isPurchased ?? false,
+      notes: itemData.notes ?? existing?.notes,
+      supermarket: itemData.supermarket ?? existing?.supermarket,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+    };
+
+    await storage.put('groceryItems', item);
+    setGroceryItems((prev) => {
+      const idx = prev.findIndex((g) => g.id === id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = item;
+        return copy;
+      }
+      return [...prev, item];
+    });
+  };
+
+  const deleteGroceryItem = async (id: string) => {
+    await storage.delete('groceryItems', id);
+    setGroceryItems((prev) => prev.filter((g) => g.id !== id));
+  };
+
+  const toggleGroceryItemPurchased = async (id: string) => {
+    const target = groceryItems.find((g) => g.id === id);
+    if (!target) return;
+    const updated: GroceryItem = {
+      ...target,
+      isPurchased: !target.isPurchased,
+      updatedAt: new Date().toISOString(),
+    };
+    await storage.put('groceryItems', updated);
+    setGroceryItems((prev) => prev.map((g) => (g.id === id ? updated : g)));
+  };
+
+  const copyGroceryListToMonth = async (
+    fromYear: number,
+    fromMonth: number,
+    toYear: number,
+    toMonth: number
+  ): Promise<{ copiedCount: number }> => {
+    const source = groceryItems.filter((g) => g.year === fromYear && g.month === fromMonth);
+    if (source.length === 0) return { copiedCount: 0 };
+
+    const newItems: GroceryItem[] = source.map((g) => {
+      // The real price paid in the source month becomes the projected price for the new month!
+      const effectiveProjected = g.realPrice > 0 ? g.realPrice : g.projectedPrice;
+      return {
+        id: `grocery_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`,
+        year: toYear,
+        month: toMonth,
+        name: g.name,
+        category: g.category,
+        unit: g.unit,
+        quantity: g.quantity,
+        projectedPrice: effectiveProjected,
+        realPrice: 0,
+        isPurchased: false,
+        notes: g.notes,
+        supermarket: g.supermarket,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    await storage.putBatch('groceryItems', newItems);
+    setGroceryItems((prev) => [...prev, ...newItems]);
+    return { copiedCount: newItems.length };
+  };
+
+  const clearGroceryMonth = async (year: number, month: number) => {
+    const itemsToRemove = groceryItems.filter((g) => g.year === year && g.month === month);
+    for (const item of itemsToRemove) {
+      await storage.delete('groceryItems', item.id);
+    }
+    setGroceryItems((prev) => prev.filter((g) => !(g.year === year && g.month === month)));
+  };
+
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
     const updated = { ...settings, ...newSettings };
     await storage.put('appSettings', updated);
@@ -839,12 +1050,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const loadDemoData = async () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('nexa_clean_slate');
+    }
     await storage.clearAll();
     const demo = generateDemoSeedData();
     await storage.putBatch('categories', demo.categories);
     await storage.putBatch('accounts', demo.accounts);
     await storage.putBatch('creditCards', demo.creditCards);
     await storage.putBatch('budgets', demo.budgets);
+    if (demo.itemBudgets?.length) await storage.putBatch('itemBudgets', demo.itemBudgets);
     await storage.putBatch('installmentPurchases', demo.installmentPurchases);
     await storage.putBatch('loans', demo.loans);
     await storage.putBatch('subscriptions', demo.subscriptions);
@@ -857,6 +1072,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAccounts(demo.accounts);
     setCreditCards(demo.creditCards);
     setBudgets(demo.budgets);
+    setItemBudgets(demo.itemBudgets || []);
+    setGroceryItems([]);
     setInstallmentPurchases(demo.installmentPurchases);
     setLoans(demo.loans);
     setSubscriptions(demo.subscriptions);
@@ -868,7 +1085,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSelectedMonth(9);
   };
 
-  const startFromScratch = async () => {
+  const clearAllData = async () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('nexa_clean_slate', 'true');
+    }
     await storage.clearAll();
     const defaultCats = getDefaultCategories();
     const defaultStgs = getDefaultAppSettings();
@@ -892,6 +1112,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTransactions([]);
     setCategories(defaultCats);
     setBudgets([]);
+    setItemBudgets([]);
+    setGroceryItems([]);
     setInstallmentPurchases([]);
     setLoans([]);
     setLoanPayments([]);
@@ -902,6 +1124,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSettings(defaultStgs);
   };
 
+  const startFromScratch = clearAllData;
+
   const exportBackup = async (): Promise<NexaFullBackup> => {
     return storage.exportFullBackup();
   };
@@ -909,9 +1133,83 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const importBackup = async (backup: NexaFullBackup): Promise<boolean> => {
     const success = await storage.importFullBackup(backup);
     if (success) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('nexa_clean_slate');
+      }
       await loadAllData();
     }
     return success;
+  };
+
+  const exportBackupJSON = async (): Promise<void> => {
+    const backup = await storage.exportFullBackup();
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexa-finance-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const importBackupJSON = async (jsonStr: string): Promise<boolean> => {
+    try {
+      const parsed = JSON.parse(jsonStr) as NexaFullBackup;
+      const ok = await storage.importFullBackup(parsed);
+      if (ok) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('nexa_clean_slate');
+        }
+        await loadAllData();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Error al importar archivo de respaldo JSON:', err);
+      return false;
+    }
+  };
+
+  const exportTransactionsCSV = async (): Promise<void> => {
+    const txs = await storage.getAll<Transaction>('transactions');
+    const cats = await storage.getAll<Category>('categories');
+    const catMap = new Map(cats.map((c) => [c.id, c.name]));
+
+    const headers = [
+      'ID',
+      'Fecha',
+      'Concepto',
+      'Tipo',
+      'Categoría',
+      'Monto',
+      'Estado',
+      'Medio de Pago',
+      'Notas',
+    ];
+    const rows = txs.map((tx) => [
+      tx.id,
+      tx.date,
+      `"${(tx.concept || '').replace(/"/g, '""')}"`,
+      tx.type,
+      `"${catMap.get(tx.categoryId || '') || ''}"`,
+      (tx.amount / 100).toFixed(2),
+      tx.status,
+      tx.paymentMethodType,
+      `"${(tx.notes || '').replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexa-movimientos-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -938,6 +1236,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         transactions,
         categories,
         budgets,
+        itemBudgets,
+        groceryItems,
         installmentPurchases,
         loans,
         loanPayments,
@@ -949,6 +1249,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isLoading,
         dailyCashFlow,
         budgetAnalysis,
+        detailedBudget,
         executiveSummary,
         allMonthTransactions,
         saveTransaction,
@@ -963,6 +1264,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteCategory,
         saveBudget,
         deleteBudget,
+        saveItemBudget,
+        deleteItemBudget,
+        saveGroceryItem,
+        deleteGroceryItem,
+        toggleGroceryItemPurchased,
+        copyGroceryListToMonth,
+        clearGroceryMonth,
         saveInstallmentPurchase,
         deleteInstallmentPurchase,
         saveLoan,
@@ -979,9 +1287,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         reopenMonth,
         updateSettings,
         loadDemoData,
+        clearAllData,
         startFromScratch,
         exportBackup,
         importBackup,
+        exportBackupJSON,
+        importBackupJSON,
+        exportTransactionsCSV,
       }}
     >
       {children}

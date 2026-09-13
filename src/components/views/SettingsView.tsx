@@ -77,7 +77,7 @@ export const SettingsView: React.FC = () => {
   const handleExecuteReset = async () => {
     await clearAllData();
     setIsConfirmReset(false);
-    showNotification('Todos los datos locales han sido eliminados.');
+    showNotification('¡Listo! Se han eliminado todos los datos de prueba. Ahora puedes comenzar a ingresar tus datos reales.');
   };
 
   return (
@@ -102,13 +102,23 @@ export const SettingsView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsRenderGuideOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 text-xs font-bold transition cursor-pointer"
-        >
-          <Server className="w-4 h-4" />
-          <span>Guía de Despliegue Render.com</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsConfirmReset(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition cursor-pointer"
+          >
+            <Trash2 className="w-4 h-4 text-rose-400" />
+            <span>Borrar Datos de Prueba</span>
+          </button>
+
+          <button
+            onClick={() => setIsRenderGuideOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 text-xs font-bold transition cursor-pointer"
+          >
+            <Server className="w-4 h-4" />
+            <span>Guía Render</span>
+          </button>
+        </div>
       </div>
 
       {/* Privacy & Architecture banner */}

@@ -61,6 +61,14 @@ export const MONTH_NAMES_SHORT_ES = [
   'DIC',
 ];
 
+export function getMonthNameEs(month: number): string {
+  return MONTH_NAMES_ES[month - 1] || '';
+}
+
+export function getMonthNameShortEs(month: number): string {
+  return MONTH_NAMES_SHORT_ES[month - 1] || '';
+}
+
 export const DAY_NAMES_ES = [
   'Domingo',
   'Lunes',
