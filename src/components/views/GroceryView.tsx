@@ -20,6 +20,12 @@ import {
   Calendar,
   X,
   ListPlus,
+  Share2,
+  Target,
+  ChevronDown,
+  ChevronUp,
+  Lightbulb,
+  Check,
 } from 'lucide-react';
 
 const GROCERY_CATEGORIES = [
@@ -69,6 +75,8 @@ export const GroceryView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'purchased'>('all');
+  const [showPareto, setShowPareto] = useState(false);
+  const [filterOnlyPareto, setFilterOnlyPareto] = useState(false);
 
   // Modals state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -98,6 +106,68 @@ export const GroceryView: React.FC = () => {
     return groceryItems.filter((item) => item.year === selectedYear && item.month === selectedMonth);
   }, [groceryItems, selectedYear, selectedMonth]);
 
+  // Ley de Pareto (80/20 de la Despensa)
+  const paretoAnalysis = useMemo(() => {
+    if (currentMonthItems.length === 0) return null;
+
+    // Use actual paid price if available, otherwise projected price
+    const itemsWithCost = currentMonthItems.map((item) => {
+      const unitPrice = item.realPrice > 0 ? item.realPrice : item.projectedPrice;
+      const subtotal = Math.round(item.quantity * unitPrice);
+      return {
+        item,
+        unitPrice,
+        subtotal,
+        isReal: item.realPrice > 0,
+      };
+    });
+
+    const totalCost = itemsWithCost.reduce((sum, i) => sum + i.subtotal, 0);
+    if (totalCost === 0) return null;
+
+    // Sort descending by subtotal
+    const sorted = [...itemsWithCost].sort((a, b) => b.subtotal - a.subtotal);
+
+    let runningSum = 0;
+    let cutoffReached = false;
+
+    const analyzedItems = sorted.map((entry) => {
+      runningSum += entry.subtotal;
+      const cumulativePercent = Math.round((runningSum / totalCost) * 100);
+      const percentOfTotal = Math.round((entry.subtotal / totalCost) * 100);
+      const isVitalFew = !cutoffReached;
+
+      if (cumulativePercent >= 80) {
+        cutoffReached = true;
+      }
+
+      return {
+        ...entry,
+        cumulativePercent,
+        percentOfTotal,
+        isVitalFew,
+      };
+    });
+
+    const vitalFew = analyzedItems.filter((i) => i.isVitalFew);
+    const vitalFewIds = new Set(vitalFew.map((v) => v.item.id));
+    const vitalCost = vitalFew.reduce((sum, v) => sum + v.subtotal, 0);
+    const vitalPctCost = Math.round((vitalCost / totalCost) * 100);
+    const vitalPctCount = Math.round((vitalFew.length / currentMonthItems.length) * 100);
+
+    return {
+      totalCost,
+      analyzedItems,
+      vitalFew,
+      vitalFewIds,
+      vitalCost,
+      vitalPctCost,
+      vitalFewCount: vitalFew.length,
+      vitalPctCount,
+      trivialManyCount: currentMonthItems.length - vitalFew.length,
+    };
+  }, [currentMonthItems]);
+
   // Filtered displayed items
   const filteredItems = useMemo(() => {
     return currentMonthItems.filter((item) => {
@@ -113,9 +183,11 @@ export const GroceryView: React.FC = () => {
         (statusFilter === 'pending' && !item.isPurchased) ||
         (statusFilter === 'purchased' && item.isPurchased);
 
-      return matchesSearch && matchesCat && matchesStatus;
+      const matchesPareto = !filterOnlyPareto || (paretoAnalysis?.vitalFewIds.has(item.id) ?? true);
+
+      return matchesSearch && matchesCat && matchesStatus && matchesPareto;
     });
-  }, [currentMonthItems, searchTerm, categoryFilter, statusFilter]);
+  }, [currentMonthItems, searchTerm, categoryFilter, statusFilter, filterOnlyPareto, paretoAnalysis]);
 
   // Aggregate Metrics for the month
   const metrics = useMemo(() => {
@@ -251,6 +323,48 @@ export const GroceryView: React.FC = () => {
     }
   };
 
+  const handleExportWhatsApp = () => {
+    if (currentMonthItems.length === 0) {
+      showToast('No hay productos en la lista para exportar.');
+      return;
+    }
+
+    const pending = currentMonthItems.filter((i) => !i.isPurchased);
+    const bought = currentMonthItems.filter((i) => i.isPurchased);
+
+    const totalToDisplay = metrics.totalReal > 0 ? metrics.totalReal : metrics.totalProjected;
+    const lines = [
+      `🛒 *Lista de Compras — ${MONTH_NAMES_ES[selectedMonth - 1]} ${selectedYear}*`,
+      `💰 *Total estimado:* ${formatMoney(totalToDisplay, settings.currencySymbol)}`,
+      '',
+    ];
+
+    if (pending.length > 0) {
+      lines.push('📋 *POR COMPRAR:*');
+      pending.forEach((item) => {
+        const store = item.supermarket ? ` _[${item.supermarket}]_` : '';
+        const price = item.projectedPrice > 0 ? ` (~${formatMoney(item.projectedPrice, settings.currencySymbol)})` : '';
+        lines.push(`▫️ ${item.name} — ${item.quantity} ${item.unit || 'unid'}${store}${price}`);
+      });
+      lines.push('');
+    }
+
+    if (bought.length > 0) {
+      lines.push('✅ *YA COMPRADOS:*');
+      bought.forEach((item) => {
+        const price = item.realPrice > 0 ? ` (${formatMoney(item.realPrice, settings.currencySymbol)})` : '';
+        lines.push(`✔️ ~${item.name}~ — ${item.quantity} ${item.unit || 'unid'}${price}`);
+      });
+    }
+
+    try {
+      navigator.clipboard.writeText(lines.join('\n'));
+      showToast('¡Lista copiada al portapapeles! Lista para pegar en WhatsApp o notas.');
+    } catch {
+      showToast('Copia la lista manualmente o permite acceso al portapapeles.');
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Toast Notification */}
@@ -279,6 +393,35 @@ export const GroceryView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {currentMonthItems.length > 0 && (
+            <button
+              onClick={handleExportWhatsApp}
+              title="Copiar lista de compras formateada para WhatsApp o notas"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-bold transition cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Exportar WhatsApp</span>
+            </button>
+          )}
+
+          {paretoAnalysis && (
+            <button
+              onClick={() => setShowPareto(!showPareto)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
+                showPareto
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 text-amber-400" />
+              <span>Análisis 80/20</span>
+              <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-400/20 text-amber-300 font-mono">
+                {paretoAnalysis.vitalFewCount}
+              </span>
+              {showPareto ? <ChevronUp className="w-3 h-3 ml-0.5" /> : <ChevronDown className="w-3 h-3 ml-0.5" />}
+            </button>
+          )}
+
           <button
             onClick={() => setIsCopyModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-bold transition cursor-pointer"
@@ -298,7 +441,7 @@ export const GroceryView: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Total Proyectado */}
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg space-y-1">
           <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -367,7 +510,164 @@ export const GroceryView: React.FC = () => {
             />
           </div>
         </div>
+
+        {/* Pareto 80/20 Direct Card */}
+        <div
+          onClick={() => setShowPareto(!showPareto)}
+          className={`p-4 rounded-2xl border shadow-lg space-y-1 cursor-pointer transition select-none ${
+            showPareto
+              ? 'bg-amber-950/30 border-amber-500/60 ring-1 ring-amber-500/40'
+              : 'bg-slate-900 hover:bg-slate-850 border-amber-500/30 hover:border-amber-500/60'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5" />
+              <span>Análisis 80/20</span>
+            </div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">
+              {showPareto ? 'Abierto' : 'Ver análisis'}
+            </span>
+          </div>
+          <div className="text-xl font-bold font-mono text-amber-300">
+            {paretoAnalysis ? `${paretoAnalysis.vitalFewCount} claves` : '0 claves'}
+          </div>
+          <p className="text-[11px] text-slate-400">
+            {paretoAnalysis
+              ? `${paretoAnalysis.vitalPctCount}% de items suman ${paretoAnalysis.vitalPctCost}% del gasto`
+              : 'Haz clic para explorar el 80/20'}
+          </p>
+        </div>
       </div>
+
+      {/* Sección Análisis Pareto 80/20 de la Despensa */}
+      {showPareto && paretoAnalysis && (
+        <div className="rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-amber-500/30 p-5 shadow-2xl space-y-4 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+                <Target className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Ley de Pareto del Súper: El 80/20 de la Despensa</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    Artículos Clave
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Identifica los pocos artículos que concentran la gran mayoría del presupuesto de compras.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setFilterOnlyPareto(!filterOnlyPareto)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 self-start sm:self-auto cursor-pointer ${
+                filterOnlyPareto
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5" />
+              <span>{filterOnlyPareto ? 'Viendo solo productos 80/20' : 'Filtrar tabla por estos productos'}</span>
+            </button>
+          </div>
+
+          {/* Diagnostic KPIs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Concentración 80/20
+              </span>
+              <div className="text-lg font-bold text-amber-400 font-mono">
+                {paretoAnalysis.vitalFewCount} de {currentMonthItems.length} artículos
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Solo el <span className="text-white font-semibold">{paretoAnalysis.vitalPctCount}%</span> de tus productos genera el <span className="text-amber-400 font-bold">{paretoAnalysis.vitalPctCost}%</span> del costo total.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Gasto Concentrado en Claves
+              </span>
+              <div className="text-lg font-bold text-white font-mono">
+                {formatMoney(paretoAnalysis.vitalCost, settings.currencySymbol)}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                De un total estimado de {formatMoney(paretoAnalysis.totalCost, settings.currencySymbol)} en la despensa.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Resto de la Lista (Triviales)
+              </span>
+              <div className="text-lg font-bold text-slate-300 font-mono">
+                {formatMoney(paretoAnalysis.totalCost - paretoAnalysis.vitalCost, settings.currencySymbol)}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Distribuido en {paretoAnalysis.trivialManyCount} artículos de menor impacto financiero.
+              </p>
+            </div>
+          </div>
+
+          {/* Practical Saving Tip */}
+          <div className="rounded-xl bg-amber-950/20 border border-amber-500/20 p-3 flex items-start gap-2.5 text-xs text-amber-200">
+            <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <strong>Recomendación de ahorro directo:</strong> Si este mes necesitas recortar tu presupuesto de mercado, no pierdas tiempo regateando en productos de bajo costo. Enfócate exclusivamente en buscar promociones, compras por volumen o marcas alternativas en estos <strong>{paretoAnalysis.vitalFewCount} productos clave</strong>:
+            </div>
+          </div>
+
+          {/* Ranking of products making up the 80% */}
+          <div className="space-y-2 pt-1">
+            <span className="text-xs font-bold text-slate-300">
+              Artículos de Alto Impacto Presupuestario (Top {paretoAnalysis.vitalFewCount}):
+            </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {paretoAnalysis.vitalFew.map((entry, idx) => (
+                <div
+                  key={entry.item.id}
+                  className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3 hover:border-slate-700 transition"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 font-mono font-bold text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                      #{idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-white text-xs truncate">
+                        {entry.item.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                        <span>{entry.item.quantity} {entry.item.unit || 'unid'}</span>
+                        <span>•</span>
+                        <span>{entry.item.category}</span>
+                        {entry.item.supermarket && (
+                          <>
+                            <span>•</span>
+                            <span className="text-sky-400">{entry.item.supermarket}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="font-mono font-bold text-white text-xs">
+                      {formatMoney(entry.subtotal, settings.currencySymbol)}
+                    </div>
+                    <div className="text-[10px] font-bold text-amber-400 font-mono">
+                      {entry.percentOfTotal}% de la factura
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -404,7 +704,7 @@ export const GroceryView: React.FC = () => {
           <div className="flex rounded-xl bg-slate-950 border border-slate-800 p-0.5">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
                 statusFilter === 'all'
                   ? 'bg-blue-600 text-white font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -414,7 +714,7 @@ export const GroceryView: React.FC = () => {
             </button>
             <button
               onClick={() => setStatusFilter('pending')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
                 statusFilter === 'pending'
                   ? 'bg-amber-600 text-white font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -424,7 +724,7 @@ export const GroceryView: React.FC = () => {
             </button>
             <button
               onClick={() => setStatusFilter('purchased')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
                 statusFilter === 'purchased'
                   ? 'bg-emerald-600 text-white font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -433,6 +733,21 @@ export const GroceryView: React.FC = () => {
               Comprados
             </button>
           </div>
+
+          {paretoAnalysis && (
+            <button
+              onClick={() => setFilterOnlyPareto(!filterOnlyPareto)}
+              title="Filtrar solo los artículos clave que componen el 80% del gasto de la despensa"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                filterOnlyPareto
+                  ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-amber-300'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 text-amber-400" />
+              <span>Solo 80/20 ({paretoAnalysis.vitalFewCount})</span>
+            </button>
+          )}
 
           {currentMonthItems.length > 0 && (
             <button
@@ -543,6 +858,14 @@ export const GroceryView: React.FC = () => {
                           <span className={item.isPurchased ? 'line-through text-slate-400' : ''}>
                             {item.name}
                           </span>
+                          {paretoAnalysis?.vitalFewIds.has(item.id) && (
+                            <span
+                              title="Artículo 80/20: Este producto forma parte del grupo clave que concentra el 80% del gasto del mercado"
+                              className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0"
+                            >
+                              80/20
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
                           {item.supermarket && (

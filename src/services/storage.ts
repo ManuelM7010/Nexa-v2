@@ -14,10 +14,11 @@ import {
   MonthlyClose,
   AppSettings,
   GroceryItem,
+  PlanNote,
 } from '../types';
 
 const DB_NAME = 'NexaFinanceDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export interface NexaFullBackup {
   version: number;
@@ -31,6 +32,7 @@ export interface NexaFullBackup {
     budgets: Budget[];
     itemBudgets?: ItemBudget[];
     groceryItems?: GroceryItem[];
+    planNotes?: PlanNote[];
     installmentPurchases: InstallmentPurchase[];
     loans: Loan[];
     loanPayments: LoanExtraPayment[];
@@ -67,6 +69,7 @@ class NexaStorageService {
           'budgets',
           'itemBudgets',
           'groceryItems',
+          'planNotes',
           'installmentPurchases',
           'loans',
           'loanPayments',
@@ -206,6 +209,7 @@ class NexaStorageService {
       'budgets',
       'itemBudgets',
       'groceryItems',
+      'planNotes',
       'installmentPurchases',
       'loans',
       'loanPayments',
@@ -228,6 +232,7 @@ class NexaStorageService {
       budgets,
       itemBudgets,
       groceryItems,
+      planNotes,
       installmentPurchases,
       loans,
       loanPayments,
@@ -244,6 +249,7 @@ class NexaStorageService {
       this.getAll<Budget>('budgets'),
       this.getAll<ItemBudget>('itemBudgets'),
       this.getAll<GroceryItem>('groceryItems'),
+      this.getAll<PlanNote>('planNotes'),
       this.getAll<InstallmentPurchase>('installmentPurchases'),
       this.getAll<Loan>('loans'),
       this.getAll<LoanExtraPayment>('loanPayments'),
@@ -255,7 +261,7 @@ class NexaStorageService {
     ]);
 
     const backup: NexaFullBackup = {
-      version: 3,
+      version: 4,
       appName: 'NEXA Finance',
       exportDate: new Date().toISOString(),
       data: {
@@ -266,6 +272,7 @@ class NexaStorageService {
         budgets,
         itemBudgets,
         groceryItems,
+        planNotes,
         installmentPurchases,
         loans,
         loanPayments,
@@ -314,6 +321,7 @@ class NexaStorageService {
     if (data.budgets?.length) await this.putBatch('budgets', data.budgets);
     if (data.itemBudgets?.length) await this.putBatch('itemBudgets', data.itemBudgets);
     if (data.groceryItems?.length) await this.putBatch('groceryItems', data.groceryItems);
+    if (data.planNotes?.length) await this.putBatch('planNotes', data.planNotes);
     if (data.installmentPurchases?.length)
       await this.putBatch('installmentPurchases', data.installmentPurchases);
     if (data.loans?.length) await this.putBatch('loans', data.loans);

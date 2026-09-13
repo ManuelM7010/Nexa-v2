@@ -1,51 +1,108 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#091428"/>
-      <stop offset="50%" stop-color="#0d2146"/>
-      <stop offset="100%" stop-color="#07101e"/>
+    <!-- Deep midnight sapphire background with radial brilliance -->
+    <radialGradient id="radialGlow" cx="50%" cy="28%" r="75%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="35%" stop-color="#0f172a"/>
+      <stop offset="70%" stop-color="#090d16"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+
+    <!-- Metallic electric cyan / emerald fintech gradient -->
+    <linearGradient id="cyberNeon" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="45%" stop-color="#0284c7"/>
+      <stop offset="80%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
     </linearGradient>
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#38bdf8"/>
-      <stop offset="60%" stop-color="#2563eb"/>
-      <stop offset="100%" stop-color="#1d4ed8"/>
+
+    <!-- Emerald success glow accent -->
+    <linearGradient id="emeraldGrowth" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#34d399"/>
     </linearGradient>
-    <linearGradient id="lightGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#93c5fd"/>
+
+    <!-- Premium glass / silver highlights -->
+    <linearGradient id="glassRibbon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="40%" stop-color="#e0f2fe" stop-opacity="0.85"/>
+      <stop offset="80%" stop-color="#7dd3fc" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.95"/>
     </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="12" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+
+    <!-- Subtle rim bevel lighting -->
+    <linearGradient id="rimLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#1e293b" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.4"/>
+    </linearGradient>
+
+    <filter id="ultraGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16" result="blur1" />
+      <feGaussianBlur stdDeviation="32" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.75" />
     </filter>
   </defs>
 
-  <!-- Background rounded rect -->
-  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <!-- Squircle Base / App Canvas -->
+  <rect width="512" height="512" rx="118" fill="url(#radialGlow)"/>
   
-  <!-- Subtle inner border -->
-  <rect x="8" y="8" width="496" height="496" rx="104" fill="none" stroke="#1e3a8a" stroke-width="2" opacity="0.4"/>
+  <!-- Outer metallic stroke / Chamfer highlight -->
+  <rect x="6" y="6" width="500" height="500" rx="112" fill="none" stroke="url(#rimLight)" stroke-width="3.5"/>
 
-  <!-- NEXA Symbol: Stylized connected dynamic 'N' with cashflow upward vector -->
-  <g transform="translate(48, 48) scale(0.8125)">
-    <!-- Upward trend dynamic background glow -->
-    <path d="M 96 384 L 208 192 L 304 288 L 416 128" fill="none" stroke="#2563eb" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" opacity="0.25" filter="url(#glow)"/>
-    
-    <!-- NEXA Sharp Geometric 'N' & Cash Flow Arrows -->
-    <!-- Left Pillar -->
-    <path d="M 120 128 L 176 128 L 176 384 L 120 384 Z" fill="url(#accentGrad)" rx="6"/>
-    
-    <!-- Diagonal Dynamic Ribbon -->
-    <path d="M 176 128 L 336 384 L 280 384 L 120 128 Z" fill="url(#lightGrad)" opacity="0.95"/>
-    
-    <!-- Right Pillar with Growth Chevron -->
-    <path d="M 336 128 L 392 128 L 392 384 L 336 384 Z" fill="url(#accentGrad)" rx="6"/>
+  <!-- Subtle grid dots / fintech security mesh -->
+  <g opacity="0.12" fill="#38bdf8">
+    <circle cx="128" cy="110" r="2.5"/>
+    <circle cx="256" cy="110" r="2.5"/>
+    <circle cx="384" cy="110" r="2.5"/>
+    <circle cx="128" cy="402" r="2.5"/>
+    <circle cx="256" cy="402" r="2.5"/>
+    <circle cx="384" cy="402" r="2.5"/>
+  </g>
 
-    <!-- Upward Cash Flow Arrowhead Accent -->
-    <polygon points="364,76 416,136 312,136" fill="#38bdf8" filter="url(#glow)"/>
-    
-    <!-- Flow Nodes / Currency dots -->
-    <circle cx="208" cy="240" r="10" fill="#38bdf8" />
-    <circle cx="304" cy="310" r="8" fill="#60a5fa" />
+  <!-- Ambient background glow under the emblem -->
+  <circle cx="256" cy="256" r="140" fill="#0284c7" opacity="0.16" filter="url(#ultraGlow)"/>
+
+  <!-- Growth trajectory line (Cash Flow curve) behind the NEXA Monogram -->
+  <path d="M 92 372 C 160 372, 190 280, 260 270 C 320 260, 360 170, 420 120" 
+        fill="none" 
+        stroke="url(#emeraldGrowth)" 
+        stroke-width="10" 
+        stroke-linecap="round" 
+        opacity="0.35" 
+        filter="url(#ultraGlow)"/>
+
+  <!-- NEXA ICON EMBLEM (Centered, mathematically proportioned) -->
+  <g filter="url(#softShadow)">
+    <!-- Left Pillar of 'N' -->
+    <path d="M 124 148 C 124 139.16 131.16 132 140 132 L 184 132 C 192.84 132 200 139.16 200 148 L 200 364 C 200 372.84 192.84 380 184 380 L 140 380 C 131.16 380 124 372.84 124 364 Z" 
+          fill="url(#cyberNeon)"/>
+
+    <!-- Right Pillar of 'N' with Arrow Extension -->
+    <path d="M 312 188 C 312 179.16 319.16 172 328 172 L 372 172 C 380.84 172 388 179.16 388 188 L 388 364 C 388 372.84 380.84 380 372 380 L 328 380 C 319.16 380 312 372.84 312 364 Z" 
+          fill="url(#cyberNeon)"/>
+
+    <!-- Main Diagonal Futuristic Bridge Ribbon -->
+    <path d="M 172 136 L 340 376 C 344.2 382 352.8 382 357 376 L 380 344 C 383.5 339 382.5 332 377.5 325 L 210 88 C 205.8 82 197.2 82 193 88 L 170 120 C 166.5 125 167.5 132 172 136 Z" 
+          fill="url(#glassRibbon)"/>
+
+    <!-- Upward FinTech Vector Arrow (Growth) -->
+    <g transform="translate(350, 102)">
+      <polygon points="0,-16 28,24 -28,24" fill="#38bdf8" filter="url(#ultraGlow)"/>
+      <polygon points="0,-10 20,20 -20,20" fill="#ffffff"/>
+    </g>
+
+    <!-- Cashflow Liquidity Quantum Node (Pulse dot) -->
+    <circle cx="260" cy="270" r="14" fill="#10b981" filter="url(#ultraGlow)"/>
+    <circle cx="260" cy="270" r="7" fill="#ffffff"/>
   </g>
 </svg>

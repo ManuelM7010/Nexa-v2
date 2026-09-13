@@ -16,6 +16,7 @@ import {
   Sparkles,
   Table,
   ShoppingCart,
+  StickyNote,
 } from 'lucide-react';
 
 export const NavigationBar: React.FC = () => {
@@ -28,6 +29,7 @@ export const NavigationBar: React.FC = () => {
     { id: 'presupuesto', label: 'Presupuesto', icon: PieChart },
     { id: 'tabla-mensual', label: 'Tabla Mensual (Detalle)', icon: Table },
     { id: 'super', label: 'Súper (Compras)', icon: ShoppingCart },
+    { id: 'notas', label: 'Notas & Planes', icon: StickyNote },
     { id: 'tarjetas', label: 'Tarjetas', icon: CreditCard },
     { id: 'cuotas', label: 'Compras a Cuotas', icon: Layers },
     { id: 'prestamos', label: 'Préstamos', icon: Landmark },

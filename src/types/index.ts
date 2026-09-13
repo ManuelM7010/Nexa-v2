@@ -260,6 +260,25 @@ export interface GroceryItem {
   updatedAt: string;
 }
 
+export type PlanNoteCategory = 'futuro_gasto' | 'compra_deseada' | 'plan_meta' | 'recordatorio' | 'general';
+export type PlanNotePriority = 'baja' | 'media' | 'alta';
+
+export interface PlanNote {
+  id: string;
+  title: string;
+  description?: string;
+  category: PlanNoteCategory;
+  priority: PlanNotePriority;
+  targetDate?: string; // Optional target date YYYY-MM-DD or timeframe (e.g. "Q4 2026", "Noviembre")
+  estimatedAmount?: number; // in cents (purely informative, NOT in financial totals)
+  url?: string;
+  isCompleted: boolean;
+  color?: string; // Hex or color tag
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppSettings {
   id: string;
   currency: string;

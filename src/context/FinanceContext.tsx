@@ -17,6 +17,7 @@ import {
   AppSettings,
   DailyCashFlowItem,
   GroceryItem,
+  PlanNote,
 } from '../types';
 import { storage, NexaFullBackup } from '../services/storage';
 import {
@@ -62,6 +63,7 @@ interface FinanceContextType {
   budgets: Budget[];
   itemBudgets: ItemBudget[];
   groceryItems: GroceryItem[];
+  planNotes: PlanNote[];
   installmentPurchases: InstallmentPurchase[];
   loans: Loan[];
   loanPayments: LoanExtraPayment[];
@@ -121,6 +123,11 @@ interface FinanceContextType {
   ) => Promise<{ copiedCount: number }>;
   clearGroceryMonth: (year: number, month: number) => Promise<void>;
 
+  // Plan Notes Module Actions (Scratchpad / Notas de planes & futuros gastos sin impacto financiero)
+  savePlanNote: (noteData: Partial<PlanNote> & { title: string }) => Promise<void>;
+  deletePlanNote: (id: string) => Promise<void>;
+  togglePlanNoteCompleted: (id: string) => Promise<void>;
+
   saveInstallmentPurchase: (item: Partial<InstallmentPurchase> & { concept: string; totalAmount: number }) => Promise<void>;
   deleteInstallmentPurchase: (id: string) => Promise<void>;
 
@@ -178,6 +185,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [itemBudgets, setItemBudgets] = useState<ItemBudget[]>([]);
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
+  const [planNotes, setPlanNotes] = useState<PlanNote[]>([]);
   const [installmentPurchases, setInstallmentPurchases] = useState<InstallmentPurchase[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loanPayments, setLoanPayments] = useState<LoanExtraPayment[]>([]);
@@ -202,6 +210,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         bgtList,
         itemBgtList,
         groceryList,
+        notesList,
         instList,
         loanList,
         payList,
@@ -218,6 +227,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storage.getAll<Budget>('budgets'),
         storage.getAll<ItemBudget>('itemBudgets'),
         storage.getAll<GroceryItem>('groceryItems'),
+        storage.getAll<PlanNote>('planNotes'),
         storage.getAll<InstallmentPurchase>('installmentPurchases'),
         storage.getAll<Loan>('loans'),
         storage.getAll<LoanExtraPayment>('loanPayments'),
@@ -250,6 +260,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setBudgets(demo.budgets);
         setItemBudgets(demo.itemBudgets || []);
         setGroceryItems([]);
+        setPlanNotes([]);
         setInstallmentPurchases(demo.installmentPurchases);
         setLoans(demo.loans);
         setSubscriptions(demo.subscriptions);
@@ -265,6 +276,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setBudgets(bgtList);
         setItemBudgets(itemBgtList);
         setGroceryItems(groceryList || []);
+        setPlanNotes(notesList || []);
         setInstallmentPurchases(instList);
         setLoans(loanList);
         setLoanPayments(payList);
@@ -1043,6 +1055,58 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setGroceryItems((prev) => prev.filter((g) => !(g.year === year && g.month === month)));
   };
 
+  // Plan Notes Module (Scratchpad / Notas de planes & futuros gastos sin impacto financiero)
+  const savePlanNote = async (noteData: Partial<PlanNote> & { title: string }) => {
+    const id = noteData.id || `note_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+    const existing = planNotes.find((n) => n.id === id);
+
+    const note: PlanNote = {
+      id,
+      title: noteData.title.trim(),
+      description: noteData.description?.trim() || '',
+      category: noteData.category || 'general',
+      priority: noteData.priority || 'media',
+      targetDate: noteData.targetDate?.trim() || undefined,
+      estimatedAmount:
+        noteData.estimatedAmount !== undefined ? Math.max(0, Math.round(noteData.estimatedAmount)) : undefined,
+      url: noteData.url?.trim() || undefined,
+      isCompleted: noteData.isCompleted ?? existing?.isCompleted ?? false,
+      color: noteData.color || existing?.color || undefined,
+      tags: noteData.tags || existing?.tags || [],
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+    };
+
+    await storage.put('planNotes', note);
+    setPlanNotes((prev) => {
+      const idx = prev.findIndex((n) => n.id === id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = note;
+        return copy;
+      }
+      return [note, ...prev];
+    });
+  };
+
+  const deletePlanNote = async (id: string) => {
+    await storage.delete('planNotes', id);
+    setPlanNotes((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const togglePlanNoteCompleted = async (id: string) => {
+    const target = planNotes.find((n) => n.id === id);
+    if (!target) return;
+    const updated: PlanNote = {
+      ...target,
+      isCompleted: !target.isCompleted,
+      updatedAt: new Date().toISOString(),
+    };
+    await storage.put('planNotes', updated);
+    setPlanNotes((prev) => prev.map((n) => (n.id === id ? updated : n)));
+  };
+
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
     const updated = { ...settings, ...newSettings };
     await storage.put('appSettings', updated);
@@ -1238,6 +1302,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         budgets,
         itemBudgets,
         groceryItems,
+        planNotes,
         installmentPurchases,
         loans,
         loanPayments,
@@ -1271,6 +1336,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         toggleGroceryItemPurchased,
         copyGroceryListToMonth,
         clearGroceryMonth,
+        savePlanNote,
+        deletePlanNote,
+        togglePlanNoteCompleted,
         saveInstallmentPurchase,
         deleteInstallmentPurchase,
         saveLoan,
