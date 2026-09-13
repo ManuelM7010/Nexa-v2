@@ -90,7 +90,8 @@ export const CalendarView: React.FC = () => {
 
           {/* Actual days */}
           {dailyCashFlow.map((day) => {
-            const hasMovements = day.movements.length > 0;
+            const dayMovements = day.movements || day.events || [];
+            const hasMovements = dayMovements.length > 0;
             const isSelected = selectedDayDetail === day.date;
 
             return (
@@ -146,7 +147,7 @@ export const CalendarView: React.FC = () => {
 
                 {/* Event Chips */}
                 <div className="space-y-0.5">
-                  {day.movements.slice(0, 2).map((m) => (
+                  {dayMovements.slice(0, 2).map((m) => (
                     <div
                       key={m.id}
                       className={`text-[9px] truncate px-1 py-0.5 rounded font-medium ${
@@ -160,9 +161,9 @@ export const CalendarView: React.FC = () => {
                       {m.concept}
                     </div>
                   ))}
-                  {day.movements.length > 2 && (
+                  {dayMovements.length > 2 && (
                     <span className="text-[9px] text-blue-400 font-semibold block">
-                      +{day.movements.length - 2} más
+                      +{dayMovements.length - 2} más
                     </span>
                   )}
                 </div>
@@ -216,12 +217,12 @@ export const CalendarView: React.FC = () => {
 
           {/* List of movements on this day */}
           <div className="space-y-2">
-            {activeDayObj.movements.length === 0 ? (
+            {(activeDayObj.movements || activeDayObj.events || []).length === 0 ? (
               <p className="text-xs text-slate-500 py-4 text-center">
                 No hay movimientos registrados ni programados para este día.
               </p>
             ) : (
-              activeDayObj.movements.map((m) => (
+              (activeDayObj.movements || activeDayObj.events || []).map((m) => (
                 <div
                   key={m.id}
                   className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs"

@@ -20,20 +20,30 @@ export interface BudgetAnalysisItem {
   categoryType: 'gasto' | 'ingreso';
   categoryColor: string;
   categoryIcon: string;
+  category: Category;
   budgetedAmount: number; // cents
   realAmount: number; // cents
+  realSpent: number; // cents alias
   plannedPendingAmount: number; // cents
+  plannedPendingSpent: number; // cents alias
   projectedTotalAmount: number; // cents
+  totalProjected: number; // cents alias
   variation: number; // real vs budgeted (or projected vs budgeted)
   percentUsed: number;
+  executionPercentage: number; // alias
   availableAmount: number; // budgeted - real
-  status: 'ahorro' | 'en_presupuesto' | 'alerta' | 'sobregiro';
+  availableBalance: number; // alias
+  status: 'ahorro' | 'en_presupuesto' | 'alerta' | 'sobregiro' | 'normal' | 'warning' | 'exceeded';
   transactions: Transaction[];
 }
 
 export interface ExecutiveSummary {
   currentRealCashBalance: number; // Cash + Banks actual
+  bankBalance: number;
+  cashBalance: number;
   projectedEndPeriodBalance: number;
+  projectedEndBalance: number;
+  lowestProjectedBalance: number;
   totalRealizedIncome: number;
   totalPlannedIncome: number;
   totalRealizedExpense: number;
@@ -42,13 +52,17 @@ export interface ExecutiveSummary {
   netPlannedSavings: number; // Planned Income - Planned Expense
   upcomingObligationsCommitted: number; // next 15-30 days
   totalDebt: number; // Cards used balance + Loans pending balance
+  creditCardDebt: number;
+  loanDebt: number;
   freeAvailableCash: number; // Current real cash - upcoming obligations committed
+  freeCashAfterObligations: number;
   todayIncome: number;
   todayExpense: number;
   todayObligations: number;
   todayTransactions: Transaction[];
   thisWeekObligations: Transaction[];
   alerts: AlertItem[];
+  criticalAlerts: AlertItem[];
 }
 
 /**
@@ -335,23 +349,41 @@ export class NexaFinancialEngine {
 
       const isNegative = runningProjectedBalance < 0;
       const hasRisk = isNegative || runningProjectedBalance < 10000; // less than $100
+      const status: 'healthy' | 'positive' | 'low' | 'negative' = isNegative
+        ? 'negative'
+        : hasRisk
+        ? 'low'
+        : 'positive';
 
       dailyItems.push({
         date: dateStr,
         dayOfWeek,
+        dayName: dayOfWeek,
+        dayNameShort: dayOfWeek.slice(0, 3),
         startingBalance: dayStartProjected,
+        initialBalance: dayStartProjected,
         realizedIncome,
+        realIncome: realizedIncome,
         projectedIncome,
+        plannedIncome: projectedIncome,
+        totalIncome: totalDayInflow,
         realizedExpense,
+        realExpense: realizedExpense,
         projectedExpense,
+        plannedExpense: projectedExpense,
+        totalExpense: totalDayOutflow,
         obligations,
         endDayRealBalance: runningRealBalance,
         endDayProjectedBalance: runningProjectedBalance,
+        finalBalance: runningProjectedBalance,
         variation: runningRealBalance - runningProjectedBalance,
         events: dayTxs,
+        movements: dayTxs,
+        status,
         hasRisk,
         isNegative,
         isToday: dateStr === todayStr,
+        isPast: dateStr < todayStr,
       });
     }
 
@@ -399,11 +431,11 @@ export class NexaFinancialEngine {
       const percentUsed =
         budgetedAmount > 0 ? Math.round((realAmount / budgetedAmount) * 100) : realAmount > 0 ? 100 : 0;
 
-      let status: BudgetAnalysisItem['status'] = 'en_presupuesto';
+      let status: BudgetAnalysisItem['status'] = 'normal';
       if (budgetedAmount > 0 && realAmount > budgetedAmount) {
-        status = 'sobregiro';
+        status = 'exceeded';
       } else if (budgetedAmount > 0 && percentUsed >= 80) {
-        status = 'alerta';
+        status = 'warning';
       } else if (realAmount < budgetedAmount && budgetedAmount > 0) {
         status = 'ahorro';
       }
@@ -414,13 +446,19 @@ export class NexaFinancialEngine {
         categoryType: cat.type,
         categoryColor: cat.color,
         categoryIcon: cat.icon,
+        category: cat,
         budgetedAmount,
         realAmount,
+        realSpent: realAmount,
         plannedPendingAmount,
+        plannedPendingSpent: plannedPendingAmount,
         projectedTotalAmount: projectedTotal,
+        totalProjected: projectedTotal,
         variation,
         percentUsed,
+        executionPercentage: percentUsed,
         availableAmount: Math.max(0, budgetedAmount - realAmount),
+        availableBalance: budgetedAmount - realAmount,
         status,
         transactions: catTxs,
       };
@@ -445,8 +483,18 @@ export class NexaFinancialEngine {
 
     // Real cash balance right now (cash accounts + bank accounts + realized transactions up to today)
     let currentRealCashBalance = 0;
+    let bankBalance = 0;
+    let cashBalance = 0;
+
     accounts.forEach((acc) => {
-      if (acc.isActive) currentRealCashBalance += acc.initialBalance;
+      if (acc.isActive) {
+        currentRealCashBalance += acc.initialBalance;
+        if (acc.type === 'efectivo') {
+          cashBalance += acc.initialBalance;
+        } else {
+          bankBalance += acc.initialBalance;
+        }
+      }
     });
 
     allTransactions.forEach((tx) => {
@@ -455,10 +503,17 @@ export class NexaFinancialEngine {
         if (tx.type === 'transferencia') return;
         if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
 
+        const targetAccount = accounts.find((a) => a.id === tx.accountId);
+        const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
+
         if (tx.type === 'ingreso') {
           currentRealCashBalance += tx.amount;
+          if (isCash) cashBalance += tx.amount;
+          else bankBalance += tx.amount;
         } else {
           currentRealCashBalance -= tx.amount;
+          if (isCash) cashBalance -= tx.amount;
+          else bankBalance -= tx.amount;
         }
       }
     });
@@ -483,18 +538,28 @@ export class NexaFinancialEngine {
       }
     });
 
-    // Total Debt = Cards used + Loans remaining
-    let totalDebt = 0;
+    // Debt Breakdown: Credit cards used + Loans remaining
+    let creditCardDebt = 0;
     creditCards.forEach((c) => {
-      if (c.isActive) totalDebt += c.initialUsedBalance;
-    });
-    loans.forEach((l) => {
-      totalDebt += l.remainingBalance;
+      if (c.isActive) creditCardDebt += c.initialUsedBalance;
     });
 
-    // End of period projected balance
-    const lastDay = dailyFlow[dailyFlow.length - 1];
+    let loanDebt = 0;
+    loans.forEach((l) => {
+      loanDebt += l.remainingBalance;
+    });
+
+    const totalDebt = creditCardDebt + loanDebt;
+
+    // End of period projected balance & lowest projected balance
+    const lastDay = dailyFlow && dailyFlow.length > 0 ? dailyFlow[dailyFlow.length - 1] : undefined;
     const projectedEndPeriodBalance = lastDay ? lastDay.endDayProjectedBalance : currentRealCashBalance;
+    const projectedEndBalance = projectedEndPeriodBalance;
+
+    let lowestProjectedBalance = currentRealCashBalance;
+    if (dailyFlow && dailyFlow.length > 0) {
+      lowestProjectedBalance = Math.min(...dailyFlow.map((d) => d.endDayProjectedBalance));
+    }
 
     // Upcoming committed obligations in next 15 days from today
     const in15Days = new Date(todayStr);
@@ -548,6 +613,7 @@ export class NexaFinancialEngine {
 
     // Free available cash after committed obligations
     const freeAvailableCash = currentRealCashBalance - upcomingObligationsCommitted;
+    const freeCashAfterObligations = freeAvailableCash;
 
     // Alerts generation
     const alerts: AlertItem[] = [];
@@ -618,9 +684,18 @@ export class NexaFinancialEngine {
       });
     }
 
+    alerts.forEach((a) => {
+      if (!a.severity) a.severity = a.type;
+    });
+    const criticalAlerts = alerts;
+
     return {
       currentRealCashBalance,
+      bankBalance,
+      cashBalance,
       projectedEndPeriodBalance,
+      projectedEndBalance,
+      lowestProjectedBalance,
       totalRealizedIncome,
       totalPlannedIncome,
       totalRealizedExpense,
@@ -629,13 +704,17 @@ export class NexaFinancialEngine {
       netPlannedSavings: totalPlannedIncome - totalPlannedExpense,
       upcomingObligationsCommitted,
       totalDebt,
+      creditCardDebt,
+      loanDebt,
       freeAvailableCash,
+      freeCashAfterObligations,
       todayIncome,
       todayExpense,
       todayObligations,
       todayTransactions,
       thisWeekObligations,
       alerts,
+      criticalAlerts,
     };
   }
 

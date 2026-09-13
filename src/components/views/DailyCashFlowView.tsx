@@ -29,8 +29,9 @@ export const DailyCashFlowView: React.FC = () => {
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   const filteredDays = dailyCashFlow.filter((day) => {
+    const dayMovements = day.movements || day.events || [];
     if (filterMode === 'with_movements') {
-      return day.movements.length > 0;
+      return dayMovements.length > 0;
     }
     if (filterMode === 'alerts_only') {
       return day.status === 'low' || day.status === 'negative';
@@ -107,8 +108,9 @@ export const DailyCashFlowView: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
               {filteredDays.map((day) => {
+                const dayMovements = day.movements || day.events || [];
                 const isExpanded = expandedDay === day.date;
-                const hasMovements = day.movements.length > 0;
+                const hasMovements = dayMovements.length > 0;
 
                 return (
                   <React.Fragment key={day.date}>
@@ -206,7 +208,7 @@ export const DailyCashFlowView: React.FC = () => {
                               className="p-1.5 rounded-lg text-blue-400 hover:bg-slate-800 transition flex items-center gap-0.5"
                               title="Ver movimientos del día"
                             >
-                              <span className="text-[10px] font-bold">{day.movements.length}</span>
+                              <span className="text-[10px] font-bold">{dayMovements.length}</span>
                               {isExpanded ? (
                                 <ChevronUp className="w-3.5 h-3.5" />
                               ) : (
@@ -235,12 +237,12 @@ export const DailyCashFlowView: React.FC = () => {
                             <div className="text-xs font-bold text-slate-300 flex items-center justify-between border-b border-slate-800 pb-2">
                               <span>Movimientos programados para {formatDateEs(day.date)}:</span>
                               <span className="text-[11px] text-slate-400">
-                                {day.movements.length} operaciones
+                                {dayMovements.length} operaciones
                               </span>
                             </div>
 
                             <div className="divide-y divide-slate-800/60">
-                              {day.movements.map((m) => (
+                              {dayMovements.map((m) => (
                                 <div
                                   key={m.id}
                                   className="py-2.5 flex items-center justify-between gap-3 text-xs"

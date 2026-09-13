@@ -59,14 +59,17 @@ export const BudgetView: React.FC = () => {
 
   // Chart data for Budget vs Real
   const chartData = budgetAnalysis
-    .filter((b) => b.budgetedAmount > 0 || b.realSpent > 0)
-    .map((b) => ({
-      name: b.category.name.split(' ')[0], // Short name
-      fullName: b.category.name,
-      Presupuestado: centsToDollars(b.budgetedAmount),
-      Real: centsToDollars(b.realSpent),
-      Proyectado: centsToDollars(b.totalProjected),
-    }));
+    .filter((b) => b.budgetedAmount > 0 || (b.realSpent || b.realAmount || 0) > 0)
+    .map((b) => {
+      const catName = b.category?.name || b.categoryName || 'General';
+      return {
+        name: catName.split(' ')[0], // Short name
+        fullName: catName,
+        Presupuestado: centsToDollars(b.budgetedAmount),
+        Real: centsToDollars(b.realSpent || b.realAmount || 0),
+        Proyectado: centsToDollars(b.totalProjected || b.projectedTotalAmount || 0),
+      };
+    });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -189,13 +192,15 @@ export const BudgetView: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
               {budgetAnalysis.map((item) => {
-                const isEditing = editingCategoryId === item.category.id;
+                const catId = item.category?.id || item.categoryId;
+                const catName = item.category?.name || item.categoryName || 'General';
+                const isEditing = editingCategoryId === catId;
 
                 return (
-                  <tr key={item.category.id} className="hover:bg-slate-850/60 transition">
+                  <tr key={catId} className="hover:bg-slate-850/60 transition">
                     {/* Category Name */}
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-white">{item.category.name}</div>
+                      <div className="font-bold text-white">{catName}</div>
                     </td>
 
                     {/* Presupuesto */}
@@ -208,7 +213,7 @@ export const BudgetView: React.FC = () => {
                           value={budgetInput}
                           onChange={(e) => setBudgetInput(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveBudget(item.category.id);
+                            if (e.key === 'Enter') handleSaveBudget(catId);
                             if (e.key === 'Escape') setEditingCategoryId(null);
                           }}
                           className="w-24 bg-slate-950 border border-blue-500 rounded px-2 py-1 text-right text-white focus:outline-none"
@@ -220,31 +225,31 @@ export const BudgetView: React.FC = () => {
 
                     {/* Gasto Real */}
                     <td className="py-3.5 px-3 text-right font-mono text-blue-400 font-bold">
-                      {formatMoney(item.realSpent, settings.currencySymbol)}
+                      {formatMoney(item.realSpent || item.realAmount || 0, settings.currencySymbol)}
                     </td>
 
                     {/* Pendiente Planificado */}
                     <td className="py-3.5 px-3 text-right font-mono text-slate-400">
-                      {formatMoney(item.plannedPendingSpent, settings.currencySymbol)}
+                      {formatMoney(item.plannedPendingSpent || item.plannedPendingAmount || 0, settings.currencySymbol)}
                     </td>
 
                     {/* Total Proyectado */}
                     <td className="py-3.5 px-3 text-right font-mono font-bold text-slate-200">
-                      {formatMoney(item.totalProjected, settings.currencySymbol)}
+                      {formatMoney(item.totalProjected || item.projectedTotalAmount || 0, settings.currencySymbol)}
                     </td>
 
                     {/* Saldo Disponible */}
                     <td className="py-3.5 px-3 text-right font-mono font-bold">
                       <span
                         className={
-                          item.availableBalance < 0
+                          (item.availableBalance ?? item.availableAmount ?? 0) < 0
                             ? 'text-rose-400'
-                            : item.availableBalance < 2000
+                            : (item.availableBalance ?? item.availableAmount ?? 0) < 2000
                             ? 'text-amber-400'
                             : 'text-emerald-400'
                         }
                       >
-                        {formatMoney(item.availableBalance, settings.currencySymbol)}
+                        {formatMoney(item.availableBalance ?? item.availableAmount ?? 0, settings.currencySymbol)}
                       </span>
                     </td>
 
@@ -254,27 +259,27 @@ export const BudgetView: React.FC = () => {
                         <div className="flex items-center justify-between text-[10px]">
                           <span
                             className={`font-bold ${
-                              item.status === 'exceeded'
+                              (item.status === 'exceeded' || item.status === 'sobregiro')
                                 ? 'text-rose-400'
-                                : item.status === 'warning'
+                                : (item.status === 'warning' || item.status === 'alerta')
                                 ? 'text-amber-400'
                                 : 'text-slate-400'
                             }`}
                           >
-                            {item.executionPercentage}%
+                            {item.executionPercentage ?? item.percentUsed ?? 0}%
                           </span>
 
-                          {item.status === 'exceeded' && (
+                          {(item.status === 'exceeded' || item.status === 'sobregiro') && (
                             <span className="flex items-center gap-1 text-rose-400 font-bold">
                               <AlertCircle className="w-3 h-3" /> Sobrepasado
                             </span>
                           )}
-                          {item.status === 'warning' && (
+                          {(item.status === 'warning' || item.status === 'alerta') && (
                             <span className="flex items-center gap-1 text-amber-400 font-semibold">
                               <AlertTriangle className="w-3 h-3" /> Alerta 80%
                             </span>
                           )}
-                          {item.status === 'normal' && item.budgetedAmount > 0 && (
+                          {(item.status === 'normal' || item.status === 'en_presupuesto') && item.budgetedAmount > 0 && (
                             <span className="flex items-center gap-1 text-emerald-400 font-semibold">
                               <CheckCircle2 className="w-3 h-3" /> Normal
                             </span>
@@ -284,13 +289,13 @@ export const BudgetView: React.FC = () => {
                         <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
-                              item.status === 'exceeded'
+                              (item.status === 'exceeded' || item.status === 'sobregiro')
                                 ? 'bg-rose-500'
-                                : item.status === 'warning'
+                                : (item.status === 'warning' || item.status === 'alerta')
                                 ? 'bg-amber-500'
                                 : 'bg-blue-500'
                             }`}
-                            style={{ width: `${Math.min(100, item.executionPercentage)}%` }}
+                            style={{ width: `${Math.min(100, item.executionPercentage ?? item.percentUsed ?? 0)}%` }}
                           />
                         </div>
                       </div>
@@ -301,7 +306,7 @@ export const BudgetView: React.FC = () => {
                       {isEditing ? (
                         <div className="flex items-center justify-center gap-1">
                           <button
-                            onClick={() => handleSaveBudget(item.category.id)}
+                            onClick={() => handleSaveBudget(catId)}
                             className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold"
                           >
                             OK
@@ -315,7 +320,7 @@ export const BudgetView: React.FC = () => {
                         </div>
                       ) : (
                         <button
-                          onClick={() => handleOpenEdit(item.category.id, item.budgetedAmount)}
+                          onClick={() => handleOpenEdit(catId, item.budgetedAmount)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
                           title="Asignar o modificar presupuesto"
                         >

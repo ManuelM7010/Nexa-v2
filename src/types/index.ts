@@ -223,24 +223,38 @@ export interface AppSettings {
 export interface DailyCashFlowItem {
   date: string; // YYYY-MM-DD
   dayOfWeek: string;
+  dayName?: string;
+  dayNameShort?: string;
   startingBalance: number; // cents
+  initialBalance?: number;
   realizedIncome: number;
+  realIncome?: number;
   projectedIncome: number;
+  plannedIncome?: number;
+  totalIncome?: number;
   realizedExpense: number;
+  realExpense?: number;
   projectedExpense: number;
+  plannedExpense?: number;
+  totalExpense?: number;
   obligations: number;
   endDayRealBalance: number;
   endDayProjectedBalance: number;
+  finalBalance?: number;
   variation: number; // Real - Proyectado
   events: Transaction[];
+  movements: Transaction[];
+  status: 'healthy' | 'positive' | 'low' | 'negative';
   hasRisk: boolean;
   isNegative: boolean;
   isToday: boolean;
+  isPast?: boolean;
 }
 
 export interface AlertItem {
   id: string;
   type: 'danger' | 'warning' | 'info' | 'success';
+  severity?: 'danger' | 'warning' | 'info' | 'success';
   title: string;
   message: string;
   date?: string;

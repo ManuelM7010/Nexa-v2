@@ -384,33 +384,41 @@ export const DashboardView: React.FC = () => {
               Alertas Financieras & Diagnóstico
             </h3>
             <span className="text-[11px] font-semibold text-slate-400">
-              {executiveSummary.criticalAlerts.length} avisos
+              {(executiveSummary.criticalAlerts || executiveSummary.alerts || []).length} avisos
             </span>
           </div>
 
           <div className="space-y-2.5">
-            {executiveSummary.criticalAlerts.map((alert) => (
-              <div
-                key={alert.id}
-                className={`p-3.5 rounded-xl border flex items-start gap-3 transition ${
-                  alert.severity === 'danger'
-                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
-                    : alert.severity === 'warning'
-                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
-                    : 'bg-blue-500/10 border-blue-500/30 text-blue-200'
-                }`}
-              >
-                <div className="flex-shrink-0 mt-0.5">
-                  {alert.severity === 'danger' && <AlertTriangle className="w-4 h-4 text-rose-400" />}
-                  {alert.severity === 'warning' && <Clock className="w-4 h-4 text-amber-400" />}
-                  {alert.severity === 'info' && <CheckCircle2 className="w-4 h-4 text-blue-400" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-bold text-white">{alert.title}</div>
-                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">{alert.message}</p>
-                </div>
+            {(executiveSummary.criticalAlerts || executiveSummary.alerts || []).length === 0 ? (
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
+                <p className="text-xs text-slate-300 font-medium">Todo en orden</p>
+                <p className="text-[11px] text-slate-500">No hay alertas de liquidez ni sobregiros proyectados.</p>
               </div>
-            ))}
+            ) : (
+              (executiveSummary.criticalAlerts || executiveSummary.alerts || []).map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`p-3.5 rounded-xl border flex items-start gap-3 transition ${
+                    (alert.severity || alert.type) === 'danger'
+                      ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
+                      : (alert.severity || alert.type) === 'warning'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                      : 'bg-blue-500/10 border-blue-500/30 text-blue-200'
+                  }`}
+                >
+                  <div className="flex-shrink-0 mt-0.5">
+                    {(alert.severity || alert.type) === 'danger' && <AlertTriangle className="w-4 h-4 text-rose-400" />}
+                    {(alert.severity || alert.type) === 'warning' && <Clock className="w-4 h-4 text-amber-400" />}
+                    {(alert.severity || alert.type) === 'info' && <CheckCircle2 className="w-4 h-4 text-blue-400" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-white">{alert.title}</div>
+                    <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">{alert.message}</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="pt-2 flex items-center justify-between">
