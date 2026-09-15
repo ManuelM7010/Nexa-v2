@@ -279,6 +279,21 @@ export interface PlanNote {
   updatedAt: string;
 }
 
+export interface QuickTemplate {
+  id: string;
+  name: string;
+  type: 'gasto' | 'ingreso';
+  amount: number; // in cents
+  categoryId: string;
+  paymentMethod: PaymentMethodType;
+  accountId?: string;
+  creditCardId?: string;
+  notes?: string;
+  icon?: string;
+  color?: string;
+  usageCount?: number;
+}
+
 export interface AppSettings {
   id: string;
   currency: string;

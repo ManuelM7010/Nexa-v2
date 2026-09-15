@@ -13,6 +13,71 @@ import {
   AppSettings,
 } from '../types';
 
+export function getDefaultQuickTemplates(): import('../types').QuickTemplate[] {
+  return [
+    {
+      id: 'tmpl_cafe',
+      name: 'Café / Desayuno',
+      type: 'gasto',
+      amount: 350, // $3.50
+      categoryId: 'cat_alimentacion',
+      paymentMethod: 'efectivo',
+      notes: 'Café o snack matutino',
+      icon: 'Coffee',
+      color: '#f59e0b',
+      usageCount: 0,
+    },
+    {
+      id: 'tmpl_almuerzo',
+      name: 'Almuerzo / Menú del día',
+      type: 'gasto',
+      amount: 750, // $7.50
+      categoryId: 'cat_alimentacion',
+      paymentMethod: 'tarjeta_credito',
+      notes: 'Comida diaria',
+      icon: 'Utensils',
+      color: '#3b82f6',
+      usageCount: 0,
+    },
+    {
+      id: 'tmpl_gasolina',
+      name: 'Gasolina Semanal',
+      type: 'gasto',
+      amount: 3000, // $30.00
+      categoryId: 'cat_transporte',
+      paymentMethod: 'tarjeta_credito',
+      notes: 'Combustible',
+      icon: 'Fuel',
+      color: '#10b981',
+      usageCount: 0,
+    },
+    {
+      id: 'tmpl_farmacia',
+      name: 'Farmacia / Salud',
+      type: 'gasto',
+      amount: 1500, // $15.00
+      categoryId: 'cat_salud',
+      paymentMethod: 'banco',
+      notes: 'Medicamentos menores',
+      icon: 'Pill',
+      color: '#ec4899',
+      usageCount: 0,
+    },
+    {
+      id: 'tmpl_super_rapido',
+      name: 'Compra exprés súper',
+      type: 'gasto',
+      amount: 2000, // $20.00
+      categoryId: 'cat_alimentacion',
+      paymentMethod: 'tarjeta_credito',
+      notes: 'Pan, leche, fruta rápida',
+      icon: 'ShoppingBag',
+      color: '#8b5cf6',
+      usageCount: 0,
+    },
+  ];
+}
+
 export function getDefaultCategories(): Category[] {
   return [
     {

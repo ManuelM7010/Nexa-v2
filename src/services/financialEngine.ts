@@ -14,7 +14,7 @@ import {
   DailyCashFlowItem,
   AlertItem,
 } from '../types';
-import { daysInMonth } from '../utils/formatters';
+import { daysInMonth, MONTH_NAMES_ES } from '../utils/formatters';
 
 export interface BudgetAnalysisItem {
   categoryId: string;
@@ -65,6 +65,23 @@ export interface ExecutiveSummary {
   thisWeekObligations: Transaction[];
   alerts: AlertItem[];
   criticalAlerts: AlertItem[];
+}
+
+export interface MonthProjection {
+  year: number;
+  month: number;
+  monthKey: string;
+  monthName: string;
+  openingBalance: number; // in cents
+  projectedIncome: number; // in cents
+  projectedExpense: number; // in cents
+  fixedObligations: number; // loans + subs + services + installment purchases
+  discretionaryBudget: number; // item budgets / categories
+  closingBalance: number; // opening + income - expense
+  netSavings: number; // income - expense
+  savingsRate: number; // percentage
+  status: 'saludable' | 'ajustado' | 'deficit';
+  loansDueCount: number;
 }
 
 /**
@@ -1079,5 +1096,143 @@ export class NexaFinancialEngine {
       balanceAfterObligations,
       explanation,
     };
+  }
+
+  /**
+   * Calculates a 12-Month Multi-Month Cash Flow & Net Savings Projection
+   * starting from a given year & month.
+   */
+  static calculateAnnualProjection(
+    startYear: number,
+    startMonth: number,
+    initialCashCents: number,
+    data: {
+      accounts: Account[];
+      creditCards: CreditCard[];
+      categories: Category[];
+      budgets: Budget[];
+      itemBudgets: ItemBudget[];
+      subscriptions: Subscription[];
+      services: ServiceItem[];
+      installmentPurchases: InstallmentPurchase[];
+      loans: Loan[];
+      transactions: Transaction[];
+    }
+  ): MonthProjection[] {
+    const projections: MonthProjection[] = [];
+    let runningBalance = initialCashCents;
+    const catMap = new Map(data.categories.map((c) => [c.id, c.type]));
+
+    for (let i = 0; i < 12; i++) {
+      let curMonth = startMonth + i;
+      let curYear = startYear;
+      while (curMonth > 12) {
+        curMonth -= 12;
+        curYear += 1;
+      }
+
+      const monthKey = `${curYear}-${String(curMonth).padStart(2, '0')}`;
+      const monthName = MONTH_NAMES_ES[curMonth - 1] || `Mes ${curMonth}`;
+
+      // 1. Explicit transactions recorded for this future/past month
+      const monthTxs = data.transactions.filter((t) => t.date.startsWith(monthKey));
+
+      // 2. Projected fixed events for this month
+      const projectedEvents = NexaFinancialEngine.generateProjectedEvents(curYear, curMonth, {
+        subscriptions: data.subscriptions,
+        services: data.services,
+        installmentPurchases: data.installmentPurchases,
+        loans: data.loans,
+        creditCards: data.creditCards,
+        accounts: data.accounts,
+        existingTransactions: data.transactions,
+      });
+
+      const combined = [...monthTxs, ...projectedEvents];
+
+      // Income
+      let monthIncome = 0;
+      for (const tx of combined) {
+        if (tx.type === 'ingreso') {
+          monthIncome += tx.amount;
+        }
+      }
+
+      // If no explicit income is scheduled in future months, estimate from recurring itemBudgets/budgets
+      if (monthIncome === 0) {
+        const incomeBudgets = data.itemBudgets.filter(
+          (b) => b.type === 'ingreso' && (b.year === curYear ? b.month === curMonth : true)
+        );
+        if (incomeBudgets.length > 0) {
+          monthIncome = incomeBudgets.reduce((acc, b) => acc + (b.projectedAmount || b.budgetedAmount), 0);
+        } else {
+          // fallback to baseline monthly planned income from start month transactions or general income budget
+          const defaultIncomeBudget = data.budgets
+            .filter((b) => catMap.get(b.categoryId) === 'ingreso')
+            .reduce((acc, b) => acc + b.budgetedAmount, 0);
+          monthIncome = defaultIncomeBudget;
+        }
+      }
+
+      // Fixed obligations
+      let fixedObligations = 0;
+      let loansDueCount = 0;
+
+      for (const tx of combined) {
+        if (['cuota_prestamo', 'suscripcion', 'servicio', 'pago_tarjeta', 'cuota_tarjeta'].includes(tx.type)) {
+          fixedObligations += tx.amount;
+          if (tx.type === 'cuota_prestamo') loansDueCount++;
+        }
+      }
+
+      // Discretionary expenses (regular spending, itemBudgets or general budgets)
+      let discretionaryExpenses = 0;
+      const explicitDiscretionary = combined.filter((t) => t.type === 'gasto');
+      discretionaryExpenses = explicitDiscretionary.reduce((sum, t) => sum + t.amount, 0);
+
+      // If future month has low or no manual discretionary entries, project from regular expense budgets
+      const baseExpenseBudgets = data.budgets
+        .filter((b) => catMap.get(b.categoryId) === 'gasto')
+        .reduce((sum, b) => sum + b.budgetedAmount, 0);
+
+      if (discretionaryExpenses < baseExpenseBudgets && baseExpenseBudgets > 0) {
+        discretionaryExpenses = baseExpenseBudgets;
+      }
+
+      const totalExpense = fixedObligations + discretionaryExpenses;
+      const openingBalance = runningBalance;
+      const closingBalance = openingBalance + monthIncome - totalExpense;
+      const netSavings = monthIncome - totalExpense;
+      const savingsRate = monthIncome > 0 ? Math.round((netSavings / monthIncome) * 100) : 0;
+
+      let status: 'saludable' | 'ajustado' | 'deficit' = 'saludable';
+      if (closingBalance < 0) {
+        status = 'deficit';
+      } else if (closingBalance < 10000 || savingsRate < 5) {
+        status = 'ajustado';
+      }
+
+      projections.push({
+        year: curYear,
+        month: curMonth,
+        monthKey,
+        monthName: `${monthName} ${curYear}`,
+        openingBalance,
+        projectedIncome: monthIncome,
+        projectedExpense: totalExpense,
+        fixedObligations,
+        discretionaryBudget: discretionaryExpenses,
+        closingBalance,
+        netSavings,
+        savingsRate,
+        status,
+        loansDueCount,
+      });
+
+      // Update running balance for next month's opening
+      runningBalance = closingBalance;
+    }
+
+    return projections;
   }
 }

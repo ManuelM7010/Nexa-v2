@@ -17,6 +17,7 @@ import {
   Table,
   ShoppingCart,
   StickyNote,
+  LineChart,
 } from 'lucide-react';
 
 export const NavigationBar: React.FC = () => {
@@ -25,6 +26,7 @@ export const NavigationBar: React.FC = () => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'flujo', label: 'Flujo Diario', icon: BarChart3 },
+    { id: 'proyeccion-anual', label: 'Proyección 12M', icon: LineChart },
     { id: 'movimientos', label: 'Movimientos', icon: ArrowLeftRight },
     { id: 'presupuesto', label: 'Presupuesto', icon: PieChart },
     { id: 'tabla-mensual', label: 'Tabla Mensual (Detalle)', icon: Table },

@@ -17,6 +17,9 @@ import {
   AlertTriangle,
   Award,
   Sparkles,
+  Printer,
+  FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -59,6 +62,7 @@ export const ReportsView: React.FC = () => {
     monthlyCloses,
     closeCurrentMonth,
     reopenMonth,
+    exportTransactionsCSV,
     settings,
   } = useFinance();
 
@@ -76,6 +80,67 @@ export const ReportsView: React.FC = () => {
 
   const handleReopen = async (year: number, month: number) => {
     await reopenMonth(year, month);
+  };
+
+  // Export full monthly report in CSV/Excel formatted text
+  const handleExportMonthCSV = () => {
+    const monthName = MONTH_NAMES_ES[selectedMonth - 1];
+    const headers = ['Fecha', 'Concepto', 'Tipo', 'Categoría', 'Monto', 'Estado', 'Medio de Pago', 'Notas'];
+    const rows = allMonthTransactions.map((tx) => {
+      const cat = categories.find((c) => c.id === tx.categoryId);
+      return [
+        tx.date,
+        `"${(tx.concept || '').replace(/"/g, '""')}"`,
+        tx.type,
+        `"${cat?.name || 'General'}"`,
+        (tx.amount / 100).toFixed(2),
+        tx.status,
+        tx.paymentMethodType,
+        `"${(tx.notes || '').replace(/"/g, '""')}"`,
+      ].join(',');
+    });
+
+    const summaryHeaders = [
+      '',
+      '',
+      `"REPORTE MENSUAL NEXA FINANCE - ${monthName.toUpperCase()} ${selectedYear}"`,
+      '',
+      '',
+      '',
+      '',
+      '',
+    ];
+    const kpiRows = [
+      ['', 'Ingresos Realizados', (executiveSummary.totalRealizedIncome / 100).toFixed(2)],
+      ['', 'Gastos Realizados', (executiveSummary.totalRealizedExpense / 100).toFixed(2)],
+      ['', 'Ahorro Neto', (executiveSummary.netRealSavings / 100).toFixed(2)],
+      ['', 'Saldo Bancos y Efectivo', (executiveSummary.currentRealCashBalance / 100).toFixed(2)],
+      ['', 'Deuda Total', (executiveSummary.totalDebt / 100).toFixed(2)],
+      [''],
+    ];
+
+    const csvContent =
+      '\uFEFF' +
+      summaryHeaders.join(',') +
+      '\n' +
+      kpiRows.map((r) => r.join(',')).join('\n') +
+      headers.join(',') +
+      '\n' +
+      rows.join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Reporte_${monthName}_${selectedYear}_NexaFinance.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrintPDF = () => {
+    window.print();
   };
 
   // 1. Gastos por categoría para el Gráfico de Pastel ("¿En qué se gastó más?")
@@ -153,8 +218,8 @@ export const ReportsView: React.FC = () => {
     allMonthTransactions
       .filter((tx) => tx.type === 'gasto')
       .forEach((tx) => {
-        if (tx.paymentMethodType === 'cash') cash += tx.amount;
-        else if (tx.paymentMethodType === 'credit_card') credit += tx.amount;
+        if (tx.paymentMethodType === 'efectivo') cash += tx.amount;
+        else if (tx.paymentMethodType === 'tarjeta_credito') credit += tx.amount;
         else bank += tx.amount;
       });
 
@@ -243,19 +308,39 @@ export const ReportsView: React.FC = () => {
           </p>
         </div>
 
-        <div>
+        <div className="flex items-center flex-wrap gap-2">
+          {/* Export to Excel / CSV */}
+          <button
+            onClick={handleExportMonthCSV}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 font-semibold text-xs transition cursor-pointer"
+            title="Descargar datos del mes formateados para Microsoft Excel o Google Sheets"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Excel / CSV</span>
+          </button>
+
+          {/* Printable / PDF Report */}
+          <button
+            onClick={handlePrintPDF}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs transition cursor-pointer"
+            title="Imprimir reporte formal o guardar como archivo PDF"
+          >
+            <Printer className="w-3.5 h-3.5 text-sky-400" />
+            <span>Imprimir / PDF</span>
+          </button>
+
           {currentMonthClose ? (
             <div className="flex items-center gap-2">
               <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Mes Auditado & Cerrado</span>
+                <span>Mes Auditado</span>
               </span>
               <button
                 onClick={() => handleReopen(selectedYear, selectedMonth)}
                 className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
               >
                 <Unlock className="w-3.5 h-3.5" />
-                <span>Reabrir mes</span>
+                <span>Reabrir</span>
               </button>
             </div>
           ) : (
@@ -264,7 +349,7 @@ export const ReportsView: React.FC = () => {
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white shadow-md shadow-blue-600/30 transition cursor-pointer"
             >
               <Lock className="w-4 h-4" />
-              <span>Cerrar {MONTH_NAMES_ES[selectedMonth - 1]} {selectedYear}</span>
+              <span>Cerrar Mes</span>
             </button>
           )}
         </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { PWAInstallButton } from './PWAInstallButton';
 import {
@@ -7,6 +7,9 @@ import {
   Server,
   Calendar,
   Sparkles,
+  Wifi,
+  WifiOff,
+  Zap,
 } from 'lucide-react';
 import { formatDateEs } from '../../utils/formatters';
 
@@ -17,6 +20,23 @@ export const Header: React.FC = () => {
     setIsAffordabilityOpen,
     setIsRenderGuideOpen,
   } = useFinance();
+
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   return (
     <header className="w-full bg-slate-950/80 border-b border-slate-900 px-4 sm:px-6 py-3.5 backdrop-blur-md">
@@ -36,9 +56,23 @@ export const Header: React.FC = () => {
               <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
                 NEXA <span className="text-blue-400 font-light">FINANCE</span>
               </h1>
-              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Local-First
-              </span>
+              {isOnline ? (
+                <span
+                  title="Operando en modo local-first con conexión activa"
+                  className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Offline Ready</span>
+                </span>
+              ) : (
+                <span
+                  title="Modo 100% Offline: Tus datos se guardan de forma instantánea en tu dispositivo sin requerir internet"
+                  className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1"
+                >
+                  <WifiOff className="w-3 h-3 text-amber-400" />
+                  <span>Modo Offline Activo</span>
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-300 font-medium">
               Personal Finance & Daily Cash Flow

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { TransactionType, PaymentMethodType, TransactionStatus } from '../../types';
 import { formatMoney, dollarsToCents, centsToDollars } from '../../utils/formatters';
-import { X, ArrowRight, AlertCircle, CheckCircle, Plus } from 'lucide-react';
+import { X, ArrowRight, AlertCircle, CheckCircle, Plus, Zap } from 'lucide-react';
 import { NewCategoryModal } from './NewCategoryModal';
 
 export const NewTransactionModal: React.FC = () => {
@@ -14,6 +14,7 @@ export const NewTransactionModal: React.FC = () => {
     accounts,
     creditCards,
     categories,
+    quickTemplates,
     todayStr,
     saveTransaction,
     settings,
@@ -149,6 +150,46 @@ export const NewTransactionModal: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          {/* Quick template auto-fill presets */}
+          {!editingTransaction && quickTemplates.length > 0 && (
+            <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wide">
+                  Autocompletar con plantilla frecuente
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                {quickTemplates.map((tmpl) => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => {
+                      setConcept(tmpl.name);
+                      setAmountStr(centsToDollars(tmpl.amount).toFixed(2));
+                      setType(tmpl.type);
+                      setCategoryId(tmpl.categoryId);
+                      setPaymentMethodType(tmpl.paymentMethod);
+                      if (tmpl.paymentMethod === 'tarjeta_credito' && tmpl.creditCardId) {
+                        setCreditCardId(tmpl.creditCardId);
+                      } else if (tmpl.accountId) {
+                        setAccountId(tmpl.accountId);
+                      }
+                      if (tmpl.notes) setNotes(tmpl.notes);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-blue-900/30 border border-slate-800 hover:border-blue-500/40 text-xs text-slate-200 transition cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tmpl.color || '#3b82f6' }} />
+                    <span className="font-medium">{tmpl.name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {formatMoney(tmpl.amount, settings.currencySymbol)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Movement Type buttons */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">

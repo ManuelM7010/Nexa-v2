@@ -9,6 +9,7 @@ import { RenderGuideModal } from './components/common/RenderGuideModal';
 
 import { DashboardView } from './components/views/DashboardView';
 import { DailyCashFlowView } from './components/views/DailyCashFlowView';
+import { MultiMonthProjectionView } from './components/views/MultiMonthProjectionView';
 import { TransactionsView } from './components/views/TransactionsView';
 import { BudgetView } from './components/views/BudgetView';
 import { DetailedMonthlyBudgetView } from './components/views/DetailedMonthlyBudgetView';
@@ -34,6 +35,8 @@ const MainAppContent: React.FC = () => {
         return <DashboardView />;
       case 'flujo':
         return <DailyCashFlowView />;
+      case 'proyeccion-anual':
+        return <MultiMonthProjectionView />;
       case 'movimientos':
         return <TransactionsView />;
       case 'presupuesto':

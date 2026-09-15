@@ -18,16 +18,19 @@ import {
   DailyCashFlowItem,
   GroceryItem,
   PlanNote,
+  QuickTemplate,
 } from '../types';
 import { storage, NexaFullBackup } from '../services/storage';
 import {
   NexaFinancialEngine,
   BudgetAnalysisItem,
   ExecutiveSummary,
+  MonthProjection,
 } from '../services/financialEngine';
 import {
   getDefaultCategories,
   getDefaultAppSettings,
+  getDefaultQuickTemplates,
   generateDemoSeedData,
 } from '../services/seedData';
 import { getTodayDateStr } from '../utils/formatters';
@@ -64,6 +67,7 @@ interface FinanceContextType {
   itemBudgets: ItemBudget[];
   groceryItems: GroceryItem[];
   planNotes: PlanNote[];
+  quickTemplates: QuickTemplate[];
   installmentPurchases: InstallmentPurchase[];
   loans: Loan[];
   loanPayments: LoanExtraPayment[];
@@ -80,6 +84,7 @@ interface FinanceContextType {
   detailedBudget: DetailedBudgetItem[];
   executiveSummary: ExecutiveSummary;
   allMonthTransactions: Transaction[];
+  annualProjection: MonthProjection[];
 
   // CRUD Actions
   saveTransaction: (tx: Partial<Transaction> & { concept: string; amount: number; date: string }) => Promise<void>;
@@ -127,6 +132,11 @@ interface FinanceContextType {
   savePlanNote: (noteData: Partial<PlanNote> & { title: string }) => Promise<void>;
   deletePlanNote: (id: string) => Promise<void>;
   togglePlanNoteCompleted: (id: string) => Promise<void>;
+
+  // Quick Templates (Gastos Frecuentes / Transacciones Rápidas)
+  saveQuickTemplate: (template: Partial<QuickTemplate> & { name: string; amount: number; categoryId: string }) => Promise<void>;
+  deleteQuickTemplate: (id: string) => Promise<void>;
+  executeQuickTemplate: (templateId: string, customAmount?: number) => Promise<Transaction>;
 
   saveInstallmentPurchase: (item: Partial<InstallmentPurchase> & { concept: string; totalAmount: number }) => Promise<void>;
   deleteInstallmentPurchase: (id: string) => Promise<void>;
@@ -186,6 +196,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [itemBudgets, setItemBudgets] = useState<ItemBudget[]>([]);
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [planNotes, setPlanNotes] = useState<PlanNote[]>([]);
+  const [quickTemplates, setQuickTemplates] = useState<QuickTemplate[]>([]);
   const [installmentPurchases, setInstallmentPurchases] = useState<InstallmentPurchase[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loanPayments, setLoanPayments] = useState<LoanExtraPayment[]>([]);
@@ -211,6 +222,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         itemBgtList,
         groceryList,
         notesList,
+        tmplList,
         instList,
         loanList,
         payList,
@@ -228,6 +240,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storage.getAll<ItemBudget>('itemBudgets'),
         storage.getAll<GroceryItem>('groceryItems'),
         storage.getAll<PlanNote>('planNotes'),
+        storage.getAll<QuickTemplate>('quickTemplates'),
         storage.getAll<InstallmentPurchase>('installmentPurchases'),
         storage.getAll<Loan>('loans'),
         storage.getAll<LoanExtraPayment>('loanPayments'),
@@ -254,6 +267,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         await storage.putBatch('transactions', demo.transactions);
         await storage.put('appSettings', getDefaultAppSettings());
 
+        const defaultTemplates = getDefaultQuickTemplates();
+        await storage.putBatch('quickTemplates', defaultTemplates);
+
         setCategories(demo.categories);
         setAccounts(demo.accounts);
         setCreditCards(demo.creditCards);
@@ -261,6 +277,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setItemBudgets(demo.itemBudgets || []);
         setGroceryItems([]);
         setPlanNotes([]);
+        setQuickTemplates(defaultTemplates);
         setInstallmentPurchases(demo.installmentPurchases);
         setLoans(demo.loans);
         setSubscriptions(demo.subscriptions);
@@ -269,6 +286,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setTransactions(demo.transactions);
         setSettings(getDefaultAppSettings());
       } else {
+        // If templates is empty in existing DB, seed with default quick templates for convenience
+        let loadedTemplates = tmplList;
+        if (!isCleanSlate && tmplList.length === 0) {
+          const defaultTemplates = getDefaultQuickTemplates();
+          await storage.putBatch('quickTemplates', defaultTemplates);
+          loadedTemplates = defaultTemplates;
+        }
+
         setAccounts(accList);
         setCreditCards(cardList);
         setTransactions(txList);
@@ -277,6 +302,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setItemBudgets(itemBgtList);
         setGroceryItems(groceryList || []);
         setPlanNotes(notesList || []);
+        setQuickTemplates(loadedTemplates || []);
         setInstallmentPurchases(instList);
         setLoans(loanList);
         setLoanPayments(payList);
@@ -400,6 +426,41 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     dailyCashFlow,
     allMonthTransactions,
     budgetAnalysis,
+  ]);
+
+  // 12-Month Multi-Month Cash Flow & Net Savings Projection
+  const annualProjection = useMemo(() => {
+    return NexaFinancialEngine.calculateAnnualProjection(
+      selectedYear,
+      selectedMonth,
+      executiveSummary.currentRealCashBalance,
+      {
+        accounts,
+        creditCards,
+        categories,
+        budgets,
+        itemBudgets,
+        subscriptions,
+        services,
+        installmentPurchases,
+        loans,
+        transactions,
+      }
+    );
+  }, [
+    selectedYear,
+    selectedMonth,
+    executiveSummary.currentRealCashBalance,
+    accounts,
+    creditCards,
+    categories,
+    budgets,
+    itemBudgets,
+    subscriptions,
+    services,
+    installmentPurchases,
+    loans,
+    transactions,
   ]);
 
   // --- Actions ---
@@ -1107,6 +1168,93 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setPlanNotes((prev) => prev.map((n) => (n.id === id ? updated : n)));
   };
 
+  // Quick Templates Actions (Gastos Frecuentes / Registro Rápido)
+  const saveQuickTemplate = async (
+    templateData: Partial<QuickTemplate> & { name: string; amount: number; categoryId: string }
+  ) => {
+    const id = templateData.id || `tmpl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const template: QuickTemplate = {
+      id,
+      name: templateData.name.trim(),
+      type: templateData.type || 'gasto',
+      amount: Math.round(templateData.amount),
+      categoryId: templateData.categoryId,
+      paymentMethod: templateData.paymentMethod || 'efectivo',
+      accountId: templateData.accountId,
+      creditCardId: templateData.creditCardId,
+      notes: templateData.notes?.trim() || undefined,
+      icon: templateData.icon || 'Zap',
+      color: templateData.color || '#3b82f6',
+      usageCount: templateData.usageCount || 0,
+    };
+
+    await storage.put('quickTemplates', template);
+    setQuickTemplates((prev) => {
+      const idx = prev.findIndex((t) => t.id === id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = template;
+        return copy;
+      }
+      return [template, ...prev];
+    });
+  };
+
+  const deleteQuickTemplate = async (id: string) => {
+    await storage.delete('quickTemplates', id);
+    setQuickTemplates((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const executeQuickTemplate = async (templateId: string, customAmount?: number): Promise<Transaction> => {
+    const template = quickTemplates.find((t) => t.id === templateId);
+    if (!template) throw new Error('Plantilla rápida no encontrada');
+
+    const effectiveAmount = customAmount !== undefined ? Math.round(customAmount) : template.amount;
+
+    // Pick payment target
+    let effectiveAccountId = template.accountId;
+    let effectiveCardId = template.creditCardId;
+
+    if (template.paymentMethod === 'banco' && !effectiveAccountId) {
+      effectiveAccountId = accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id;
+    } else if (template.paymentMethod === 'efectivo' && !effectiveAccountId) {
+      effectiveAccountId = accounts.find((a) => a.type === 'efectivo')?.id || accounts[0]?.id;
+    } else if (template.paymentMethod === 'tarjeta_credito' && !effectiveCardId) {
+      effectiveCardId = creditCards[0]?.id;
+    }
+
+    const newTx: Transaction = {
+      id: `tx_quick_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      date: todayStr,
+      concept: template.name,
+      notes: template.notes ? `${template.notes} (Registro rápido)` : 'Registro rápido con plantilla',
+      type: template.type,
+      amount: effectiveAmount,
+      categoryId: template.categoryId,
+      paymentMethodType: template.paymentMethod,
+      accountId: effectiveAccountId,
+      creditCardId: effectiveCardId,
+      status: 'realizado',
+      origin: `quick_template:${template.id}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Increment usage counter
+    const updatedTemplate: QuickTemplate = {
+      ...template,
+      usageCount: (template.usageCount || 0) + 1,
+    };
+
+    await storage.put('transactions', newTx);
+    await storage.put('quickTemplates', updatedTemplate);
+
+    setTransactions((prev) => [newTx, ...prev]);
+    setQuickTemplates((prev) => prev.map((t) => (t.id === templateId ? updatedTemplate : t)));
+
+    return newTx;
+  };
+
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
     const updated = { ...settings, ...newSettings };
     await storage.put('appSettings', updated);
@@ -1303,6 +1451,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         itemBudgets,
         groceryItems,
         planNotes,
+        quickTemplates,
         installmentPurchases,
         loans,
         loanPayments,
@@ -1317,6 +1466,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         detailedBudget,
         executiveSummary,
         allMonthTransactions,
+        annualProjection,
         saveTransaction,
         deleteTransaction,
         duplicateTransaction,
@@ -1339,6 +1489,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         savePlanNote,
         deletePlanNote,
         togglePlanNoteCompleted,
+        saveQuickTemplate,
+        deleteQuickTemplate,
+        executeQuickTemplate,
         saveInstallmentPurchase,
         deleteInstallmentPurchase,
         saveLoan,

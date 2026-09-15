@@ -30,6 +30,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from 'recharts';
+import { QuickExpenseTemplates } from '../common/QuickExpenseTemplates';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -280,6 +281,11 @@ export const DashboardView: React.FC = () => {
             Diferencia de ahorro: {formatMoney(executiveSummary.netRealSavings - executiveSummary.netPlannedSavings, settings.currencySymbol)}
           </div>
         </div>
+      </div>
+
+      {/* QUICK EXPENSE TEMPLATES (1-Click Quick Add) */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-xl">
+        <QuickExpenseTemplates />
       </div>
 
       {/* 3. CHART: Daily Cash Flow Evolution Curve */}
