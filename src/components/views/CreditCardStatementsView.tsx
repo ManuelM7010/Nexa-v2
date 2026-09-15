@@ -7,6 +7,7 @@ import {
   centsToDollars,
   dollarsToCents,
   MONTH_NAMES_ES,
+  formatPeriodEs,
 } from '../../utils/formatters';
 import {
   FileSpreadsheet,
@@ -407,8 +408,9 @@ export const CreditCardStatementsView: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-1">
-                      Periodo de facturación: <strong className="text-slate-200">{statement.cycleStartDate}</strong> al{' '}
-                      <strong className="text-slate-200">{statement.cycleEndDate}</strong> (Corte: día {statement.cutOffDay})
+                      Periodo del corte: <strong className="text-slate-100">{formatPeriodEs(statement.cycleStartDate, statement.cycleEndDate)}</strong>{' '}
+                      <span className="text-slate-500">({statement.cycleStartDate} al {statement.cycleEndDate})</span>
+                      <span className="ml-2 text-slate-400">· Corte: día {statement.cutOffDay}</span>
                     </p>
                   </div>
                 </div>
@@ -513,7 +515,8 @@ export const CreditCardStatementsView: React.FC = () => {
                     <span>Detalle de Consumos y Movimientos del Periodo</span>
                   </h4>
                   <p className="text-xs text-slate-400">
-                    Movimientos registrados entre el {statement.cycleStartDate} y el {statement.cycleEndDate}
+                    Consumos comprendidos del <strong className="text-slate-300">{statement.cycleStartDate}</strong> al{' '}
+                    <strong className="text-slate-300">{statement.cycleEndDate}</strong> (desde el día siguiente al corte anterior hasta la fecha de corte)
                   </p>
                 </div>
                 <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300">

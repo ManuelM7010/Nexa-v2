@@ -15,7 +15,7 @@ import {
   DailyCashFlowItem,
   AlertItem,
 } from '../types';
-import { daysInMonth, MONTH_NAMES_ES } from '../utils/formatters';
+import { daysInMonth, MONTH_NAMES_ES, addDays } from '../utils/formatters';
 
 export interface BudgetAnalysisItem {
   categoryId: string;
@@ -256,28 +256,15 @@ export class NexaFinancialEngine {
             closingYear = year - 1;
           }
         }
-        const closingDays = daysInMonth(closingYear, closingMonth);
-        const cutOffDayActual = Math.min(card.cutOffDay, closingDays);
-        const cycleEndDate = `${closingYear}-${String(closingMonth).padStart(2, '0')}-${String(cutOffDayActual).padStart(2, '0')}`;
+        const { cycleStartDate, cycleEndDate } = NexaFinancialEngine.getBillingCycleDates(card, closingYear, closingMonth);
 
-        // Start of that billing cycle (previous cutoff)
-        let prevClosingYear = closingYear;
-        let prevClosingMonth = closingMonth - 1;
-        if (prevClosingMonth < 1) {
-          prevClosingMonth = 12;
-          prevClosingYear = closingYear - 1;
-        }
-        const prevClosingDays = daysInMonth(prevClosingYear, prevClosingMonth);
-        const prevCutOffActual = Math.min(card.cutOffDay, prevClosingDays);
-        const cycleStartDate = `${prevClosingYear}-${String(prevClosingMonth).padStart(2, '0')}-${String(prevCutOffActual).padStart(2, '0')}`;
-
-        // Add expenses made on this card within this billing cycle
+        // Add expenses made on this card within this billing cycle (from day after previous cut-off to current cut-off day)
         const cycleExpenses = data.existingTransactions.filter((tx) => {
           if (tx.status === 'cancelado') return false;
           if (tx.creditCardId !== card.id) return false;
           if (tx.paymentMethodType !== 'tarjeta_credito') return false;
           if (tx.type === 'pago_tarjeta') return false;
-          return tx.date > cycleStartDate && tx.date <= cycleEndDate;
+          return tx.date >= cycleStartDate && tx.date <= cycleEndDate;
         });
 
         const cycleExpensesSum = cycleExpenses.reduce((sum, tx) => sum + tx.amount, 0);
@@ -1337,6 +1324,51 @@ export class NexaFinancialEngine {
   }
 
   /**
+   * Calculates the exact start and end dates for a credit card billing cycle.
+   * By banking rules and user specification:
+   * A cycle with cut-off day X in month M:
+   * - cycleEndDate: Cut-off day X of month M (e.g. 12 de septiembre: 2026-09-12)
+   * - cycleStartDate: Exactly 1 day after previous cut-off date (e.g. 13 de agosto: 2026-08-13)
+   *   (i.e. From August 13 to September 12, not August 12 to September 12).
+   */
+  static getBillingCycleDates(
+    card: { cutOffDay: number },
+    year: number,
+    month: number
+  ): {
+    cycleStartDate: string;
+    cycleEndDate: string;
+    cutOffDayActual: number;
+    prevCutOffDate: string;
+  } {
+    const cycleMonthDays = daysInMonth(year, month);
+    const cutOffDayActual = Math.min(card.cutOffDay, cycleMonthDays);
+    const cycleEndDate = `${year}-${String(month).padStart(2, '0')}-${String(cutOffDayActual).padStart(2, '0')}`;
+
+    // Previous cycle cutoff (1 month before)
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth < 1) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
+    const prevMonthDays = daysInMonth(prevYear, prevMonth);
+    const prevCutOffActual = Math.min(card.cutOffDay, prevMonthDays);
+    const prevCutOffDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(prevCutOffActual).padStart(2, '0')}`;
+
+    // The cycle starts exactly 1 day after the previous cutoff date
+    // e.g. If previous cutoff was 2026-08-12, cycle begins on 2026-08-13 and ends on 2026-09-12.
+    const cycleStartDate = addDays(prevCutOffDate, 1);
+
+    return {
+      cycleStartDate,
+      cycleEndDate,
+      cutOffDayActual,
+      prevCutOffDate,
+    };
+  }
+
+  /**
    * Generates a complete Credit Card Billing Statement (Estado de Cuenta)
    * for a given card and billing cycle month (year, month).
    */
@@ -1348,20 +1380,7 @@ export class NexaFinancialEngine {
     installmentPurchases: InstallmentPurchase[] = [],
     todayStr: string = new Date().toISOString().split('T')[0]
   ): CreditCardStatement {
-    const cycleMonthDays = daysInMonth(year, month);
-    const cutOffDayActual = Math.min(card.cutOffDay, cycleMonthDays);
-    const cycleEndDate = `${year}-${String(month).padStart(2, '0')}-${String(cutOffDayActual).padStart(2, '0')}`;
-
-    // Previous cycle cutoff (cycle start is cutOffDay of previous month)
-    let prevMonth = month - 1;
-    let prevYear = year;
-    if (prevMonth < 1) {
-      prevMonth = 12;
-      prevYear = year - 1;
-    }
-    const prevMonthDays = daysInMonth(prevYear, prevMonth);
-    const prevCutOffActual = Math.min(card.cutOffDay, prevMonthDays);
-    const cycleStartDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(prevCutOffActual).padStart(2, '0')}`;
+    const { cycleStartDate, cycleEndDate, cutOffDayActual } = NexaFinancialEngine.getBillingCycleDates(card, year, month);
 
     // Payment due date
     let payYear = year;
@@ -1377,11 +1396,11 @@ export class NexaFinancialEngine {
     const payDayActual = Math.min(card.paymentDueDay, payMonthDays);
     const paymentDueDate = `${payYear}-${String(payMonth).padStart(2, '0')}-${String(payDayActual).padStart(2, '0')}`;
 
-    // Transactions inside this billing cycle
+    // Transactions inside this billing cycle (from day after previous cut-off to current cut-off day)
     const cycleTxs = allTransactions.filter((tx) => {
       if (tx.creditCardId !== card.id) return false;
       if (tx.status === 'cancelado') return false;
-      return tx.date > cycleStartDate && tx.date <= cycleEndDate;
+      return tx.date >= cycleStartDate && tx.date <= cycleEndDate;
     });
 
     // Expenses / Purchases

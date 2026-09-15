@@ -92,6 +92,21 @@ export function formatDateEs(dateStr: string, options?: { withYear?: boolean; wi
   return `${d} ${monthName.substring(0, 3)}${options?.withYear ? ` ${y}` : ''}`;
 }
 
+export function formatPeriodEs(startStr: string, endStr: string): string {
+  if (!startStr || !endStr) return '';
+  const [sy, sm, sd] = startStr.split('-').map(Number);
+  const [ey, em, ed] = endStr.split('-').map(Number);
+  const startMonth = MONTH_NAMES_ES[sm - 1] || '';
+  const endMonth = MONTH_NAMES_ES[em - 1] || '';
+  if (sy === ey) {
+    if (sm === em) {
+      return `${sd} al ${ed} de ${startMonth} de ${sy}`;
+    }
+    return `${sd} de ${startMonth} al ${ed} de ${endMonth} de ${sy}`;
+  }
+  return `${sd} de ${startMonth} de ${sy} al ${ed} de ${endMonth} de ${ey}`;
+}
+
 export function getTodayDateStr(): string {
   // Respect user context: September 12, 2026 or current browser time if simulated
   const now = new Date();
