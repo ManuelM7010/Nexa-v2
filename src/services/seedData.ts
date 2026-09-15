@@ -190,6 +190,7 @@ export function getDefaultAppSettings(): AppSettings {
     encryptionEnabled: true,
     budgetAlertThreshold: 80,
     theme: 'fintech-dark',
+    liquidityStartDate: '2026-09-15',
   };
 }
 
@@ -214,11 +215,11 @@ export function generateDemoSeedData(): {
       name: 'Efectivo Personal',
       type: 'efectivo',
       initialBalance: 10000, // $100.00
-      initialDate: '2026-09-12',
+      initialDate: '2026-09-15',
       isActive: true,
       color: '#10b981',
-      createdAt: '2026-09-12T00:00:00.000Z',
-      updatedAt: '2026-09-12T00:00:00.000Z',
+      createdAt: '2026-09-15T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
     },
     {
       id: 'acc_bac',
@@ -226,11 +227,11 @@ export function generateDemoSeedData(): {
       type: 'banco',
       bankName: 'BAC Credomatic',
       initialBalance: 85000, // $850.00
-      initialDate: '2026-09-12',
+      initialDate: '2026-09-15',
       isActive: true,
       color: '#2563eb',
-      createdAt: '2026-09-12T00:00:00.000Z',
-      updatedAt: '2026-09-12T00:00:00.000Z',
+      createdAt: '2026-09-15T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
     },
     {
       id: 'acc_agricola',
@@ -238,11 +239,11 @@ export function generateDemoSeedData(): {
       type: 'banco',
       bankName: 'Banco Agrícola',
       initialBalance: 30000, // $300.00
-      initialDate: '2026-09-12',
+      initialDate: '2026-09-15',
       isActive: true,
       color: '#0284c7',
-      createdAt: '2026-09-12T00:00:00.000Z',
-      updatedAt: '2026-09-12T00:00:00.000Z',
+      createdAt: '2026-09-15T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
     },
   ];
 
@@ -429,7 +430,7 @@ export function generateDemoSeedData(): {
 
   const initialPosition: InitialPosition = {
     id: 'pos_inicial_principal',
-    startDate: '2026-09-12',
+    startDate: '2026-09-15',
     cashBalance: 10000, // $100.00
     bankBalances: {
       acc_bac: 85000, // $850.00
@@ -443,7 +444,7 @@ export function generateDemoSeedData(): {
       loan_auto: 320000, // $3,200.00
     },
     initialized: true,
-    updatedAt: '2026-09-12T00:00:00.000Z',
+    updatedAt: '2026-09-15T00:00:00.000Z',
   };
 
   const budgets: Budget[] = [
@@ -488,12 +489,25 @@ export function generateDemoSeedData(): {
     },
   ];
 
-  // Movements matching prompt scenario:
-  // Sep 12: hoy (posicion inicial $850 banco, $100 cash)
-  // Sep 13: Gasto $25
-  // Sep 14: Ingreso Quincena $685
-  // Sep 15: Gasto $120, Obligacion $350
+  // Transactions list including prior August card payment for cycle calculation
   const transactions: Transaction[] = [
+    {
+      id: 'tx_demo_aug20_pago_tdc',
+      date: '2026-08-20',
+      expectedDate: '2026-08-20',
+      realDate: '2026-08-20',
+      concept: 'Abono Ciclo Agosto Tarjeta BAC',
+      notes: 'Abono realizado en ciclo anterior (agosto)',
+      type: 'pago_tarjeta',
+      categoryId: 'cat_deuda_tarjetas',
+      amount: 15000, // $150.00
+      paymentMethodType: 'banco',
+      accountId: 'acc_bac',
+      creditCardId: 'card_bac',
+      status: 'realizado',
+      createdAt: '2026-08-20T00:00:00.000Z',
+      updatedAt: '2026-08-20T00:00:00.000Z',
+    },
     {
       id: 'tx_demo_sep13_combustible',
       date: '2026-09-13',

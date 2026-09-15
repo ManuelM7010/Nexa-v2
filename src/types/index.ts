@@ -306,6 +306,7 @@ export interface AppSettings {
   encryptionEnabled: boolean;
   budgetAlertThreshold: number; // default 80%
   theme: 'fintech-dark' | 'fintech-light';
+  liquidityStartDate: string; // YYYY-MM-DD (e.g. '2026-09-15')
 }
 
 export interface DailyCashFlowItem {

@@ -373,9 +373,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       todayStr,
       initialPosition,
       accounts,
-      fullTransactionsForCashFlow
+      fullTransactionsForCashFlow,
+      settings.liquidityStartDate || '2026-09-15'
     );
-  }, [selectedYear, selectedMonth, todayStr, initialPosition, accounts, transactions, allMonthTransactions]);
+  }, [
+    selectedYear,
+    selectedMonth,
+    todayStr,
+    initialPosition,
+    accounts,
+    transactions,
+    allMonthTransactions,
+    settings.liquidityStartDate,
+  ]);
 
   // Deep Budget vs Real Analysis
   const budgetAnalysis = useMemo(() => {
@@ -420,7 +430,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       loans,
       dailyCashFlow,
       allMonthTransactions,
-      budgetAnalysis
+      budgetAnalysis,
+      settings.liquidityStartDate || '2026-09-15'
     );
   }, [
     selectedYear,
@@ -432,6 +443,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     dailyCashFlow,
     allMonthTransactions,
     budgetAnalysis,
+    settings.liquidityStartDate,
   ]);
 
   // 12-Month Multi-Month Cash Flow & Net Savings Projection

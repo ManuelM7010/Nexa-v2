@@ -19,8 +19,9 @@ import {
   Plus,
   TrendingUp,
   TrendingDown,
+  Calendar,
 } from 'lucide-react';
-import { dollarsToCents, centsToDollars } from '../../utils/formatters';
+import { dollarsToCents, centsToDollars, formatDateEs } from '../../utils/formatters';
 import { NewCategoryModal } from '../common/NewCategoryModal';
 
 export const SettingsView: React.FC = () => {
@@ -35,6 +36,9 @@ export const SettingsView: React.FC = () => {
     loadDemoData,
     clearAllData,
     setIsRenderGuideOpen,
+    todayStr,
+    selectedYear,
+    selectedMonth,
   } = useFinance();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -190,6 +194,98 @@ export const SettingsView: React.FC = () => {
               <option value={0}>Domingo</option>
             </select>
             <span className="text-[10px] text-slate-400 mt-1 block">Afecta el Calendario Mensual</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Liquidity Calculation Starting Date Configuration */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-blue-400" />
+              <span>Fecha de Inicio del Cálculo de Liquidez</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Control del punto de inicio para el cómputo de saldos y flujo de caja diario en cuentas
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span>Inicio: {formatDateEs(settings.liquidityStartDate || '2026-09-15', { withYear: true })}</span>
+          </div>
+        </div>
+
+        <div className="bg-slate-950/60 rounded-xl p-4 border border-slate-800/80 space-y-2.5">
+          <p className="text-xs text-slate-300 leading-relaxed">
+            El saldo configurado en tus cuentas bancarias y efectivo corresponde a tu dinero real disponible a partir de este día.
+            Todos los cálculos de liquidez anteriores a esta fecha se computan estrictamente en <span className="font-mono text-emerald-400 font-bold">$0.00</span>.
+          </p>
+          <div className="flex items-start gap-2.5 text-[11px] text-slate-400 bg-slate-900/70 p-3 rounded-lg border border-slate-800">
+            <span className="text-blue-400 font-bold text-xs shrink-0 mt-0.5">💡</span>
+            <span>
+              <strong>Estados de cuenta y aportes de meses previos:</strong> Los movimientos registrados con fecha anterior (por ejemplo, compras o aportes a tarjetas de crédito en agosto) se conservan para auditar y calcular con precisión los estados de cuenta de tus tarjetas, pero <strong>no afectan la liquidez bancaria</strong> ni reducen tus saldos antes del día de inicio.
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end pt-1">
+          <div>
+            <label className="block text-slate-300 font-semibold text-xs mb-1.5">
+              Día de Inicio de Liquidez (AAAA-MM-DD)
+            </label>
+            <input
+              type="date"
+              value={settings.liquidityStartDate || '2026-09-15'}
+              onChange={(e) => {
+                const newDate = e.target.value;
+                if (newDate) {
+                  updateSettings({ liquidityStartDate: newDate });
+                  showNotification(`Inicio de cálculo de liquidez actualizado al ${newDate}`);
+                }
+              }}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono text-xs focus:border-blue-500 focus:outline-none"
+            />
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Cambia esta fecha en cualquier momento si deseas reiniciar el cómputo o proyectar a partir de otro día.
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="text-[11px] text-slate-400 font-medium block">Accesos rápidos de configuración:</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettings({ liquidityStartDate: '2026-09-15' });
+                  showNotification('Inicio de liquidez fijado al 15 de Septiembre 2026.');
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-300 hover:text-white text-xs font-semibold transition cursor-pointer border border-slate-700"
+              >
+                15 de Septiembre 2026
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateSettings({ liquidityStartDate: todayStr });
+                  showNotification(`Inicio de liquidez fijado a hoy (${todayStr}).`);
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold transition cursor-pointer border border-slate-700"
+              >
+                Hoy ({todayStr})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const firstDay = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+                  updateSettings({ liquidityStartDate: firstDay });
+                  showNotification(`Inicio de liquidez fijado al 1ro de ${selectedYear}-${String(selectedMonth).padStart(2, '0')}.`);
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold transition cursor-pointer border border-slate-700"
+              >
+                1ro de este mes
+              </button>
+            </div>
           </div>
         </div>
       </div>

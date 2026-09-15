@@ -608,43 +608,103 @@ export class NexaFinancialEngine {
     todayStr: string,
     initialPos: InitialPosition | null,
     accounts: Account[],
-    allTransactions: Transaction[]
+    allTransactions: Transaction[],
+    liquidityStartDate: string = '2026-09-15'
   ): DailyCashFlowItem[] {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     const daysInCurrentMonth = daysInMonth(year, month);
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-
-    // 1. Calculate Starting Balance at the beginning of this month:
-    // Base cash balance from accounts/initial position
-    let cumulativeCash = 0;
-    accounts.forEach((acc) => {
-      if (acc.isActive) cumulativeCash += acc.initialBalance;
-    });
-
     const monthStartStr = `${monthKey}-01`;
+    const monthEndStr = `${monthKey}-${String(daysInCurrentMonth).padStart(2, '0')}`;
 
-    // Incorporate all transactions prior to the 1st of this month
-    allTransactions.forEach((tx) => {
-      if (tx.status === 'cancelado') return;
-      if (tx.date < monthStartStr) {
-        // Transfers between user cash/bank accounts do not alter total cash
-        if (tx.type === 'transferencia') return;
-
-        // Card purchases DO NOT alter bank cash! Only pagos de tarjeta from cash/bank do
-        if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') {
-          return;
-        }
-
-        if (tx.type === 'ingreso') {
-          cumulativeCash += tx.amount;
-        } else {
-          // Expenses, subscriptions, utilities, card payments, loan payments paid from cash/bank
-          cumulativeCash -= tx.amount;
-        }
-      }
+    // Base cash balance from active accounts (representing funds as of liquidityStartDate)
+    let totalBaseCash = 0;
+    accounts.forEach((acc) => {
+      if (acc.isActive) totalBaseCash += acc.initialBalance;
     });
 
     const dailyItems: DailyCashFlowItem[] = [];
+
+    // CASE 1: The entire month is strictly prior to liquidityStartDate (e.g. Jan-Aug 2026)
+    // As requested: "sea 0.00 desde enero hasta el 15 de septiembre 2026"
+    // Transactions exist (for CC statement calculations), but cash liquidity is 0.00
+    if (monthEndStr < liquidityStartDate) {
+      for (let d = 1; d <= daysInCurrentMonth; d++) {
+        const dayStr = String(d).padStart(2, '0');
+        const dateStr = `${monthKey}-${dayStr}`;
+        const [y, m, dayNum] = dateStr.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, dayNum);
+        const dayOfWeek = dayNames[dateObj.getDay()];
+
+        const dayTxs = allTransactions.filter((tx) => tx.date === dateStr && tx.status !== 'cancelado');
+        let obligations = 0;
+        dayTxs.forEach((tx) => {
+          if (
+            tx.type === 'pago_tarjeta' ||
+            tx.type === 'cuota_tarjeta' ||
+            tx.type === 'cuota_prestamo' ||
+            tx.type === 'suscripcion' ||
+            tx.type === 'servicio'
+          ) {
+            obligations += tx.amount;
+          }
+        });
+
+        dailyItems.push({
+          date: dateStr,
+          dayOfWeek,
+          dayName: dayOfWeek,
+          dayNameShort: dayOfWeek.slice(0, 3),
+          startingBalance: 0,
+          initialBalance: 0,
+          realizedIncome: 0,
+          realIncome: 0,
+          projectedIncome: 0,
+          plannedIncome: 0,
+          totalIncome: 0,
+          realizedExpense: 0,
+          realExpense: 0,
+          projectedExpense: 0,
+          plannedExpense: 0,
+          totalExpense: 0,
+          obligations,
+          endDayRealBalance: 0,
+          endDayProjectedBalance: 0,
+          finalBalance: 0,
+          variation: 0,
+          events: dayTxs,
+          movements: dayTxs,
+          status: 'positive',
+          hasRisk: false,
+          isNegative: false,
+          isToday: dateStr === todayStr,
+          isPast: dateStr < todayStr,
+        });
+      }
+      return dailyItems;
+    }
+
+    // CASE 2: Month is on or after liquidityStartDate
+    // If month starts on/after liquidityStartDate, cumulativeCash carries totalBaseCash + all cash movements since liquidityStartDate
+    let cumulativeCash = 0;
+    if (monthStartStr >= liquidityStartDate) {
+      cumulativeCash = totalBaseCash;
+      allTransactions.forEach((tx) => {
+        if (tx.status === 'cancelado') return;
+        // Only transactions on or after liquidityStartDate and prior to this month start
+        if (tx.date >= liquidityStartDate && tx.date < monthStartStr) {
+          if (tx.type === 'transferencia') return;
+          if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+
+          if (tx.type === 'ingreso') {
+            cumulativeCash += tx.amount;
+          } else {
+            cumulativeCash -= tx.amount;
+          }
+        }
+      });
+    }
+
     let runningProjectedBalance = cumulativeCash;
     let runningRealBalance = cumulativeCash;
 
@@ -654,6 +714,62 @@ export class NexaFinancialEngine {
       const [y, m, dayNum] = dateStr.split('-').map(Number);
       const dateObj = new Date(y, m - 1, dayNum);
       const dayOfWeek = dayNames[dateObj.getDay()];
+
+      // If the day is strictly before liquidityStartDate (e.g. Sept 1 to Sept 14 when start is Sept 15):
+      // Liquidity balance remains 0.00
+      if (dateStr < liquidityStartDate) {
+        const dayTxs = allTransactions.filter((tx) => tx.date === dateStr && tx.status !== 'cancelado');
+        let obligations = 0;
+        dayTxs.forEach((tx) => {
+          if (
+            tx.type === 'pago_tarjeta' ||
+            tx.type === 'cuota_tarjeta' ||
+            tx.type === 'cuota_prestamo' ||
+            tx.type === 'suscripcion' ||
+            tx.type === 'servicio'
+          ) {
+            obligations += tx.amount;
+          }
+        });
+
+        dailyItems.push({
+          date: dateStr,
+          dayOfWeek,
+          dayName: dayOfWeek,
+          dayNameShort: dayOfWeek.slice(0, 3),
+          startingBalance: 0,
+          initialBalance: 0,
+          realizedIncome: 0,
+          realIncome: 0,
+          projectedIncome: 0,
+          plannedIncome: 0,
+          totalIncome: 0,
+          realizedExpense: 0,
+          realExpense: 0,
+          projectedExpense: 0,
+          plannedExpense: 0,
+          totalExpense: 0,
+          obligations,
+          endDayRealBalance: 0,
+          endDayProjectedBalance: 0,
+          finalBalance: 0,
+          variation: 0,
+          events: dayTxs,
+          movements: dayTxs,
+          status: 'positive',
+          hasRisk: false,
+          isNegative: false,
+          isToday: dateStr === todayStr,
+          isPast: dateStr < todayStr,
+        });
+        continue;
+      }
+
+      // If dateStr === liquidityStartDate: the liquidity activates on this day with totalBaseCash!
+      if (dateStr === liquidityStartDate && monthStartStr < liquidityStartDate) {
+        runningProjectedBalance = totalBaseCash;
+        runningRealBalance = totalBaseCash;
+      }
 
       const dayStartProjected = runningProjectedBalance;
 
@@ -1104,46 +1220,53 @@ export class NexaFinancialEngine {
     loans: Loan[],
     dailyFlow: DailyCashFlowItem[],
     allTransactions: Transaction[],
-    budgetItems: BudgetAnalysisItem[]
+    budgetItems: BudgetAnalysisItem[],
+    liquidityStartDate: string = '2026-09-15'
   ): ExecutiveSummary {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+    const daysInCurrentMonth = daysInMonth(year, month);
+    const monthEndStr = `${monthKey}-${String(daysInCurrentMonth).padStart(2, '0')}`;
 
-    // Real cash balance right now (cash accounts + bank accounts + realized transactions up to today)
+    // Real cash balance right now (cash accounts + bank accounts + realized transactions from liquidityStartDate up to today)
     let currentRealCashBalance = 0;
     let bankBalance = 0;
     let cashBalance = 0;
 
-    accounts.forEach((acc) => {
-      if (acc.isActive) {
-        currentRealCashBalance += acc.initialBalance;
-        if (acc.type === 'efectivo') {
-          cashBalance += acc.initialBalance;
-        } else {
-          bankBalance += acc.initialBalance;
+    // Only compute real cash if today is on or after liquidityStartDate
+    if (todayStr >= liquidityStartDate) {
+      accounts.forEach((acc) => {
+        if (acc.isActive) {
+          currentRealCashBalance += acc.initialBalance;
+          if (acc.type === 'efectivo') {
+            cashBalance += acc.initialBalance;
+          } else {
+            bankBalance += acc.initialBalance;
+          }
         }
-      }
-    });
+      });
 
-    allTransactions.forEach((tx) => {
-      if (tx.status !== 'realizado') return;
-      if (tx.date <= todayStr) {
-        if (tx.type === 'transferencia') return;
-        if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+      allTransactions.forEach((tx) => {
+        if (tx.status !== 'realizado') return;
+        // Only apply movements from liquidityStartDate onwards
+        if (tx.date >= liquidityStartDate && tx.date <= todayStr) {
+          if (tx.type === 'transferencia') return;
+          if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
 
-        const targetAccount = accounts.find((a) => a.id === tx.accountId);
-        const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
+          const targetAccount = accounts.find((a) => a.id === tx.accountId);
+          const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
 
-        if (tx.type === 'ingreso') {
-          currentRealCashBalance += tx.amount;
-          if (isCash) cashBalance += tx.amount;
-          else bankBalance += tx.amount;
-        } else {
-          currentRealCashBalance -= tx.amount;
-          if (isCash) cashBalance -= tx.amount;
-          else bankBalance -= tx.amount;
+          if (tx.type === 'ingreso') {
+            currentRealCashBalance += tx.amount;
+            if (isCash) cashBalance += tx.amount;
+            else bankBalance += tx.amount;
+          } else {
+            currentRealCashBalance -= tx.amount;
+            if (isCash) cashBalance -= tx.amount;
+            else bankBalance -= tx.amount;
+          }
         }
-      }
-    });
+      });
+    }
 
     // Month totals
     const monthTxs = allTransactions.filter(
@@ -1187,7 +1310,16 @@ export class NexaFinancialEngine {
 
     let lowestProjectedBalance = currentRealCashBalance;
     if (dailyFlow && dailyFlow.length > 0) {
-      lowestProjectedBalance = Math.min(...dailyFlow.map((d) => d.endDayProjectedBalance));
+      if (monthEndStr < liquidityStartDate) {
+        lowestProjectedBalance = 0;
+      } else {
+        const activeDays = dailyFlow.filter((d) => d.date >= liquidityStartDate);
+        if (activeDays.length > 0) {
+          lowestProjectedBalance = Math.min(...activeDays.map((d) => d.endDayProjectedBalance));
+        } else {
+          lowestProjectedBalance = Math.min(...dailyFlow.map((d) => d.endDayProjectedBalance));
+        }
+      }
     }
 
     // Upcoming committed obligations in next 15 days from today
