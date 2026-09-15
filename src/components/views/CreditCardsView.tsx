@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { CreditCard } from '../../types';
 import { formatMoney, dollarsToCents, centsToDollars } from '../../utils/formatters';
+import { NexaFinancialEngine } from '../../services/financialEngine';
 import {
   CreditCard as CreditCardIcon,
   AlertTriangle,
@@ -14,17 +15,20 @@ import {
   Sparkles,
   Edit2,
   Trash2,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const CreditCardsView: React.FC = () => {
   const {
     creditCards,
+    transactions,
     saveCreditCard,
     deleteCreditCard,
     saveTransaction,
     accounts,
     todayStr,
     settings,
+    setActiveTab,
   } = useFinance();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -100,21 +104,21 @@ export const CreditCardsView: React.FC = () => {
       accountId: paymentAccountId,
       creditCardId: card.id,
       status: 'realizado',
+      origin: `pago_tarjeta:${card.id}`,
       notes: `Liquidación de deuda de tarjeta. Descontado de cuenta bancaria.`,
-    });
-
-    // Reduce used balance on card
-    await saveCreditCard({
-      ...card,
-      initialUsedBalance: Math.max(0, card.initialUsedBalance - payCents),
     });
 
     setPaymentCardId(null);
     setPaymentAmountStr('');
   };
 
+  const cardBalances = creditCards.map((c) => ({
+    card: c,
+    ...NexaFinancialEngine.calculateCardCurrentBalance(c, transactions),
+  }));
+
   const totalLimit = creditCards.reduce((acc, c) => acc + c.limit, 0);
-  const totalUsed = creditCards.reduce((acc, c) => acc + c.initialUsedBalance, 0);
+  const totalUsed = cardBalances.reduce((acc, cb) => acc + cb.balance, 0);
   const totalAvailable = Math.max(0, totalLimit - totalUsed);
 
   return (
@@ -131,13 +135,24 @@ export const CreditCardsView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={openNewCardModal}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white shadow-md shadow-blue-600/30 transition cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nueva Tarjeta</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setActiveTab('estados-cuenta')}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-bold text-xs transition cursor-pointer"
+            title="Ver Estados de Cuenta detallados con total TDDC"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Estados de Cuenta (TDDC)</span>
+          </button>
+
+          <button
+            onClick={openNewCardModal}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white shadow-md shadow-blue-600/30 transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva Tarjeta</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary Metrics */}
@@ -173,8 +188,8 @@ export const CreditCardsView: React.FC = () => {
       {/* Credit Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {creditCards.map((card) => {
-          const usedPct = card.limit > 0 ? Math.round((card.initialUsedBalance / card.limit) * 100) : 0;
-          const available = Math.max(0, card.limit - card.initialUsedBalance);
+          const { balance: currentBalance, available, usagePercentage: usedPct } =
+            NexaFinancialEngine.calculateCardCurrentBalance(card, transactions);
           const isHighUsage = usedPct >= 80;
           const isPayingThis = paymentCardId === card.id;
 
@@ -219,9 +234,9 @@ export const CreditCardsView: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between">
                   <div>
-                    <span className="text-xs text-slate-400 block">Deuda Utilizada:</span>
+                    <span className="text-xs text-slate-400 block">Deuda Utilizada (TDDC):</span>
                     <span className="text-xl font-black text-rose-400">
-                      {formatMoney(card.initialUsedBalance, settings.currencySymbol)}
+                      {formatMoney(currentBalance, settings.currencySymbol)}
                     </span>
                   </div>
                   <div className="text-right">
@@ -302,10 +317,10 @@ export const CreditCardsView: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setPaymentAmountStr(centsToDollars(card.initialUsedBalance).toFixed(2))}
+                        onClick={() => setPaymentAmountStr(centsToDollars(currentBalance).toFixed(2))}
                         className="text-[10px] px-2 py-1 rounded bg-slate-800 text-blue-300 hover:text-white"
                       >
-                        Pago total ({formatMoney(card.initialUsedBalance, settings.currencySymbol)})
+                        Pago total ({formatMoney(currentBalance, settings.currencySymbol)})
                       </button>
                     </div>
 
@@ -325,16 +340,27 @@ export const CreditCardsView: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => {
-                      setPaymentCardId(card.id);
-                      setPaymentAmountStr(centsToDollars(card.initialUsedBalance).toFixed(2));
-                    }}
-                    className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <span>Pagar / Liquidar Tarjeta</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setActiveTab('estados-cuenta')}
+                      className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-xs font-semibold text-slate-300 transition cursor-pointer flex items-center justify-center gap-1.5 border border-slate-700/60"
+                      title="Ver Estado de Cuenta y Detalle de Gastos"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Estado de Cuenta</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setPaymentCardId(card.id);
+                        setPaymentAmountStr(centsToDollars(currentBalance).toFixed(2));
+                      }}
+                      className="py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/20"
+                    >
+                      <span>Liquidar</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

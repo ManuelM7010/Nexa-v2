@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
+import { Category } from '../../types';
 import { formatMoney, dollarsToCents, centsToDollars } from '../../utils/formatters';
 import {
   PieChart,
@@ -27,6 +28,7 @@ export const BudgetView: React.FC = () => {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [budgetInput, setBudgetInput] = useState('');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [categoryToEditModal, setCategoryToEditModal] = useState<Category | null>(null);
 
   const expenseCategories = categories.filter((c) => c.type === 'gasto');
 
@@ -209,7 +211,21 @@ export const BudgetView: React.FC = () => {
                   <tr key={catId} className="hover:bg-slate-850/60 transition">
                     {/* Category Name */}
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-white">{catName}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-bold text-white">{catName}</div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const foundCat = categories.find((c) => c.id === catId) || item.category || null;
+                            setCategoryToEditModal(foundCat);
+                            setIsCategoryModalOpen(true);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 hover:opacity-100 text-slate-500 hover:text-blue-400 p-1 rounded transition"
+                          title={`Editar categoría "${catName}"`}
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </td>
 
                     {/* Presupuesto */}
@@ -347,7 +363,11 @@ export const BudgetView: React.FC = () => {
 
       <NewCategoryModal
         isOpen={isCategoryModalOpen}
-        onClose={() => setIsCategoryModalOpen(false)}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          setCategoryToEditModal(null);
+        }}
+        categoryToEdit={categoryToEditModal}
         defaultType="gasto"
       />
     </div>

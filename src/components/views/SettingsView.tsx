@@ -1,11 +1,13 @@
 import React, { useRef, useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
+import { Category } from '../../types';
 import {
   Settings,
   Download,
   Upload,
   FileSpreadsheet,
   Trash2,
+  Edit2,
   RefreshCw,
   Sparkles,
   Server,
@@ -39,6 +41,7 @@ export const SettingsView: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isConfirmReset, setIsConfirmReset] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryModalType, setCategoryModalType] = useState<'gasto' | 'ingreso'>('gasto');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'gasto' | 'ingreso'>('all');
 
@@ -240,6 +243,7 @@ export const SettingsView: React.FC = () => {
 
             <button
               onClick={() => {
+                setEditingCategory(null);
                 setCategoryModalType('gasto');
                 setIsCategoryModalOpen(true);
               }}
@@ -295,22 +299,34 @@ export const SettingsView: React.FC = () => {
                   </div>
                 </div>
 
-                <button
-                  onClick={async () => {
-                    if (categories.length <= 1) {
-                      alert('Debes mantener al menos una categoría en el sistema.');
-                      return;
-                    }
-                    if (window.confirm(`¿Seguro que deseas eliminar la categoría "${cat.name}"?`)) {
-                      await deleteCategory(cat.id);
-                      showNotification(`Categoría "${cat.name}" eliminada.`);
-                    }
-                  }}
-                  className="text-slate-600 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-500/10 transition cursor-pointer shrink-0"
-                  title="Eliminar categoría"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => {
+                      setEditingCategory(cat);
+                      setIsCategoryModalOpen(true);
+                    }}
+                    className="text-slate-500 hover:text-blue-400 p-1 rounded-lg hover:bg-blue-500/10 transition cursor-pointer"
+                    title="Editar categoría"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (categories.length <= 1) {
+                        alert('Debes mantener al menos una categoría en el sistema.');
+                        return;
+                      }
+                      if (window.confirm(`¿Seguro que deseas eliminar la categoría "${cat.name}"?`)) {
+                        await deleteCategory(cat.id);
+                        showNotification(`Categoría "${cat.name}" eliminada.`);
+                      }
+                    }}
+                    className="text-slate-600 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-500/10 transition cursor-pointer"
+                    title="Eliminar categoría"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
         </div>
@@ -455,10 +471,17 @@ export const SettingsView: React.FC = () => {
 
       <NewCategoryModal
         isOpen={isCategoryModalOpen}
-        onClose={() => setIsCategoryModalOpen(false)}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          setEditingCategory(null);
+        }}
+        categoryToEdit={editingCategory}
         defaultType={categoryModalType}
         onCategoryCreated={(newCat) => {
           showNotification(`Categoría "${newCat.name}" creada con éxito.`);
+        }}
+        onCategorySaved={(savedCat) => {
+          showNotification(`Categoría "${savedCat.name}" actualizada con éxito.`);
         }}
       />
     </div>

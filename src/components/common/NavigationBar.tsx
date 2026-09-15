@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   StickyNote,
   LineChart,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const NavigationBar: React.FC = () => {
@@ -33,6 +34,7 @@ export const NavigationBar: React.FC = () => {
     { id: 'super', label: 'Súper (Compras)', icon: ShoppingCart },
     { id: 'notas', label: 'Notas & Planes', icon: StickyNote },
     { id: 'tarjetas', label: 'Tarjetas', icon: CreditCard },
+    { id: 'estados-cuenta', label: 'Estados de Cuenta (TDDC)', icon: FileSpreadsheet },
     { id: 'cuotas', label: 'Compras a Cuotas', icon: Layers },
     { id: 'prestamos', label: 'Préstamos', icon: Landmark },
     { id: 'suscripciones', label: 'Suscripciones', icon: Tv },

@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { Category } from '../../types';
-import { X, Tag, Plus, Check } from 'lucide-react';
+import { X, Tag, Plus, Check, Edit2 } from 'lucide-react';
 
 interface NewCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
+  categoryToEdit?: Category | null;
   defaultType?: 'gasto' | 'ingreso';
   onCategoryCreated?: (newCategory: Category) => void;
+  onCategorySaved?: (savedCategory: Category) => void;
 }
 
 const PRESET_COLORS = [
@@ -26,8 +28,10 @@ const PRESET_COLORS = [
 export const NewCategoryModal: React.FC<NewCategoryModalProps> = ({
   isOpen,
   onClose,
+  categoryToEdit,
   defaultType = 'gasto',
   onCategoryCreated,
+  onCategorySaved,
 }) => {
   const { saveCategory, categories } = useFinance();
 
@@ -36,6 +40,22 @@ export const NewCategoryModal: React.FC<NewCategoryModalProps> = ({
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const [subcategoriesStr, setSubcategoriesStr] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (categoryToEdit) {
+      setName(categoryToEdit.name);
+      setType(categoryToEdit.type);
+      setColor(categoryToEdit.color || PRESET_COLORS[0]);
+      setSubcategoriesStr((categoryToEdit.subcategories || []).join(', '));
+      setError(null);
+    } else {
+      setName('');
+      setType(defaultType);
+      setColor(PRESET_COLORS[0]);
+      setSubcategoriesStr('');
+      setError(null);
+    }
+  }, [categoryToEdit, defaultType, isOpen]);
 
   if (!isOpen) return null;
 
@@ -47,9 +67,12 @@ export const NewCategoryModal: React.FC<NewCategoryModalProps> = ({
       return;
     }
 
-    // Check duplicate
+    // Check duplicate (excluding the category itself if editing)
     const exists = categories.some(
-      (c) => c.name.toLowerCase() === trimmedName.toLowerCase() && c.type === type
+      (c) =>
+        c.name.toLowerCase() === trimmedName.toLowerCase() &&
+        c.type === type &&
+        (!categoryToEdit || c.id !== categoryToEdit.id)
     );
     if (exists) {
       setError(`Ya existe una categoría de ${type} con el nombre "${trimmedName}".`);
@@ -61,19 +84,21 @@ export const NewCategoryModal: React.FC<NewCategoryModalProps> = ({
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
-    const newCatId = `cat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const newCategory: Category = {
-      id: newCatId,
+    const catId = categoryToEdit?.id || `cat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const savedCategory: Category = {
+      id: catId,
       name: trimmedName,
       type,
       color,
-      icon: type === 'ingreso' ? 'TrendingUp' : 'Tag',
+      icon: categoryToEdit?.icon || (type === 'ingreso' ? 'TrendingUp' : 'Tag'),
       subcategories,
     };
 
-    await saveCategory(newCategory);
-    if (onCategoryCreated) {
-      onCategoryCreated(newCategory);
+    await saveCategory(savedCategory);
+    if (onCategorySaved) {
+      onCategorySaved(savedCategory);
+    } else if (onCategoryCreated) {
+      onCategoryCreated(savedCategory);
     }
 
     setName('');
@@ -88,12 +113,16 @@ export const NewCategoryModal: React.FC<NewCategoryModalProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
-              <Tag className="w-4 h-4" />
+              {categoryToEdit ? <Edit2 className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">Nueva Categoría</h3>
+              <h3 className="text-sm font-bold text-white">
+                {categoryToEdit ? 'Editar Categoría' : 'Nueva Categoría'}
+              </h3>
               <p className="text-[11px] text-slate-400">
-                Personaliza tus ingresos y gastos
+                {categoryToEdit
+                  ? 'Modifica el nombre, tipo, color o subcategorías'
+                  : 'Personaliza tus ingresos y gastos'}
               </p>
             </div>
           </div>
@@ -210,8 +239,8 @@ export const NewCategoryModal: React.FC<NewCategoryModalProps> = ({
               type="submit"
               className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition cursor-pointer shadow-md shadow-blue-600/30 flex items-center gap-1.5"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Guardar Categoría</span>
+              {categoryToEdit ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              <span>{categoryToEdit ? 'Actualizar Categoría' : 'Guardar Categoría'}</span>
             </button>
           </div>
         </form>
