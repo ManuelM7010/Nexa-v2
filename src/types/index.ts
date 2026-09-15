@@ -153,6 +153,8 @@ export interface Loan {
   remainingInstallmentsCount: number;
   paymentsMadeCount: number;
   nextPaymentDate: string; // YYYY-MM-DD
+  startDate?: string; // YYYY-MM-DD
+  totalInstallments?: number;
   preferredAccountId?: string;
   notes?: string;
   createdAt: string;

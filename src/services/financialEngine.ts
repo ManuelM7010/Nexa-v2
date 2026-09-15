@@ -91,6 +91,225 @@ export interface MonthProjection {
  */
 export class NexaFinancialEngine {
   /**
+   * Generates all installment items for a purchase according to its firstPaymentDate,
+   * frequency, and totalInstallments.
+   */
+  static getInstallmentSchedule(ip: InstallmentPurchase): {
+    installmentNumber: number;
+    totalInstallments: number;
+    date: string; // YYYY-MM-DD
+    amount: number;
+  }[] {
+    const schedule: { installmentNumber: number; totalInstallments: number; date: string; amount: number }[] = [];
+    if (!ip.firstPaymentDate || !ip.totalInstallments || ip.totalInstallments <= 0) {
+      return schedule;
+    }
+
+    const [firstY, firstM, firstD] = ip.firstPaymentDate.split('-').map(Number);
+    if (!firstY || !firstM || !firstD) return schedule;
+
+    for (let i = 0; i < ip.totalInstallments; i++) {
+      let y = firstY;
+      let m = firstM + i;
+      while (m > 12) {
+        m -= 12;
+        y += 1;
+      }
+      const maxDay = daysInMonth(y, m);
+      const d = Math.min(firstD, maxDay);
+      const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      schedule.push({
+        installmentNumber: i + 1,
+        totalInstallments: ip.totalInstallments,
+        date: dateStr,
+        amount: ip.installmentAmount,
+      });
+    }
+
+    return schedule;
+  }
+
+  /**
+   * Calculates the status of an installment purchase as of a specific date (defaults to today).
+   * Identifies exact elapsed payments, remaining payments, pending balance, and completion.
+   */
+  static getInstallmentPurchaseStatus(
+    ip: InstallmentPurchase,
+    asOfDateStr: string = new Date().toISOString().split('T')[0]
+  ): {
+    paidCount: number;
+    remainingCount: number;
+    pendingBalance: number;
+    isCompleted: boolean;
+    lastPaymentDate: string | null;
+    nextPaymentDate: string | null;
+    lastInstallmentDate: string | null;
+    totalInstallments: number;
+    installmentAmount: number;
+  } {
+    const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
+    const total = ip.totalInstallments || schedule.length;
+    if (schedule.length === 0) {
+      const remaining = Math.max(0, total - (ip.paidInstallmentsCount || 0));
+      return {
+        paidCount: ip.paidInstallmentsCount || 0,
+        remainingCount: remaining,
+        pendingBalance: ip.pendingBalance !== undefined ? ip.pendingBalance : remaining * ip.installmentAmount,
+        isCompleted: remaining === 0,
+        lastPaymentDate: null,
+        nextPaymentDate: null,
+        lastInstallmentDate: null,
+        totalInstallments: total,
+        installmentAmount: ip.installmentAmount,
+      };
+    }
+
+    const elapsed = schedule.filter((s) => s.date <= asOfDateStr);
+    const future = schedule.filter((s) => s.date > asOfDateStr);
+
+    const paidCount = Math.min(total, Math.max(ip.paidInstallmentsCount || 0, elapsed.length));
+    const remainingCount = Math.max(0, total - paidCount);
+    const pendingBalance = remainingCount * ip.installmentAmount;
+    const isCompleted = remainingCount === 0;
+
+    const lastPaymentDate = elapsed.length > 0 ? elapsed[elapsed.length - 1].date : null;
+    const nextPaymentDate = future.length > 0 ? future[0].date : null;
+    const lastInstallmentDate = schedule[schedule.length - 1].date;
+
+    return {
+      paidCount,
+      remainingCount,
+      pendingBalance,
+      isCompleted,
+      lastPaymentDate,
+      nextPaymentDate,
+      lastInstallmentDate,
+      totalInstallments: total,
+      installmentAmount: ip.installmentAmount,
+    };
+  }
+
+  /**
+   * Generates the amortization schedule for a loan according to its startDate/nextPaymentDate
+   * and total installments.
+   */
+  static getLoanSchedule(loan: Loan): {
+    installmentNumber: number;
+    totalInstallments: number;
+    date: string;
+    amount: number;
+  }[] {
+    const schedule: { installmentNumber: number; totalInstallments: number; date: string; amount: number }[] = [];
+    const total =
+      loan.totalInstallments ||
+      (loan.paymentsMadeCount + loan.remainingInstallmentsCount > 0
+        ? loan.paymentsMadeCount + loan.remainingInstallmentsCount
+        : 24);
+
+    if (!total || total <= 0) return schedule;
+
+    let startYear: number;
+    let startMonth: number;
+    let paymentDay = loan.paymentDay || 28;
+
+    if (loan.startDate) {
+      const [sy, sm, sd] = loan.startDate.split('-').map(Number);
+      startYear = sy;
+      startMonth = sm;
+      if (sd) paymentDay = sd;
+    } else {
+      const ref = loan.nextPaymentDate || loan.createdAt || '2026-09-01';
+      const [ry, rm, rd] = ref.split('-').map(Number);
+      if (rd) paymentDay = rd;
+      const offset = loan.paymentsMadeCount || 0;
+      let m = rm - offset;
+      let y = ry;
+      while (m < 1) {
+        m += 12;
+        y -= 1;
+      }
+      startYear = y;
+      startMonth = m;
+    }
+
+    for (let i = 0; i < total; i++) {
+      let y = startYear;
+      let m = startMonth + i;
+      while (m > 12) {
+        m -= 12;
+        y += 1;
+      }
+      const maxDay = daysInMonth(y, m);
+      const d = Math.min(paymentDay, maxDay);
+      schedule.push({
+        installmentNumber: i + 1,
+        totalInstallments: total,
+        date: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+        amount: loan.installmentAmount,
+      });
+    }
+
+    return schedule;
+  }
+
+  /**
+   * Calculates the status of a loan as of a specific date.
+   */
+  static getLoanStatus(
+    loan: Loan,
+    asOfDateStr: string = new Date().toISOString().split('T')[0]
+  ): {
+    paidCount: number;
+    remainingCount: number;
+    remainingBalance: number;
+    isCompleted: boolean;
+    lastPaymentDate: string | null;
+    nextPaymentDate: string | null;
+    lastInstallmentDate: string | null;
+    totalInstallments: number;
+  } {
+    const schedule = NexaFinancialEngine.getLoanSchedule(loan);
+    const total = loan.totalInstallments || schedule.length;
+    if (schedule.length === 0) {
+      const isCompleted = loan.remainingBalance <= 0 || loan.remainingInstallmentsCount <= 0;
+      return {
+        paidCount: loan.paymentsMadeCount || 0,
+        remainingCount: loan.remainingInstallmentsCount || 0,
+        remainingBalance: loan.remainingBalance,
+        isCompleted,
+        lastPaymentDate: null,
+        nextPaymentDate: null,
+        lastInstallmentDate: null,
+        totalInstallments: total,
+      };
+    }
+
+    const elapsed = schedule.filter((s) => s.date <= asOfDateStr);
+    const future = schedule.filter((s) => s.date > asOfDateStr);
+
+    const paidCount = Math.min(total, Math.max(loan.paymentsMadeCount || 0, elapsed.length));
+    const remainingCount = Math.max(0, total - paidCount);
+    const estimatedBalance = remainingCount * loan.installmentAmount;
+    const remainingBalance = Math.min(loan.remainingBalance, estimatedBalance);
+    const isCompleted = remainingCount === 0 || remainingBalance <= 0;
+
+    const lastPaymentDate = elapsed.length > 0 ? elapsed[elapsed.length - 1].date : null;
+    const nextPaymentDate = future.length > 0 ? future[0].date : null;
+    const lastInstallmentDate = schedule[schedule.length - 1].date;
+
+    return {
+      paidCount,
+      remainingCount,
+      remainingBalance,
+      isCompleted,
+      lastPaymentDate,
+      nextPaymentDate,
+      lastInstallmentDate,
+      totalInstallments: total,
+    };
+  }
+
+  /**
    * Generates all dynamic future financial transactions based on:
    * - Subscriptions
    * - Services
@@ -109,11 +328,13 @@ export class NexaFinancialEngine {
       creditCards: CreditCard[];
       accounts: Account[];
       existingTransactions: Transaction[];
+      todayStr?: string;
     }
   ): Transaction[] {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     const generated: Transaction[] = [];
     const daysCount = daysInMonth(year, month);
+    const referenceToday = data.todayStr || new Date().toISOString().split('T')[0];
 
     // 1. Subscriptions
     for (const sub of data.subscriptions) {
@@ -190,21 +411,39 @@ export class NexaFinancialEngine {
 
     // 3. Loans
     for (const loan of data.loans) {
+      const schedule = NexaFinancialEngine.getLoanSchedule(loan);
+      const monthInst = schedule.find((s) => s.date.startsWith(monthKey));
+
+      // If a schedule exists and this month is past the last installment, do not generate!
+      if (schedule.length > 0) {
+        const lastDate = schedule[schedule.length - 1].date;
+        if (lastDate < `${monthKey}-01`) {
+          continue; // Loan was completely paid off in a prior month!
+        }
+        if (!monthInst) {
+          continue;
+        }
+      }
+
       if (loan.remainingBalance <= 0 || loan.remainingInstallmentsCount <= 0) continue;
 
       const paymentDay = Math.min(loan.paymentDay, daysCount);
-      const dateStr = `${monthKey}-${String(paymentDay).padStart(2, '0')}`;
+      const dateStr = monthInst ? monthInst.date : `${monthKey}-${String(paymentDay).padStart(2, '0')}`;
 
       const hasDuplicate = data.existingTransactions.some(
         (t) => t.date.startsWith(monthKey) && t.origin === `prestamo:${loan.id}`
       );
 
       if (!hasDuplicate) {
+        const label = monthInst
+          ? `Cuota Préstamo ${monthInst.installmentNumber}/${monthInst.totalInstallments}: ${loan.name} (${loan.lender})`
+          : `Cuota Préstamo: ${loan.name} (${loan.lender})`;
+
         generated.push({
           id: `gen_loan_${loan.id}_${monthKey}`,
           date: dateStr,
           expectedDate: dateStr,
-          concept: `Cuota Préstamo: ${loan.name} (${loan.lender})`,
+          concept: label,
           type: 'cuota_prestamo',
           amount: loan.installmentAmount,
           paymentMethodType: 'banco',
@@ -260,14 +499,26 @@ export class NexaFinancialEngine {
         const cycleExpensesSum = cycleExpenses.reduce((sum, tx) => sum + tx.amount, 0);
         chargesAmount += cycleExpensesSum;
 
-        // Add active installment purchase quotas on this card for this month
+        // Add installment purchase quotas that fall specifically within this card billing cycle [cycleStartDate, cycleEndDate]
         if (data.installmentPurchases) {
           data.installmentPurchases.forEach((ip) => {
-            if (ip.creditCardId === card.id && ip.pendingBalance > 0) {
-              const alreadyIncluded = cycleExpenses.some((tx) => tx.origin === `cuota:${ip.id}`);
-              if (!alreadyIncluded) {
-                chargesAmount += ip.installmentAmount;
-              }
+            if (ip.creditCardId === card.id) {
+              const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
+              const matchingInCycle = schedule.filter(
+                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
+              );
+
+              matchingInCycle.forEach((inst) => {
+                const alreadyIncluded = cycleExpenses.some(
+                  (tx) =>
+                    tx.origin === `cuota:${ip.id}` ||
+                    tx.origin === `cuota:${ip.id}:${inst.installmentNumber}` ||
+                    tx.installmentPurchaseId === ip.id
+                );
+                if (!alreadyIncluded) {
+                  chargesAmount += inst.amount;
+                }
+              });
             }
           });
         }
@@ -302,6 +553,41 @@ export class NexaFinancialEngine {
             creditCardId: card.id,
             status: 'planificado',
             origin: `pago_tarjeta:${card.id}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    // 5. Active Installment Purchases on Credit Cards (charged to credit card on their scheduled date)
+    if (data.installmentPurchases) {
+      for (const ip of data.installmentPurchases) {
+        const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
+        const monthInst = schedule.find((s) => s.date.startsWith(monthKey));
+        if (!monthInst) continue;
+
+        const hasDuplicate = data.existingTransactions.some(
+          (t) =>
+            t.date.startsWith(monthKey) &&
+            (t.origin === `cuota:${ip.id}` ||
+              t.origin === `cuota:${ip.id}:${monthInst.installmentNumber}` ||
+              t.installmentPurchaseId === ip.id)
+        );
+
+        if (!hasDuplicate) {
+          generated.push({
+            id: `gen_inst_${ip.id}_${monthInst.installmentNumber}_${monthKey}`,
+            date: monthInst.date,
+            expectedDate: monthInst.date,
+            concept: `Cuota ${monthInst.installmentNumber}/${monthInst.totalInstallments}: ${ip.concept}`,
+            type: 'gasto',
+            amount: monthInst.amount,
+            paymentMethodType: 'tarjeta_credito',
+            creditCardId: ip.creditCardId,
+            status: monthInst.date <= referenceToday ? 'realizado' : 'planificado',
+            origin: `cuota:${ip.id}:${monthInst.installmentNumber}`,
+            installmentPurchaseId: ip.id,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           });
@@ -1419,11 +1705,38 @@ export class NexaFinancialEngine {
     // Active Installment Purchases for this card that apply to this cycle
     const cycleMonthKey = `${year}-${String(month).padStart(2, '0')}`;
     installmentPurchases.forEach((ip) => {
-      if (ip.creditCardId === card.id && ip.pendingBalance > 0) {
-        const alreadyInCycle = purchaseTxs.some((tx) => tx.origin === `cuota:${ip.id}`);
-        if (!alreadyInCycle) {
-          purchasesSum += ip.installmentAmount;
-        }
+      if (ip.creditCardId === card.id) {
+        const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
+        const matchingInCycle = schedule.filter(
+          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
+        );
+
+        matchingInCycle.forEach((inst) => {
+          const alreadyInCycle = purchaseTxs.some(
+            (tx) =>
+              tx.origin === `cuota:${ip.id}` ||
+              tx.origin === `cuota:${ip.id}:${inst.installmentNumber}` ||
+              tx.installmentPurchaseId === ip.id
+          );
+          if (!alreadyInCycle) {
+            purchasesSum += inst.amount;
+            cycleTxs.push({
+              id: `gen_inst_${ip.id}_${inst.installmentNumber}`,
+              date: inst.date,
+              expectedDate: inst.date,
+              concept: `Cuota ${inst.installmentNumber}/${inst.totalInstallments}: ${ip.concept}`,
+              type: 'gasto',
+              amount: inst.amount,
+              paymentMethodType: 'tarjeta_credito',
+              creditCardId: card.id,
+              status: inst.date <= todayStr ? 'realizado' : 'planificado',
+              origin: `cuota:${ip.id}:${inst.installmentNumber}`,
+              installmentPurchaseId: ip.id,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        });
       }
     });
 

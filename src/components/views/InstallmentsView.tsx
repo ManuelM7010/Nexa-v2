@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { InstallmentPurchase } from '../../types';
 import { formatMoney, dollarsToCents, centsToDollars, formatDateEs } from '../../utils/formatters';
+import { NexaFinancialEngine } from '../../services/financialEngine';
 import {
   Layers,
   Plus,
@@ -11,6 +12,8 @@ import {
   Trash2,
   Edit2,
   Percent,
+  Clock,
+  Check,
 } from 'lucide-react';
 
 export const InstallmentsView: React.FC = () => {
@@ -25,6 +28,7 @@ export const InstallmentsView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InstallmentPurchase | null>(null);
+  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
 
   const [concept, setConcept] = useState('');
   const [totalAmountStr, setTotalAmountStr] = useState('');
@@ -64,8 +68,6 @@ export const InstallmentsView: React.FC = () => {
 
     const totalCents = dollarsToCents(totalAmountStr);
     const installmentCents = Math.round(totalCents / totalInstallments);
-    const remainingCount = totalInstallments - paidInstallments;
-    const pendingBalance = remainingCount * installmentCents;
 
     await saveInstallmentPurchase({
       id: editingItem?.id,
@@ -75,8 +77,6 @@ export const InstallmentsView: React.FC = () => {
       totalInstallments,
       installmentAmount: installmentCents,
       paidInstallmentsCount: paidInstallments,
-      remainingInstallmentsCount: remainingCount,
-      pendingBalance,
       firstPaymentDate,
       notes: notes.trim() || undefined,
     });
@@ -84,8 +84,16 @@ export const InstallmentsView: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const totalPendingDebt = installmentPurchases.reduce((acc, i) => acc + i.pendingBalance, 0);
-  const totalMonthlyCommitment = installmentPurchases.reduce((acc, i) => acc + i.installmentAmount, 0);
+  // Status-aware metrics calculation
+  const totalPendingDebt = installmentPurchases.reduce((acc, i) => {
+    const s = NexaFinancialEngine.getInstallmentPurchaseStatus(i, todayStr);
+    return acc + s.pendingBalance;
+  }, 0);
+
+  const totalMonthlyCommitment = installmentPurchases.reduce((acc, i) => {
+    const s = NexaFinancialEngine.getInstallmentPurchaseStatus(i, todayStr);
+    return acc + (!s.isCompleted ? s.installmentAmount : 0);
+  }, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -97,7 +105,7 @@ export const InstallmentsView: React.FC = () => {
             <h2 className="text-base font-bold text-white">Compras a Cuotas & Financiamientos</h2>
           </div>
           <p className="text-xs text-slate-400">
-            Control de compras a plazo en tarjetas de crédito y calendarización automática de cuotas
+            Control exacto por fecha y número de cuotas. Al vencer la última cuota, el cobro finaliza automáticamente.
           </p>
         </div>
 
@@ -116,11 +124,11 @@ export const InstallmentsView: React.FC = () => {
           <span className="text-xs font-semibold uppercase text-slate-400 block mb-1">
             Saldo Pendiente Total en Cuotas
           </span>
-          <div className="text-2xl font-black text-white">
+          <div className="text-2xl font-black text-white font-mono">
             {formatMoney(totalPendingDebt, settings.currencySymbol)}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            Monto total comprometido en futuras cuotas
+            Monto total comprometido en cuotas activas
           </p>
         </div>
 
@@ -128,11 +136,11 @@ export const InstallmentsView: React.FC = () => {
           <span className="text-xs font-semibold uppercase text-slate-400 block mb-1">
             Compromiso Mensual de Cuotas
           </span>
-          <div className="text-2xl font-black text-indigo-400">
+          <div className="text-2xl font-black text-indigo-400 font-mono">
             {formatMoney(totalMonthlyCommitment, settings.currencySymbol)}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            Suma de cuotas que vencen mensualmente
+            Suma de cuotas vigentes este mes (excluye planes finalizados)
           </p>
         </div>
       </div>
@@ -141,22 +149,41 @@ export const InstallmentsView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {installmentPurchases.map((item) => {
           const card = creditCards.find((c) => c.id === item.creditCardId);
+          const status = NexaFinancialEngine.getInstallmentPurchaseStatus(item, todayStr);
+          const schedule = NexaFinancialEngine.getInstallmentSchedule(item);
           const progressPct =
-            item.totalInstallments > 0
-              ? Math.round((item.paidInstallmentsCount / item.totalInstallments) * 100)
+            status.totalInstallments > 0
+              ? Math.round((status.paidCount / status.totalInstallments) * 100)
               : 0;
+
+          const isExpanded = expandedScheduleId === item.id;
 
           return (
             <div
               key={item.id}
-              className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4"
+              className={`rounded-2xl bg-slate-900 border p-5 shadow-xl space-y-4 transition ${
+                status.isCompleted ? 'border-emerald-500/40 bg-slate-900/90' : 'border-slate-800'
+              }`}
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-white">{item.concept}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white">{item.concept}</h3>
+                    {status.isCompleted ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Finalizada ({status.totalInstallments}/{status.totalInstallments})
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        <Clock className="w-3 h-3" />
+                        En Curso ({status.paidCount}/{status.totalInstallments})
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                     <CreditCard className="w-3.5 h-3.5 text-blue-400" />
-                    <span>{card ? card.name : 'Tarjeta'}</span>
+                    <span>{card ? card.name : 'Tarjeta de Crédito'}</span>
                     {item.notes && <span>• {item.notes}</span>}
                   </div>
                 </div>
@@ -165,12 +192,14 @@ export const InstallmentsView: React.FC = () => {
                   <button
                     onClick={() => openEditModal(item)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                    title="Editar"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteInstallmentPurchase(item.id)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer"
+                    title="Eliminar"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -182,14 +211,18 @@ export const InstallmentsView: React.FC = () => {
                 <div className="flex items-baseline justify-between">
                   <div>
                     <span className="text-xs text-slate-400 block">Cuota Mensual:</span>
-                    <span className="text-xl font-black text-indigo-400">
+                    <span className="text-xl font-black text-indigo-400 font-mono">
                       {formatMoney(item.installmentAmount, settings.currencySymbol)}
                     </span>
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-slate-400 block">Saldo Restante:</span>
-                    <span className="text-base font-bold text-white">
-                      {formatMoney(item.pendingBalance, settings.currencySymbol)}
+                    <span
+                      className={`text-base font-bold font-mono ${
+                        status.isCompleted ? 'text-emerald-400' : 'text-white'
+                      }`}
+                    >
+                      {formatMoney(status.pendingBalance, settings.currencySymbol)}
                     </span>
                   </div>
                 </div>
@@ -197,23 +230,27 @@ export const InstallmentsView: React.FC = () => {
                 {/* Progress bar */}
                 <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
                   <div
-                    className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      status.isCompleted ? 'bg-emerald-500' : 'bg-indigo-500'
+                    }`}
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
 
                 <div className="flex justify-between text-[11px] text-slate-400 font-semibold">
                   <span>
-                    {item.paidInstallmentsCount} de {item.totalInstallments} cuotas pagadas ({progressPct}%)
+                    {status.paidCount} de {status.totalInstallments} cuotas pagadas ({progressPct}%)
                   </span>
-                  <span>{item.remainingInstallmentsCount} cuotas restantes</span>
+                  <span>
+                    {status.isCompleted ? '0 cuotas restantes' : `${status.remainingCount} cuotas restantes`}
+                  </span>
                 </div>
               </div>
 
               {/* Additional Meta info */}
-              <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs">
+              <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs">
                 <div>
-                  <span className="text-slate-400 block text-[10px]">MONTO ORIGINAL</span>
+                  <span className="text-slate-400 block text-[10px]">MONTO TOTAL</span>
                   <span className="font-bold text-white font-mono">
                     {formatMoney(item.totalAmount, settings.currencySymbol)}
                   </span>
@@ -224,7 +261,62 @@ export const InstallmentsView: React.FC = () => {
                     {formatDateEs(item.firstPaymentDate, { withDayName: false })}
                   </span>
                 </div>
+                <div>
+                  <span className="text-slate-400 block text-[10px]">ÚLTIMA CUOTA</span>
+                  <span className="font-bold text-slate-200">
+                    {status.lastInstallmentDate
+                      ? formatDateEs(status.lastInstallmentDate, { withDayName: false })
+                      : 'N/A'}
+                  </span>
+                </div>
               </div>
+
+              {/* Toggleable Schedule View */}
+              {schedule.length > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedScheduleId(isExpanded ? null : item.id)}
+                    className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>{isExpanded ? 'Ocultar calendario de cuotas' : `Ver calendario de las ${schedule.length} cuotas`}</span>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-2.5 max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-slate-950/80 border border-slate-800">
+                      {schedule.map((inst) => {
+                        const isPaid = inst.date <= todayStr;
+                        return (
+                          <div
+                            key={inst.installmentNumber}
+                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg ${
+                              isPaid ? 'bg-slate-900/60 text-slate-300' : 'bg-slate-900 text-slate-100 font-medium'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              {isPaid ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <span className="w-3.5 h-3.5 rounded-full border border-slate-600 inline-block" />
+                              )}
+                              <span>
+                                Cuota {inst.installmentNumber}/{inst.totalInstallments}
+                              </span>
+                            </span>
+                            <span className="text-slate-400 font-mono text-[11px]">
+                              {formatDateEs(inst.date, { withDayName: false })}
+                            </span>
+                            <span className="font-mono font-bold text-indigo-300">
+                              {formatMoney(inst.amount, settings.currencySymbol)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

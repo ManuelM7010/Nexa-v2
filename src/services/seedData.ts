@@ -289,6 +289,8 @@ export function generateDemoSeedData(): {
       paymentDay: 28,
       remainingInstallmentsCount: 23,
       paymentsMadeCount: 13,
+      startDate: '2025-08-28',
+      totalInstallments: 36,
       nextPaymentDate: '2026-09-28',
       preferredAccountId: 'acc_bac',
       notes: 'Cuota fija mensual debitada de cuenta BAC',

@@ -633,35 +633,64 @@ export const CreditCardStatementsView: React.FC = () => {
             </div>
 
             {/* Installment purchases section for this card */}
-            {installmentPurchases.filter((ip) => ip.creditCardId === currentCard.id && ip.pendingBalance > 0).length > 0 && (
+            {installmentPurchases.filter((ip) => {
+              if (ip.creditCardId !== currentCard.id) return false;
+              const status = NexaFinancialEngine.getInstallmentPurchaseStatus(ip, statement.cycleEndDate);
+              return !status.isCompleted || (status.lastInstallmentDate && status.lastInstallmentDate >= statement.cycleStartDate);
+            }).length > 0 && (
               <div className="p-5 bg-slate-950/40 border-t border-slate-800 space-y-3">
                 <h4 className="text-xs font-bold text-purple-300 flex items-center gap-2">
                   <Layers className="w-4 h-4 text-purple-400" />
-                  <span>Compras a Cuotas Vigentes en Esta Tarjeta</span>
+                  <span>Compras a Cuotas Vinculadas a Esta Tarjeta</span>
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                   {installmentPurchases
-                    .filter((ip) => ip.creditCardId === currentCard.id && ip.pendingBalance > 0)
-                    .map((ip) => (
-                      <div
-                        key={ip.id}
-                        className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between"
-                      >
-                        <div>
-                          <span className="font-bold text-white block">{ip.concept}</span>
-                          <span className="text-[10px] text-slate-400">
-                            Cuota: {formatMoney(ip.installmentAmount, settings.currencySymbol)} • Restan{' '}
-                            {ip.remainingInstallmentsCount} cuotas
-                          </span>
+                    .filter((ip) => {
+                      if (ip.creditCardId !== currentCard.id) return false;
+                      const status = NexaFinancialEngine.getInstallmentPurchaseStatus(ip, statement.cycleEndDate);
+                      return !status.isCompleted || (status.lastInstallmentDate && status.lastInstallmentDate >= statement.cycleStartDate);
+                    })
+                    .map((ip) => {
+                      const status = NexaFinancialEngine.getInstallmentPurchaseStatus(ip, statement.cycleEndDate);
+                      const isChargedInThisCycle = statement.transactions.some(
+                        (tx) => tx.installmentPurchaseId === ip.id || (tx.origin && tx.origin.startsWith(`cuota:${ip.id}`))
+                      );
+                      return (
+                        <div
+                          key={ip.id}
+                          className={`p-3 rounded-xl border flex items-center justify-between ${
+                            status.isCompleted
+                              ? 'bg-emerald-950/20 border-emerald-800/40'
+                              : 'bg-slate-900 border-slate-800'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white block">{ip.concept}</span>
+                              {status.isCompleted ? (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                  Finalizada ({status.totalInstallments}/{status.totalInstallments})
+                                </span>
+                              ) : isChargedInThisCycle ? (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                  Cuota en este corte
+                                </span>
+                              ) : null}
+                            </div>
+                            <span className="text-[10px] text-slate-400">
+                              Cuota: {formatMoney(ip.installmentAmount, settings.currencySymbol)} • {status.paidCount} de {status.totalInstallments} pagadas
+                              {status.isCompleted ? ' (Plan liquidado)' : ` (${status.remainingCount} restantes)`}
+                            </span>
+                          </div>
+                          <div className="text-right font-mono">
+                            <span className="text-[11px] text-slate-400 block">Saldo Pendiente:</span>
+                            <span className={`font-bold ${status.isCompleted ? 'text-emerald-400' : 'text-purple-400'}`}>
+                              {formatMoney(status.pendingBalance, settings.currencySymbol)}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-right font-mono">
-                          <span className="text-[11px] text-slate-400 block">Saldo Pendiente:</span>
-                          <span className="font-bold text-purple-400">
-                            {formatMoney(ip.pendingBalance, settings.currencySymbol)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               </div>
             )}

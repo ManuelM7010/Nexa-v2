@@ -338,6 +338,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       creditCards,
       accounts,
       existingTransactions: transactions,
+      todayStr,
     });
   }, [
     selectedYear,
@@ -349,6 +350,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     creditCards,
     accounts,
     transactions,
+    todayStr,
   ]);
 
   // Merge explicit transactions with generated projections
@@ -698,13 +700,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const now = new Date().toISOString();
     const id = itemData.id || `inst_${Date.now()}`;
     const totalInstallments = itemData.totalInstallments || 12;
-    const paid = itemData.paidInstallmentsCount || 0;
-    const remaining = totalInstallments - paid;
     const installmentAmount =
       itemData.installmentAmount || Math.round(itemData.totalAmount / totalInstallments);
-    const pendingBalance = itemData.pendingBalance !== undefined ? itemData.pendingBalance : remaining * installmentAmount;
+    const firstPaymentDate = itemData.firstPaymentDate || todayStr;
 
-    const newItem: InstallmentPurchase = {
+    const baseItem: InstallmentPurchase = {
       id,
       concept: itemData.concept,
       purchaseDate: itemData.purchaseDate || todayStr,
@@ -712,15 +712,25 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       creditCardId: itemData.creditCardId || creditCards[0]?.id || '',
       totalInstallments,
       installmentAmount,
-      firstPaymentDate: itemData.firstPaymentDate || todayStr,
+      firstPaymentDate,
       frequency: itemData.frequency || 'mensual',
-      paidInstallmentsCount: paid,
-      remainingInstallmentsCount: remaining,
-      pendingBalance,
+      paidInstallmentsCount: itemData.paidInstallmentsCount || 0,
+      remainingInstallmentsCount: itemData.remainingInstallmentsCount || totalInstallments,
+      pendingBalance:
+        itemData.pendingBalance !== undefined ? itemData.pendingBalance : itemData.totalAmount,
       notes: itemData.notes,
       createdAt: itemData.createdAt || now,
       updatedAt: now,
     };
+
+    const status = NexaFinancialEngine.getInstallmentPurchaseStatus(baseItem, todayStr);
+    const newItem: InstallmentPurchase = {
+      ...baseItem,
+      paidInstallmentsCount: status.paidCount,
+      remainingInstallmentsCount: status.remainingCount,
+      pendingBalance: status.pendingBalance,
+    };
+
     await storage.put('installmentPurchases', newItem);
     setInstallmentPurchases((prev) => {
       const idx = prev.findIndex((i) => i.id === id);
@@ -741,7 +751,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const saveLoan = async (loanData: Partial<Loan> & { name: string; originalAmount: number }) => {
     const now = new Date().toISOString();
     const id = loanData.id || `loan_${Date.now()}`;
-    const newLoan: Loan = {
+    const totalInstallments =
+      loanData.totalInstallments ||
+      (loanData.paymentsMadeCount || 0) + (loanData.remainingInstallmentsCount || 24);
+
+    const baseLoan: Loan = {
       id,
       name: loanData.name,
       lender: loanData.lender || 'Entidad Financiera',
@@ -753,12 +767,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       paymentDay: loanData.paymentDay || 28,
       remainingInstallmentsCount: loanData.remainingInstallmentsCount || 24,
       paymentsMadeCount: loanData.paymentsMadeCount || 0,
+      startDate: loanData.startDate,
+      totalInstallments,
       nextPaymentDate: loanData.nextPaymentDate || `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-28`,
       preferredAccountId: loanData.preferredAccountId,
       notes: loanData.notes,
       createdAt: loanData.createdAt || now,
       updatedAt: now,
     };
+
+    const status = NexaFinancialEngine.getLoanStatus(baseLoan, todayStr);
+    const newLoan: Loan = {
+      ...baseLoan,
+      paymentsMadeCount: status.paidCount,
+      remainingInstallmentsCount: status.remainingCount,
+      remainingBalance: status.remainingBalance,
+    };
+
     await storage.put('loans', newLoan);
     setLoans((prev) => {
       const idx = prev.findIndex((l) => l.id === id);

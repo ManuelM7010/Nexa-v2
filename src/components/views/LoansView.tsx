@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { Loan } from '../../types';
-import { formatMoney, dollarsToCents, centsToDollars } from '../../utils/formatters';
+import { formatMoney, dollarsToCents, centsToDollars, formatDateEs } from '../../utils/formatters';
+import { NexaFinancialEngine } from '../../services/financialEngine';
 import {
   Landmark,
   Plus,
@@ -12,6 +13,9 @@ import {
   Coins,
   ArrowRight,
   TrendingDown,
+  CheckCircle2,
+  Clock,
+  Check,
 } from 'lucide-react';
 
 export const LoansView: React.FC = () => {
@@ -22,10 +26,12 @@ export const LoansView: React.FC = () => {
     deleteLoan,
     registerLoanExtraPayment,
     settings,
+    todayStr,
   } = useFinance();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
+  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -34,6 +40,8 @@ export const LoansView: React.FC = () => {
   const [remainingBalanceStr, setRemainingBalanceStr] = useState('');
   const [installmentStr, setInstallmentStr] = useState('');
   const [paymentDay, setPaymentDay] = useState(28);
+  const [startDate, setStartDate] = useState('');
+  const [totalInstallments, setTotalInstallments] = useState(24);
   const [preferredAccountId, setPreferredAccountId] = useState(accounts[0]?.id || '');
   const [notes, setNotes] = useState('');
 
@@ -51,6 +59,8 @@ export const LoansView: React.FC = () => {
     setRemainingBalanceStr('3200');
     setInstallmentStr('140');
     setPaymentDay(28);
+    setStartDate(todayStr);
+    setTotalInstallments(24);
     setPreferredAccountId(accounts[0]?.id || '');
     setNotes('');
     setIsModalOpen(true);
@@ -64,6 +74,10 @@ export const LoansView: React.FC = () => {
     setRemainingBalanceStr(centsToDollars(loan.remainingBalance).toFixed(2));
     setInstallmentStr(centsToDollars(loan.installmentAmount).toFixed(2));
     setPaymentDay(loan.paymentDay);
+    setStartDate(loan.startDate || '');
+    setTotalInstallments(
+      loan.totalInstallments || (loan.paymentsMadeCount || 0) + (loan.remainingInstallmentsCount || 24)
+    );
     setPreferredAccountId(loan.preferredAccountId || accounts[0]?.id || '');
     setNotes(loan.notes || '');
     setIsModalOpen(true);
@@ -81,6 +95,8 @@ export const LoansView: React.FC = () => {
       remainingBalance: dollarsToCents(remainingBalanceStr || originalAmountStr),
       installmentAmount: dollarsToCents(installmentStr || 100),
       paymentDay,
+      startDate: startDate.trim() || undefined,
+      totalInstallments: Number(totalInstallments) || 24,
       preferredAccountId,
       notes: notes.trim() || undefined,
     });
@@ -108,8 +124,14 @@ export const LoansView: React.FC = () => {
   };
 
   const totalOriginalLoan = loans.reduce((acc, l) => acc + l.originalAmount, 0);
-  const totalRemainingLoan = loans.reduce((acc, l) => acc + l.remainingBalance, 0);
-  const totalInstallmentMonthly = loans.reduce((acc, l) => acc + l.installmentAmount, 0);
+  const totalRemainingLoan = loans.reduce((acc, l) => {
+    const s = NexaFinancialEngine.getLoanStatus(l, todayStr);
+    return acc + s.remainingBalance;
+  }, 0);
+  const totalInstallmentMonthly = loans.reduce((acc, l) => {
+    const s = NexaFinancialEngine.getLoanStatus(l, todayStr);
+    return acc + (!s.isCompleted ? l.installmentAmount : 0);
+  }, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -121,7 +143,7 @@ export const LoansView: React.FC = () => {
             <h2 className="text-base font-bold text-white">Préstamos & Pasivos Financieros</h2>
           </div>
           <p className="text-xs text-slate-400">
-            Control de amortización de préstamos bancarios, cuotas fijas y abonos extraordinarios a capital
+            Control exacto por fecha y amortización. Al cumplirse el plazo total de cuotas, el cobro finaliza automáticamente.
           </p>
         </div>
 
@@ -140,11 +162,11 @@ export const LoansView: React.FC = () => {
           <span className="text-xs font-semibold uppercase text-slate-400 block mb-1">
             Deuda Pendiente Total
           </span>
-          <div className="text-2xl font-black text-rose-400">
+          <div className="text-2xl font-black text-rose-400 font-mono">
             {formatMoney(totalRemainingLoan, settings.currencySymbol)}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            Capital remanente por liquidar
+            Saldo pendiente en préstamos activos
           </p>
         </div>
 
@@ -152,11 +174,11 @@ export const LoansView: React.FC = () => {
           <span className="text-xs font-semibold uppercase text-slate-400 block mb-1">
             Cuota Mensual Comprometida
           </span>
-          <div className="text-2xl font-black text-amber-400">
+          <div className="text-2xl font-black text-amber-400 font-mono">
             {formatMoney(totalInstallmentMonthly, settings.currencySymbol)}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            Descontada mensualmente de bancos
+            Total debitado este mes (excluye préstamos liquidados)
           </p>
         </div>
 
@@ -164,7 +186,7 @@ export const LoansView: React.FC = () => {
           <span className="text-xs font-semibold uppercase text-slate-400 block mb-1">
             Monto Original Prestado
           </span>
-          <div className="text-2xl font-black text-white">
+          <div className="text-2xl font-black text-white font-mono">
             {formatMoney(totalOriginalLoan, settings.currencySymbol)}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
@@ -177,19 +199,37 @@ export const LoansView: React.FC = () => {
       {/* Loan Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {loans.map((loan) => {
-          const amortized = Math.max(0, loan.originalAmount - loan.remainingBalance);
+          const status = NexaFinancialEngine.getLoanStatus(loan, todayStr);
+          const schedule = NexaFinancialEngine.getLoanSchedule(loan);
+          const amortized = Math.max(0, loan.originalAmount - status.remainingBalance);
           const progressPct =
             loan.originalAmount > 0 ? Math.round((amortized / loan.originalAmount) * 100) : 0;
           const account = accounts.find((a) => a.id === loan.preferredAccountId);
+          const isExpanded = expandedScheduleId === loan.id;
 
           return (
             <div
               key={loan.id}
-              className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4"
+              className={`rounded-2xl bg-slate-900 border p-5 shadow-xl space-y-4 transition ${
+                status.isCompleted ? 'border-emerald-500/40 bg-slate-900/90' : 'border-slate-800'
+              }`}
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-white">{loan.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white">{loan.name}</h3>
+                    {status.isCompleted ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Liquidado ({status.totalInstallments}/{status.totalInstallments})
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        <Clock className="w-3 h-3" />
+                        En Curso ({status.paidCount}/{status.totalInstallments})
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                     <Building2 className="w-3.5 h-3.5 text-blue-400" />
                     <span>{loan.lender}</span>
@@ -201,12 +241,14 @@ export const LoansView: React.FC = () => {
                   <button
                     onClick={() => openEditModal(loan)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                    title="Editar"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteLoan(loan.id)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer"
+                    title="Eliminar"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -218,8 +260,12 @@ export const LoansView: React.FC = () => {
                 <div className="flex items-baseline justify-between">
                   <div>
                     <span className="text-xs text-slate-400 block">Saldo Pendiente:</span>
-                    <span className="text-2xl font-black text-rose-400 font-mono">
-                      {formatMoney(loan.remainingBalance, settings.currencySymbol)}
+                    <span
+                      className={`text-2xl font-black font-mono ${
+                        status.isCompleted ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
+                      {formatMoney(status.remainingBalance, settings.currencySymbol)}
                     </span>
                   </div>
                   <div className="text-right">
@@ -238,25 +284,76 @@ export const LoansView: React.FC = () => {
                   />
                 </div>
                 <div className="flex justify-between text-[11px] text-slate-400 font-semibold">
-                  <span>{progressPct}% amortizado a capital</span>
+                  <span>
+                    {status.paidCount} de {status.totalInstallments} cuotas ({progressPct}% amortizado)
+                  </span>
                   <span>Día de cobro: {loan.paymentDay} de cada mes</span>
                 </div>
               </div>
 
               {/* Extra Payment CTA (Requirement 16) */}
-              <div className="pt-2 border-t border-slate-800">
-                <button
-                  onClick={() => {
-                    setExtraPaymentLoan(loan);
-                    setExtraAmountStr('200');
-                    setExtraAccountId(loan.preferredAccountId || accounts[0]?.id || '');
-                  }}
-                  className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1.5 transition cursor-pointer"
-                >
-                  <Coins className="w-4 h-4" />
-                  <span>+ Registrar Abono Extraordinario a Capital</span>
-                </button>
-              </div>
+              {!status.isCompleted && (
+                <div className="pt-2 border-t border-slate-800">
+                  <button
+                    onClick={() => {
+                      setExtraPaymentLoan(loan);
+                      setExtraAmountStr('200');
+                      setExtraAccountId(loan.preferredAccountId || accounts[0]?.id || '');
+                    }}
+                    className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-emerald-400 flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Coins className="w-4 h-4" />
+                    <span>+ Registrar Abono Extraordinario a Capital</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Schedule Accordion */}
+              {schedule.length > 0 && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedScheduleId(isExpanded ? null : loan.id)}
+                    className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>{isExpanded ? 'Ocultar calendario de pagos' : `Ver calendario de las ${schedule.length} cuotas`}</span>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-2 max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-slate-950/80 border border-slate-800">
+                      {schedule.map((inst) => {
+                        const isPaid = inst.date <= todayStr;
+                        return (
+                          <div
+                            key={inst.installmentNumber}
+                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg ${
+                              isPaid ? 'bg-slate-900/60 text-slate-300' : 'bg-slate-900 text-slate-100 font-medium'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              {isPaid ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <span className="w-3.5 h-3.5 rounded-full border border-slate-600 inline-block" />
+                              )}
+                              <span>
+                                Cuota {inst.installmentNumber}/{inst.totalInstallments}
+                              </span>
+                            </span>
+                            <span className="text-slate-400 font-mono text-[11px]">
+                              {formatDateEs(inst.date, { withDayName: false })}
+                            </span>
+                            <span className="font-mono font-bold text-amber-300">
+                              {formatMoney(inst.amount, settings.currencySymbol)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
@@ -400,7 +497,7 @@ export const LoansView: React.FC = () => {
                     required
                     value={installmentStr}
                     onChange={(e) => setInstallmentStr(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold font-mono"
                   />
                 </div>
 
@@ -412,6 +509,30 @@ export const LoansView: React.FC = () => {
                     max="31"
                     value={paymentDay}
                     onChange={(e) => setPaymentDay(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-center font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold">Fecha Primera Cuota</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold">Total de Cuotas (Plazo)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="360"
+                    value={totalInstallments}
+                    onChange={(e) => setTotalInstallments(Number(e.target.value))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-center font-bold"
                   />
                 </div>
