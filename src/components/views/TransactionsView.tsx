@@ -17,6 +17,9 @@ import {
   CreditCard,
   Building2,
   Wallet,
+  Pin,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 export const TransactionsView: React.FC = () => {
@@ -38,6 +41,7 @@ export const TransactionsView: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<string>('all');
+  const [isTableScrollFixed, setIsTableScrollFixed] = useState(true);
 
   const filteredTransactions = useMemo(() => {
     return allMonthTransactions.filter((tx) => {
@@ -147,31 +151,53 @@ export const TransactionsView: React.FC = () => {
   const isCashActive = filterPayment === 'efectivo' || filterPayment === 'type:efectivo';
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-200">
-      {/* Top Bar: Search, Filters & Action CTA */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          {/* Search input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por concepto, notas o comercio..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
+    <div className="space-y-4 animate-in fade-in duration-200">
+      {/* Top Bar: Search, Filters & Action CTA (Sticky / Frozen Panel) */}
+      <div className="sticky top-0 z-30 pt-1 pb-1.5 bg-slate-950/95 backdrop-blur-md">
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-3 shadow-xl shadow-slate-950/80">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Search input */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por concepto, notas o comercio..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
 
-          {/* New Transaction Button */}
-          <button
-            onClick={() => setIsNewTxOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white shadow-md shadow-blue-600/30 transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nuevo Movimiento</span>
-          </button>
-        </div>
+            <div className="flex items-center gap-2">
+              {/* Toggle Freeze / Sticky Mode */}
+              <button
+                type="button"
+                onClick={() => setIsTableScrollFixed(!isTableScrollFixed)}
+                title={
+                  isTableScrollFixed
+                    ? 'Encabezado fijo activo (solo se mueve la lista de abajo). Clic para expandir vista completa'
+                    : 'Vista expandida activa. Clic para fijar encabezado y hacer scroll solo en los movimientos'
+                }
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+                  isTableScrollFixed
+                    ? 'bg-blue-600/15 border-blue-500/40 text-blue-300 hover:bg-blue-600/25 shadow-sm'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                <Pin className={`w-3.5 h-3.5 ${isTableScrollFixed ? 'text-blue-400 fill-blue-400/30' : 'text-slate-500'}`} />
+                <span>{isTableScrollFixed ? 'Encabezado Freeze' : 'Modo Libre'}</span>
+              </button>
+
+              {/* New Transaction Button */}
+              <button
+                onClick={() => setIsNewTxOpen(true)}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white shadow-md shadow-blue-600/30 transition cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Nuevo Movimiento</span>
+              </button>
+            </div>
+          </div>
 
         {/* Quick Payment Method Filter Pills */}
         <div className="space-y-2 pt-2 border-t border-slate-800/80">
@@ -489,20 +515,27 @@ export const TransactionsView: React.FC = () => {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Movements Table */}
       <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
+        <div
+          className={`overflow-auto ${
+            isTableScrollFixed
+              ? 'max-h-[calc(100vh-360px)] min-h-[360px]'
+              : ''
+          }`}
+        >
           <table className="w-full text-left text-xs text-slate-300 border-collapse">
-            <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-800">
+            <thead className="sticky top-0 z-10 bg-slate-950 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-800 shadow-sm">
               <tr>
-                <th className="py-3 px-4">Estado</th>
-                <th className="py-3 px-3">Fecha</th>
-                <th className="py-3 px-4">Concepto / Detalle</th>
-                <th className="py-3 px-3">Categoría</th>
-                <th className="py-3 px-3">Medio de Pago</th>
-                <th className="py-3 px-4 text-right">Monto</th>
-                <th className="py-3 px-4 text-center">Acciones</th>
+                <th className="py-3 px-4 bg-slate-950">Estado</th>
+                <th className="py-3 px-3 bg-slate-950">Fecha</th>
+                <th className="py-3 px-4 bg-slate-950">Concepto / Detalle</th>
+                <th className="py-3 px-3 bg-slate-950">Categoría</th>
+                <th className="py-3 px-3 bg-slate-950">Medio de Pago</th>
+                <th className="py-3 px-4 bg-slate-950 text-right">Monto</th>
+                <th className="py-3 px-4 bg-slate-950 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
