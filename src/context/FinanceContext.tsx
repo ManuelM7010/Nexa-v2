@@ -361,15 +361,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Daily Cash Flow calculation
   const dailyCashFlow = useMemo(() => {
+    const monthStartStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const priorTransactions = transactions.filter((t) => t.date < monthStartStr);
+    const fullTransactionsForCashFlow = [...priorTransactions, ...allMonthTransactions];
+
     return NexaFinancialEngine.calculateDailyCashFlow(
       selectedYear,
       selectedMonth,
       todayStr,
       initialPosition,
       accounts,
-      allMonthTransactions
+      fullTransactionsForCashFlow
     );
-  }, [selectedYear, selectedMonth, todayStr, initialPosition, accounts, allMonthTransactions]);
+  }, [selectedYear, selectedMonth, todayStr, initialPosition, accounts, transactions, allMonthTransactions]);
 
   // Deep Budget vs Real Analysis
   const budgetAnalysis = useMemo(() => {

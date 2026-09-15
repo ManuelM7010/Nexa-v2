@@ -228,23 +228,6 @@ export class NexaFinancialEngine {
         const payDay = Math.min(card.usualPaymentDay || card.paymentDueDay, daysCount);
         const dateStr = `${monthKey}-${String(payDay).padStart(2, '0')}`;
 
-        // Check if user already registered an explicit payment transaction for this card in this month
-        const hasDuplicate = data.existingTransactions.some(
-          (t) =>
-            t.date.startsWith(monthKey) &&
-            (t.type === 'pago_tarjeta' || t.origin === `pago_tarjeta:${card.id}`) &&
-            t.creditCardId === card.id
-        );
-
-        if (hasDuplicate) continue;
-
-        let paymentAmount = 0;
-
-        // In the starting month (September 2026), include the initial balance configured by the user
-        if (monthKey === '2026-09' && card.initialUsedBalance > 0) {
-          paymentAmount += card.initialUsedBalance;
-        }
-
         // Determine cycle closing month & year for payments due in this month (year, month)
         let closingYear = year;
         let closingMonth = month;
@@ -258,6 +241,13 @@ export class NexaFinancialEngine {
         }
         const { cycleStartDate, cycleEndDate } = NexaFinancialEngine.getBillingCycleDates(card, closingYear, closingMonth);
 
+        let chargesAmount = 0;
+
+        // In the starting month (September 2026), include the initial balance configured by the user
+        if (monthKey === '2026-09' && card.initialUsedBalance > 0) {
+          chargesAmount += card.initialUsedBalance;
+        }
+
         // Add expenses made on this card within this billing cycle (from day after previous cut-off to current cut-off day)
         const cycleExpenses = data.existingTransactions.filter((tx) => {
           if (tx.status === 'cancelado') return false;
@@ -268,7 +258,7 @@ export class NexaFinancialEngine {
         });
 
         const cycleExpensesSum = cycleExpenses.reduce((sum, tx) => sum + tx.amount, 0);
-        paymentAmount += cycleExpensesSum;
+        chargesAmount += cycleExpensesSum;
 
         // Add active installment purchase quotas on this card for this month
         if (data.installmentPurchases) {
@@ -276,20 +266,37 @@ export class NexaFinancialEngine {
             if (ip.creditCardId === card.id && ip.pendingBalance > 0) {
               const alreadyIncluded = cycleExpenses.some((tx) => tx.origin === `cuota:${ip.id}`);
               if (!alreadyIncluded) {
-                paymentAmount += ip.installmentAmount;
+                chargesAmount += ip.installmentAmount;
               }
             }
           });
         }
 
-        if (paymentAmount > 0) {
+        // Deduct payments and abonos made to this card for this billing cycle:
+        // Includes abonos made during the cycle (e.g., Aug 20 for cycle Aug 13 - Sep 12)
+        // as well as explicit payments made up to the payment month
+        const monthEndStr = `${monthKey}-${String(daysCount).padStart(2, '0')}`;
+        const cyclePayments = data.existingTransactions.filter((tx) => {
+          if (tx.status === 'cancelado') return false;
+          if (tx.creditCardId !== card.id) return false;
+          if (tx.type !== 'pago_tarjeta') return false;
+          if (tx.id.startsWith('gen_')) return false; // Only count explicit user payments
+          return tx.date >= cycleStartDate && tx.date <= monthEndStr;
+        });
+
+        const cyclePaymentsSum = cyclePayments.reduce((sum, tx) => sum + tx.amount, 0);
+
+        // Net remaining payment after taking into account all abonos
+        const remainingPayment = Math.max(0, chargesAmount - cyclePaymentsSum);
+
+        if (remainingPayment > 0) {
           generated.push({
             id: `gen_card_pay_${card.id}_${monthKey}`,
             date: dateStr,
             expectedDate: dateStr,
             concept: `Pago Tarjeta: ${card.name} (${card.bank})`,
             type: 'pago_tarjeta',
-            amount: paymentAmount,
+            amount: remainingPayment,
             paymentMethodType: 'banco',
             accountId: data.accounts.find((a) => a.type === 'banco')?.id || data.accounts[0]?.id,
             creditCardId: card.id,
