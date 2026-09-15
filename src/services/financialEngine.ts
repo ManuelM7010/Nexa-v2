@@ -1,6 +1,7 @@
 import {
   Account,
   CreditCard,
+  CreditCardStatement,
   Transaction,
   Category,
   Budget,
@@ -218,25 +219,90 @@ export class NexaFinancialEngine {
     }
 
     // 4. Credit Card Payment Obligations (from card cut-off/payment dates)
-    for (const card of data.creditCards) {
-      if (!card.isActive) continue;
-      // If card has used balance, generate planned payment before/on paymentDueDay
-      if (card.initialUsedBalance > 0) {
+    // Date guard: If monthKey < '2026-09', all credit card payments are 0.00 as requested by the user
+    // ("todos lo pagos de tarjteas de agosto hacia a tras será 0.00, porque comenzaré a meter data a partir de mi situacion en Septiembre.")
+    if (monthKey >= '2026-09') {
+      for (const card of data.creditCards) {
+        if (!card.isActive) continue;
+
         const payDay = Math.min(card.usualPaymentDay || card.paymentDueDay, daysCount);
         const dateStr = `${monthKey}-${String(payDay).padStart(2, '0')}`;
 
+        // Check if user already registered an explicit payment transaction for this card in this month
         const hasDuplicate = data.existingTransactions.some(
-          (t) => t.date.startsWith(monthKey) && t.origin === `pago_tarjeta:${card.id}`
+          (t) =>
+            t.date.startsWith(monthKey) &&
+            (t.type === 'pago_tarjeta' || t.origin === `pago_tarjeta:${card.id}`) &&
+            t.creditCardId === card.id
         );
 
-        if (!hasDuplicate) {
+        if (hasDuplicate) continue;
+
+        let paymentAmount = 0;
+
+        // In the starting month (September 2026), include the initial balance configured by the user
+        if (monthKey === '2026-09' && card.initialUsedBalance > 0) {
+          paymentAmount += card.initialUsedBalance;
+        }
+
+        // Determine cycle closing month & year for payments due in this month (year, month)
+        let closingYear = year;
+        let closingMonth = month;
+        if (card.paymentDueDay <= card.cutOffDay) {
+          // Billing cycle ended in the previous month
+          closingMonth = month - 1;
+          if (closingMonth < 1) {
+            closingMonth = 12;
+            closingYear = year - 1;
+          }
+        }
+        const closingDays = daysInMonth(closingYear, closingMonth);
+        const cutOffDayActual = Math.min(card.cutOffDay, closingDays);
+        const cycleEndDate = `${closingYear}-${String(closingMonth).padStart(2, '0')}-${String(cutOffDayActual).padStart(2, '0')}`;
+
+        // Start of that billing cycle (previous cutoff)
+        let prevClosingYear = closingYear;
+        let prevClosingMonth = closingMonth - 1;
+        if (prevClosingMonth < 1) {
+          prevClosingMonth = 12;
+          prevClosingYear = closingYear - 1;
+        }
+        const prevClosingDays = daysInMonth(prevClosingYear, prevClosingMonth);
+        const prevCutOffActual = Math.min(card.cutOffDay, prevClosingDays);
+        const cycleStartDate = `${prevClosingYear}-${String(prevClosingMonth).padStart(2, '0')}-${String(prevCutOffActual).padStart(2, '0')}`;
+
+        // Add expenses made on this card within this billing cycle
+        const cycleExpenses = data.existingTransactions.filter((tx) => {
+          if (tx.status === 'cancelado') return false;
+          if (tx.creditCardId !== card.id) return false;
+          if (tx.paymentMethodType !== 'tarjeta_credito') return false;
+          if (tx.type === 'pago_tarjeta') return false;
+          return tx.date > cycleStartDate && tx.date <= cycleEndDate;
+        });
+
+        const cycleExpensesSum = cycleExpenses.reduce((sum, tx) => sum + tx.amount, 0);
+        paymentAmount += cycleExpensesSum;
+
+        // Add active installment purchase quotas on this card for this month
+        if (data.installmentPurchases) {
+          data.installmentPurchases.forEach((ip) => {
+            if (ip.creditCardId === card.id && ip.pendingBalance > 0) {
+              const alreadyIncluded = cycleExpenses.some((tx) => tx.origin === `cuota:${ip.id}`);
+              if (!alreadyIncluded) {
+                paymentAmount += ip.installmentAmount;
+              }
+            }
+          });
+        }
+
+        if (paymentAmount > 0) {
           generated.push({
             id: `gen_card_pay_${card.id}_${monthKey}`,
             date: dateStr,
             expectedDate: dateStr,
             concept: `Pago Tarjeta: ${card.name} (${card.bank})`,
             type: 'pago_tarjeta',
-            amount: card.initialUsedBalance,
+            amount: paymentAmount,
             paymentMethodType: 'banco',
             accountId: data.accounts.find((a) => a.type === 'banco')?.id || data.accounts[0]?.id,
             creditCardId: card.id,
@@ -822,7 +888,9 @@ export class NexaFinancialEngine {
     // Debt Breakdown: Credit cards used + Loans remaining
     let creditCardDebt = 0;
     creditCards.forEach((c) => {
-      if (c.isActive) creditCardDebt += c.initialUsedBalance;
+      if (c.isActive) {
+        creditCardDebt += NexaFinancialEngine.calculateCardCurrentBalance(c, allTransactions).balance;
+      }
     });
 
     let loanDebt = 0;
@@ -1234,5 +1302,181 @@ export class NexaFinancialEngine {
     }
 
     return projections;
+  }
+
+  /**
+   * Calculates the current dynamic balance and available limit of a credit card
+   */
+  static calculateCardCurrentBalance(
+    card: CreditCard,
+    allTransactions: Transaction[],
+    asOfDate?: string
+  ): { balance: number; available: number; usagePercentage: number } {
+    let balance = card.initialUsedBalance || 0;
+
+    allTransactions.forEach((tx) => {
+      if (tx.status === 'cancelado') return;
+      if (tx.creditCardId !== card.id) return;
+      if (asOfDate && tx.date > asOfDate) return;
+
+      if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') {
+        balance += tx.amount;
+      } else if (tx.type === 'pago_tarjeta') {
+        balance = Math.max(0, balance - tx.amount);
+      }
+    });
+
+    const available = Math.max(0, card.limit - balance);
+    const usagePercentage = card.limit > 0 ? Math.round((balance / card.limit) * 100) : 0;
+
+    return {
+      balance,
+      available,
+      usagePercentage,
+    };
+  }
+
+  /**
+   * Generates a complete Credit Card Billing Statement (Estado de Cuenta)
+   * for a given card and billing cycle month (year, month).
+   */
+  static generateCreditCardStatement(
+    card: CreditCard,
+    year: number,
+    month: number,
+    allTransactions: Transaction[],
+    installmentPurchases: InstallmentPurchase[] = [],
+    todayStr: string = new Date().toISOString().split('T')[0]
+  ): CreditCardStatement {
+    const cycleMonthDays = daysInMonth(year, month);
+    const cutOffDayActual = Math.min(card.cutOffDay, cycleMonthDays);
+    const cycleEndDate = `${year}-${String(month).padStart(2, '0')}-${String(cutOffDayActual).padStart(2, '0')}`;
+
+    // Previous cycle cutoff (cycle start is cutOffDay of previous month)
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth < 1) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
+    const prevMonthDays = daysInMonth(prevYear, prevMonth);
+    const prevCutOffActual = Math.min(card.cutOffDay, prevMonthDays);
+    const cycleStartDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(prevCutOffActual).padStart(2, '0')}`;
+
+    // Payment due date
+    let payYear = year;
+    let payMonth = month;
+    if (card.paymentDueDay <= card.cutOffDay) {
+      payMonth = month + 1;
+      if (payMonth > 12) {
+        payMonth = 1;
+        payYear = year + 1;
+      }
+    }
+    const payMonthDays = daysInMonth(payYear, payMonth);
+    const payDayActual = Math.min(card.paymentDueDay, payMonthDays);
+    const paymentDueDate = `${payYear}-${String(payMonth).padStart(2, '0')}-${String(payDayActual).padStart(2, '0')}`;
+
+    // Transactions inside this billing cycle
+    const cycleTxs = allTransactions.filter((tx) => {
+      if (tx.creditCardId !== card.id) return false;
+      if (tx.status === 'cancelado') return false;
+      return tx.date > cycleStartDate && tx.date <= cycleEndDate;
+    });
+
+    // Expenses / Purchases
+    const purchaseTxs = cycleTxs.filter(
+      (tx) => tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta'
+    );
+    let purchasesSum = purchaseTxs.reduce((sum, tx) => sum + tx.amount, 0);
+
+    // Active Installment Purchases for this card that apply to this cycle
+    const cycleMonthKey = `${year}-${String(month).padStart(2, '0')}`;
+    installmentPurchases.forEach((ip) => {
+      if (ip.creditCardId === card.id && ip.pendingBalance > 0) {
+        const alreadyInCycle = purchaseTxs.some((tx) => tx.origin === `cuota:${ip.id}`);
+        if (!alreadyInCycle) {
+          purchasesSum += ip.installmentAmount;
+        }
+      }
+    });
+
+    // Payments in this cycle
+    const paymentTxs = cycleTxs.filter((tx) => tx.type === 'pago_tarjeta');
+    const paymentsSum = paymentTxs.reduce((sum, tx) => sum + tx.amount, 0);
+
+    // Prior cycle balance (for September 2026, include initialUsedBalance if any)
+    let previousCycleBalance = 0;
+    if (cycleMonthKey === '2026-09') {
+      previousCycleBalance = card.initialUsedBalance || 0;
+    }
+
+    const totalDueAtCutOff = Math.max(0, previousCycleBalance + purchasesSum - paymentsSum);
+    const availableCredit = Math.max(0, card.limit - totalDueAtCutOff);
+    const minimumPayment = totalDueAtCutOff > 0 ? Math.min(totalDueAtCutOff, Math.max(2500, Math.round(totalDueAtCutOff * 0.05))) : 0;
+    const cashPaymentNoInterest = totalDueAtCutOff;
+
+    let status: 'en_curso' | 'cortado' | 'pagado' = 'en_curso';
+    if (totalDueAtCutOff === 0) {
+      status = 'pagado';
+    } else if (todayStr > cycleEndDate) {
+      status = 'cortado';
+    } else {
+      status = 'en_curso';
+    }
+
+    const monthNames = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const cycleLabel = `Corte ${cutOffDayActual} de ${monthNames[month - 1]} ${year}`;
+
+    return {
+      cardId: card.id,
+      cardName: card.name,
+      bank: card.bank,
+      cycleKey: cycleMonthKey,
+      cycleLabel,
+      cycleStartDate,
+      cycleEndDate,
+      cutOffDay: card.cutOffDay,
+      paymentDueDate,
+      limit: card.limit,
+      totalPurchases: purchasesSum,
+      totalPayments: paymentsSum,
+      previousCycleBalance,
+      totalDueAtCutOff,
+      availableCredit,
+      minimumPayment,
+      cashPaymentNoInterest,
+      transactions: cycleTxs.sort((a, b) => b.date.localeCompare(a.date)),
+      isCurrentCycle: todayStr >= cycleStartDate && todayStr <= cycleEndDate,
+      status,
+    };
+  }
+
+  /**
+   * Generates statements for all active cards for a given month
+   */
+  static generateAllCardStatements(
+    creditCards: CreditCard[],
+    year: number,
+    month: number,
+    allTransactions: Transaction[],
+    installmentPurchases: InstallmentPurchase[] = [],
+    todayStr: string = new Date().toISOString().split('T')[0]
+  ): CreditCardStatement[] {
+    return creditCards
+      .filter((c) => c.isActive)
+      .map((c) =>
+        NexaFinancialEngine.generateCreditCardStatement(
+          c,
+          year,
+          month,
+          allTransactions,
+          installmentPurchases,
+          todayStr
+        )
+      );
   }
 }

@@ -503,20 +503,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       return [newTx, ...prev];
     });
-
-    // If this is a credit card payment or purchase, update card used balance
-    if (newTx.paymentMethodType === 'tarjeta_credito' && newTx.creditCardId) {
-      const card = creditCards.find((c) => c.id === newTx.creditCardId);
-      if (card && isNew && newTx.status === 'realizado') {
-        const updatedCard = {
-          ...card,
-          initialUsedBalance: Math.max(0, card.initialUsedBalance + newTx.amount),
-          updatedAt: now,
-        };
-        await storage.put('creditCards', updatedCard);
-        setCreditCards((prev) => prev.map((c) => (c.id === card.id ? updatedCard : c)));
-      }
-    }
   };
 
   const deleteTransaction = async (id: string) => {

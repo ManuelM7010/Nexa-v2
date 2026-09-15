@@ -346,3 +346,26 @@ export interface AlertItem {
   date?: string;
   actionUrl?: string;
 }
+
+export interface CreditCardStatement {
+  cardId: string;
+  cardName: string;
+  bank: string;
+  cycleKey: string; // e.g. "2026-09"
+  cycleLabel: string; // e.g. "Corte 20 Sep 2026"
+  cycleStartDate: string; // YYYY-MM-DD
+  cycleEndDate: string; // YYYY-MM-DD
+  cutOffDay: number;
+  paymentDueDate: string; // YYYY-MM-DD
+  limit: number; // in cents
+  totalPurchases: number; // in cents (charges during this cycle)
+  totalPayments: number; // in cents (payments during this cycle)
+  previousCycleBalance: number; // in cents
+  totalDueAtCutOff: number; // in cents (Total TDDC / Saldo al corte)
+  availableCredit: number; // in cents (limit - totalDueAtCutOff)
+  minimumPayment: number; // in cents (suggested min payment)
+  cashPaymentNoInterest: number; // in cents (100% of balance to avoid interest)
+  transactions: Transaction[]; // Itemized expenses and charges of this cycle
+  isCurrentCycle: boolean;
+  status: 'en_curso' | 'cortado' | 'pagado';
+}
