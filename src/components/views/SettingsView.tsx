@@ -13,13 +13,20 @@ import {
   HardDrive,
   Database,
   CheckCircle2,
+  Tag,
+  Plus,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { dollarsToCents, centsToDollars } from '../../utils/formatters';
+import { NewCategoryModal } from '../common/NewCategoryModal';
 
 export const SettingsView: React.FC = () => {
   const {
     settings,
     updateSettings,
+    categories,
+    deleteCategory,
     exportBackupJSON,
     importBackupJSON,
     exportTransactionsCSV,
@@ -31,6 +38,9 @@ export const SettingsView: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isConfirmReset, setIsConfirmReset] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [categoryModalType, setCategoryModalType] = useState<'gasto' | 'ingreso'>('gasto');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'gasto' | 'ingreso'>('all');
 
   const showNotification = (msg: string) => {
     setSuccessMsg(msg);
@@ -181,6 +191,131 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
+      {/* Categories Management Section */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Tag className="w-4 h-4 text-emerald-400" />
+              <span>Gestor de Categorías</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              Administra las categorías de ingresos y gastos utilizadas en presupuestos y movimientos
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px]">
+              <button
+                onClick={() => setCategoryFilter('all')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                  categoryFilter === 'all'
+                    ? 'bg-slate-800 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Todas ({categories.length})
+              </button>
+              <button
+                onClick={() => setCategoryFilter('gasto')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                  categoryFilter === 'gasto'
+                    ? 'bg-rose-500/20 text-rose-300 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Gastos ({categories.filter((c) => c.type === 'gasto').length})
+              </button>
+              <button
+                onClick={() => setCategoryFilter('ingreso')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                  categoryFilter === 'ingreso'
+                    ? 'bg-emerald-500/20 text-emerald-300 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Ingresos ({categories.filter((c) => c.type === 'ingreso').length})
+              </button>
+            </div>
+
+            <button
+              onClick={() => {
+                setCategoryModalType('gasto');
+                setIsCategoryModalOpen(true);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nueva Categoría</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Categories Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {categories
+            .filter((cat) => categoryFilter === 'all' || cat.type === categoryFilter)
+            .map((cat) => (
+              <div
+                key={cat.id}
+                className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-start justify-between gap-2 hover:border-slate-700 transition"
+              >
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <div
+                    className="w-3.5 h-3.5 rounded-full shrink-0 mt-0.5"
+                    style={{ backgroundColor: cat.color || '#3b82f6' }}
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-xs text-white truncate">
+                        {cat.name}
+                      </span>
+                      <span
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                          cat.type === 'ingreso'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        }`}
+                      >
+                        {cat.type}
+                      </span>
+                    </div>
+                    {cat.subcategories && cat.subcategories.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {cat.subcategories.map((sub, idx) => (
+                          <span
+                            key={idx}
+                            className="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded"
+                          >
+                            {sub}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    if (categories.length <= 1) {
+                      alert('Debes mantener al menos una categoría en el sistema.');
+                      return;
+                    }
+                    if (window.confirm(`¿Seguro que deseas eliminar la categoría "${cat.name}"?`)) {
+                      await deleteCategory(cat.id);
+                      showNotification(`Categoría "${cat.name}" eliminada.`);
+                    }
+                  }}
+                  className="text-slate-600 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-500/10 transition cursor-pointer shrink-0"
+                  title="Eliminar categoría"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+        </div>
+      </div>
+
       {/* Backup & Export / Import (Requirement 26) */}
       <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4">
         <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -317,6 +452,15 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      <NewCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        defaultType={categoryModalType}
+        onCategoryCreated={(newCat) => {
+          showNotification(`Categoría "${newCat.name}" creada con éxito.`);
+        }}
+      />
     </div>
   );
 };

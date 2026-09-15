@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { TransactionType, PaymentMethodType, TransactionStatus } from '../../types';
 import { formatMoney, dollarsToCents, centsToDollars } from '../../utils/formatters';
-import { X, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, ArrowRight, AlertCircle, CheckCircle, Plus } from 'lucide-react';
+import { NewCategoryModal } from './NewCategoryModal';
 
 export const NewTransactionModal: React.FC = () => {
   const {
@@ -31,6 +32,7 @@ export const NewTransactionModal: React.FC = () => {
   const [transferToAccountId, setTransferToAccountId] = useState('');
   const [status, setStatus] = useState<TransactionStatus>('planificado');
   const [notes, setNotes] = useState('');
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   useEffect(() => {
     if (editingTransaction) {
@@ -264,9 +266,19 @@ export const NewTransactionModal: React.FC = () => {
           {/* Category (if not transfer) */}
           {type !== 'transferencia' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Categoría
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Categoría
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer transition"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Nueva Categoría</span>
+                </button>
+              </div>
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
@@ -432,6 +444,15 @@ export const NewTransactionModal: React.FC = () => {
           </div>
         </form>
       </div>
+
+      <NewCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        defaultType={type === 'ingreso' ? 'ingreso' : 'gasto'}
+        onCategoryCreated={(newCat) => {
+          setCategoryId(newCat.id);
+        }}
+      />
     </div>
   );
 };

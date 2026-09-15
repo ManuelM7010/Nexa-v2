@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+import { NewCategoryModal } from '../common/NewCategoryModal';
 
 export const BudgetView: React.FC = () => {
   const {
@@ -25,6 +26,7 @@ export const BudgetView: React.FC = () => {
 
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [budgetInput, setBudgetInput] = useState('');
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   const expenseCategories = categories.filter((c) => c.type === 'gasto');
 
@@ -174,6 +176,13 @@ export const BudgetView: React.FC = () => {
               Control preventivo al 80% y alerta crítica al superar el 100%
             </p>
           </div>
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Nueva Categoría</span>
+          </button>
         </div>
 
         <div className="overflow-x-auto">
@@ -335,6 +344,12 @@ export const BudgetView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      <NewCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        defaultType="gasto"
+      />
     </div>
   );
 };

@@ -25,6 +25,7 @@ import {
   Layers,
   HelpCircle,
 } from 'lucide-react';
+import { NewCategoryModal } from '../common/NewCategoryModal';
 
 export const DetailedMonthlyBudgetView: React.FC = () => {
   const {
@@ -75,6 +76,7 @@ export const DetailedMonthlyBudgetView: React.FC = () => {
 
   // Unbudgeted suggestions modal
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   // Month label
   const monthName = `${getMonthNameEs(selectedMonth)} ${selectedYear}`;
@@ -1101,7 +1103,17 @@ export const DetailedMonthlyBudgetView: React.FC = () => {
 
               {/* Category */}
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Categoría General</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-400 font-semibold">Categoría General</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCategoryModalOpen(true)}
+                    className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer transition"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Nueva Categoría</span>
+                  </button>
+                </div>
                 <select
                   value={modalItem.categoryId}
                   onChange={(e) => setModalItem({ ...modalItem, categoryId: e.target.value })}
@@ -1259,6 +1271,15 @@ export const DetailedMonthlyBudgetView: React.FC = () => {
           </div>
         </div>
       )}
+
+      <NewCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        defaultType={modalItem.type}
+        onCategoryCreated={(newCat) => {
+          setModalItem((prev) => ({ ...prev, categoryId: newCat.id }));
+        }}
+      />
     </div>
   );
 };
