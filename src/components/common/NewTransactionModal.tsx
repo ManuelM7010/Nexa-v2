@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { TransactionType, PaymentMethodType, TransactionStatus } from '../../types';
-import { formatMoney, dollarsToCents, centsToDollars } from '../../utils/formatters';
+import { formatMoney, dollarsToCents, centsToDollars, getTodayDateStr } from '../../utils/formatters';
 import { X, ArrowRight, AlertCircle, CheckCircle, Plus, Zap } from 'lucide-react';
 import { NewCategoryModal } from './NewCategoryModal';
 
@@ -24,7 +24,7 @@ export const NewTransactionModal: React.FC = () => {
 
   const [concept, setConcept] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [date, setDate] = useState(todayStr);
+  const [date, setDate] = useState(getTodayDateStr());
   const [type, setType] = useState<TransactionType>('gasto');
   const [categoryId, setCategoryId] = useState('');
   const [paymentMethodType, setPaymentMethodType] = useState<PaymentMethodType>('banco');
@@ -51,7 +51,7 @@ export const NewTransactionModal: React.FC = () => {
     } else {
       setConcept('');
       setAmountStr('');
-      setDate(todayStr);
+      setDate(getTodayDateStr());
       setType('gasto');
       const defaultCat = categories.find((c) => c.type === 'gasto')?.id || '';
       setCategoryId(defaultCat);
@@ -259,9 +259,19 @@ export const NewTransactionModal: React.FC = () => {
           {/* Date & Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Fecha del Evento *
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Fecha del Movimiento *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setDate(getTodayDateStr())}
+                  className="text-[11px] font-bold text-blue-400 hover:text-blue-300 transition cursor-pointer"
+                  title="Establecer fecha de hoy"
+                >
+                  Hoy
+                </button>
+              </div>
               <input
                 type="date"
                 required

@@ -176,8 +176,8 @@ interface FinanceContextType {
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Current simulated or real date
-  const todayStr = '2026-09-12'; // Default anchor matching the scenario prompt
+  // Current real date of the day
+  const todayStr = getTodayDateStr();
   const [selectedYear, setSelectedYear] = useState(2026);
   const [selectedMonth, setSelectedMonth] = useState(9); // September
 

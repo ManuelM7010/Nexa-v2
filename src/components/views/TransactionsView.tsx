@@ -62,8 +62,26 @@ export const TransactionsView: React.FC = () => {
         return false;
       }
       // Payment method
-      if (filterPayment !== 'all' && tx.paymentMethodType !== filterPayment) {
-        return false;
+      if (filterPayment !== 'all') {
+        if (filterPayment === 'banco' || filterPayment === 'type:banco') {
+          // Bank accounts: transactions via bank or that involve an account
+          const isBank = tx.paymentMethodType === 'banco' || (!!tx.accountId && tx.paymentMethodType !== 'tarjeta_credito');
+          if (!isBank) return false;
+        } else if (filterPayment === 'tarjeta_credito' || filterPayment === 'type:tarjeta_credito') {
+          // Credit cards: purchases made with card or payments applied to card
+          const isCard = tx.paymentMethodType === 'tarjeta_credito' || !!tx.creditCardId;
+          if (!isCard) return false;
+        } else if (filterPayment === 'efectivo' || filterPayment === 'type:efectivo') {
+          if (tx.paymentMethodType !== 'efectivo') return false;
+        } else if (filterPayment.startsWith('account:')) {
+          const targetAccId = filterPayment.replace('account:', '');
+          const matchesAccount = tx.accountId === targetAccId || tx.transferToAccountId === targetAccId;
+          if (!matchesAccount) return false;
+        } else if (filterPayment.startsWith('card:')) {
+          const targetCardId = filterPayment.replace('card:', '');
+          const matchesCard = tx.creditCardId === targetCardId;
+          if (!matchesCard) return false;
+        }
       }
       return true;
     });
@@ -106,6 +124,11 @@ export const TransactionsView: React.FC = () => {
   };
 
   const getPaymentName = (tx: Transaction) => {
+    if (tx.type === 'pago_tarjeta') {
+      const card = creditCards.find((c) => c.id === tx.creditCardId);
+      const acc = accounts.find((a) => a.id === tx.accountId);
+      return card ? `Pago: ${card.name}` : (acc ? acc.name : 'Pago Tarjeta');
+    }
     if (tx.paymentMethodType === 'efectivo') return 'Efectivo';
     if (tx.paymentMethodType === 'tarjeta_credito') {
       const card = creditCards.find((c) => c.id === tx.creditCardId);
@@ -114,6 +137,14 @@ export const TransactionsView: React.FC = () => {
     const acc = accounts.find((a) => a.id === tx.accountId);
     return acc ? acc.name : 'Cuenta Bancaria';
   };
+
+  const isAccountActive =
+    filterPayment === 'banco' || filterPayment === 'type:banco' || filterPayment.startsWith('account:');
+  const isCardActive =
+    filterPayment === 'tarjeta_credito' ||
+    filterPayment === 'type:tarjeta_credito' ||
+    filterPayment.startsWith('card:');
+  const isCashActive = filterPayment === 'efectivo' || filterPayment === 'type:efectivo';
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
@@ -142,11 +173,155 @@ export const TransactionsView: React.FC = () => {
           </button>
         </div>
 
+        {/* Quick Payment Method Filter Pills */}
+        <div className="space-y-2 pt-2 border-t border-slate-800/80">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-slate-400 mr-1 flex items-center gap-1">
+              <span>Medio de Pago:</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setFilterPayment('all')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                filterPayment === 'all'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterPayment(filterPayment.startsWith('account:') ? filterPayment : 'banco')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                isAccountActive
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/50 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 text-blue-400" />
+              <span>Cuentas Bancarias</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                {accounts.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterPayment(filterPayment.startsWith('card:') ? filterPayment : 'tarjeta_credito')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                isCardActive
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5 text-rose-400" />
+              <span>Tarjetas de Crédito</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                {creditCards.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterPayment('efectivo')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                isCashActive
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Efectivo</span>
+            </button>
+          </div>
+
+          {/* Sub-filter chips: Select a specific account ("una u otra") */}
+          {isAccountActive && accounts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 p-2 bg-blue-950/20 border border-blue-900/30 rounded-xl text-xs">
+              <span className="text-[11px] font-semibold text-blue-300/80 mr-1 flex items-center gap-1">
+                <Building2 className="w-3 h-3 text-blue-400" />
+                <span>Filtrar cuenta:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilterPayment('banco')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  filterPayment === 'banco'
+                    ? 'bg-blue-600 text-white font-bold'
+                    : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                }`}
+              >
+                Todas las cuentas
+              </button>
+              {accounts.map((acc) => {
+                const isSelected = filterPayment === `account:${acc.id}`;
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => setFilterPayment(`account:${acc.id}`)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-600 text-white font-bold shadow-sm'
+                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    <span>{acc.name}</span>
+                    <span className={`text-[10px] ${isSelected ? 'text-blue-200' : 'text-slate-400'}`}>
+                      ({acc.bank})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Sub-filter chips: Select a specific credit card ("una u otra") */}
+          {isCardActive && creditCards.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 p-2 bg-rose-950/20 border border-rose-900/30 rounded-xl text-xs">
+              <span className="text-[11px] font-semibold text-rose-300/80 mr-1 flex items-center gap-1">
+                <CreditCard className="w-3 h-3 text-rose-400" />
+                <span>Filtrar tarjeta:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilterPayment('tarjeta_credito')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  filterPayment === 'tarjeta_credito'
+                    ? 'bg-rose-600 text-white font-bold'
+                    : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                }`}
+              >
+                Todas las tarjetas
+              </button>
+              {creditCards.map((card) => {
+                const isSelected = filterPayment === `card:${card.id}`;
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => setFilterPayment(`card:${card.id}`)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition cursor-pointer ${
+                      isSelected
+                        ? 'bg-rose-600 text-white font-bold shadow-sm'
+                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    <span>{card.name}</span>
+                    <span className={`text-[10px] ${isSelected ? 'text-rose-200' : 'text-slate-400'}`}>
+                      ({card.bank})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Filters bar */}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80 text-xs">
           <div className="flex items-center gap-1.5 text-slate-400 font-semibold mr-1">
             <Filter className="w-3.5 h-3.5" />
-            <span>Filtros:</span>
+            <span>Otros Filtros:</span>
           </div>
 
           <select
@@ -202,12 +377,32 @@ export const TransactionsView: React.FC = () => {
           <select
             value={filterPayment}
             onChange={(e) => setFilterPayment(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-300 focus:outline-none cursor-pointer"
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-300 focus:outline-none cursor-pointer max-w-[220px] truncate"
           >
             <option value="all">Todos los medios de pago</option>
-            <option value="banco">Cuentas Bancarias</option>
-            <option value="efectivo">Efectivo</option>
-            <option value="tarjeta_credito">Tarjetas de Crédito</option>
+            <optgroup label="── Por tipo de medio ──">
+              <option value="banco">🏦 Cuentas Bancarias (Todas)</option>
+              <option value="tarjeta_credito">💳 Tarjetas de Crédito (Todas)</option>
+              <option value="efectivo">💵 Efectivo</option>
+            </optgroup>
+            {accounts.length > 0 && (
+              <optgroup label="── Cuentas Bancarias (Específicas) ──">
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={`account:${acc.id}`}>
+                    🏦 {acc.name} ({acc.bank})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {creditCards.length > 0 && (
+              <optgroup label="── Tarjetas de Crédito (Específicas) ──">
+                {creditCards.map((card) => (
+                  <option key={card.id} value={`card:${card.id}`}>
+                    💳 {card.name} ({card.bank})
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
 
           {(searchTerm ||
@@ -223,7 +418,7 @@ export const TransactionsView: React.FC = () => {
                 setFilterStatus('all');
                 setFilterPayment('all');
               }}
-              className="text-blue-400 hover:underline ml-auto font-medium"
+              className="text-blue-400 hover:underline ml-auto font-medium cursor-pointer"
             >
               Limpiar filtros
             </button>
@@ -232,7 +427,7 @@ export const TransactionsView: React.FC = () => {
 
         {/* Dynamic Summary bar for filtered results */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-[11px] text-slate-400 border-t border-slate-800/60">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span>
               Mostrando <strong className="text-white">{filteredStats.count}</strong> movimientos
             </span>
@@ -244,6 +439,21 @@ export const TransactionsView: React.FC = () => {
             <span>
               <span className="text-amber-400 font-semibold">{filteredStats.pendingCount}</span> planificados
             </span>
+            {filterPayment !== 'all' && (
+              <>
+                <span className="text-slate-600">•</span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                  <span>Filtrando por:</span>
+                  <strong className="text-white">
+                    {filterPayment === 'banco' && 'Todas las Cuentas Bancarias'}
+                    {filterPayment === 'tarjeta_credito' && 'Todas las Tarjetas de Crédito'}
+                    {filterPayment === 'efectivo' && 'Efectivo'}
+                    {filterPayment.startsWith('account:') && (accounts.find((a) => a.id === filterPayment.replace('account:', ''))?.name || 'Cuenta')}
+                    {filterPayment.startsWith('card:') && (creditCards.find((c) => c.id === filterPayment.replace('card:', ''))?.name || 'Tarjeta')}
+                  </strong>
+                </span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
