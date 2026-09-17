@@ -263,15 +263,52 @@ export const NewTransactionModal: React.FC = () => {
                 Monto ({settings.currencySymbol}) *
               </label>
               <input
-                type="number"
-                step="0.01"
-                min="0.01"
+                type="text"
                 required
                 value={amountStr}
                 onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="0.00"
+                onBlur={() => {
+                  if (!amountStr) return;
+                  try {
+                    const sanitized = amountStr.replace(/[^0-9.+\-*/\s]/g, '');
+                    if (sanitized && /^[0-9.+\-*/\s]+$/.test(sanitized)) {
+                      // eslint-disable-next-line no-eval
+                      const result = Function(`"use strict"; return (${sanitized});`)();
+                      if (typeof result === 'number' && !isNaN(result) && isFinite(result) && result >= 0) {
+                        setAmountStr(result.toFixed(2));
+                      }
+                    }
+                  } catch {
+                    // ignore
+                  }
+                }}
+                placeholder="0.00 (o ej: 15+4.50)"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-semibold placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
+              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                {[5, 10, 20, 50, 100].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => {
+                      const cur = parseFloat(amountStr) || 0;
+                      setAmountStr((cur + val).toFixed(2));
+                    }}
+                    className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60 font-mono transition cursor-pointer"
+                  >
+                    +{val}
+                  </button>
+                ))}
+                {amountStr && (
+                  <button
+                    type="button"
+                    onClick={() => setAmountStr('')}
+                    className="text-[10px] px-1.5 py-0.5 rounded-md text-slate-500 hover:text-slate-300 transition cursor-pointer"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

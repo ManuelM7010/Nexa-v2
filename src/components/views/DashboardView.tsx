@@ -77,10 +77,10 @@ export const DashboardView: React.FC = () => {
               <Wallet className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-white tracking-tight">
+          <div className="text-2xl font-black text-white tracking-tight privacy-blur">
             {formatMoney(executiveSummary.currentRealCashBalance, settings.currencySymbol)}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1 privacy-blur">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
             Bancos ({formatMoney(executiveSummary.bankBalance, settings.currencySymbol)}) + Efectivo ({formatMoney(executiveSummary.cashBalance, settings.currencySymbol)})
           </p>
@@ -97,7 +97,7 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
           <div
-            className={`text-2xl font-black tracking-tight ${
+            className={`text-2xl font-black tracking-tight privacy-blur ${
               executiveSummary.projectedEndBalance < 0
                 ? 'text-rose-400'
                 : 'text-sky-300'
@@ -105,7 +105,7 @@ export const DashboardView: React.FC = () => {
           >
             {formatMoney(executiveSummary.projectedEndBalance, settings.currencySymbol)}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
             <span>Saldo al día {dailyCashFlow[dailyCashFlow.length - 1]?.date.slice(8) || 30}</span>
             <span className={executiveSummary.lowestProjectedBalance < 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}>
               Mín: {formatMoney(executiveSummary.lowestProjectedBalance, settings.currencySymbol)}
@@ -124,7 +124,7 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
           <div
-            className={`text-2xl font-black tracking-tight ${
+            className={`text-2xl font-black tracking-tight privacy-blur ${
               executiveSummary.freeCashAfterObligations < 0
                 ? 'text-rose-400'
                 : 'text-emerald-400'
@@ -132,7 +132,7 @@ export const DashboardView: React.FC = () => {
           >
             {formatMoney(executiveSummary.freeCashAfterObligations, settings.currencySymbol)}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-400 mt-1 privacy-blur">
             Tras descontar {formatMoney(executiveSummary.upcomingObligationsCommitted, settings.currencySymbol)} en obligaciones próximas
           </p>
         </div>
@@ -147,10 +147,10 @@ export const DashboardView: React.FC = () => {
               <CreditCard className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-rose-400 tracking-tight">
+          <div className="text-2xl font-black text-rose-400 tracking-tight privacy-blur">
             {formatMoney(executiveSummary.totalDebt, settings.currencySymbol)}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
             <span>Tarjetas: {formatMoney(executiveSummary.creditCardDebt, settings.currencySymbol)}</span>
             <span>Préstamos: {formatMoney(executiveSummary.loanDebt, settings.currencySymbol)}</span>
           </p>

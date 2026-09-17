@@ -20,6 +20,7 @@ import {
   PlanNote,
   QuickTemplate,
   SavingsAccount,
+  AlertItem,
 } from '../types';
 import { storage, NexaFullBackup } from '../services/storage';
 import {
@@ -50,7 +51,7 @@ interface FinanceContextType {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 
-  // Modals & Triggers
+  // Modals, Quick Actions & UI Modes
   isNewTxOpen: boolean;
   setIsNewTxOpen: (open: boolean) => void;
   editingTransaction: Transaction | null;
@@ -59,6 +60,15 @@ interface FinanceContextType {
   setIsAffordabilityOpen: (open: boolean) => void;
   isRenderGuideOpen: boolean;
   setIsRenderGuideOpen: (open: boolean) => void;
+  isPrivacyMode: boolean;
+  togglePrivacyMode: () => void;
+  isQuickSearchOpen: boolean;
+  setIsQuickSearchOpen: (open: boolean) => void;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
+  isAlertsOpen: boolean;
+  setIsAlertsOpen: (open: boolean) => void;
+  financialAlerts: AlertItem[];
 
   // Entities
   accounts: Account[];
@@ -216,6 +226,24 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isAffordabilityOpen, setIsAffordabilityOpen] = useState(false);
   const [isRenderGuideOpen, setIsRenderGuideOpen] = useState(false);
+
+  // Privacy & Quick Search & Mobile states
+  const [isPrivacyMode, setIsPrivacyMode] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('nexa_privacy_mode') === 'true' : false;
+  });
+  const togglePrivacyMode = useCallback(() => {
+    setIsPrivacyMode((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nexa_privacy_mode', String(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
 
   // Storage entities
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -1634,6 +1662,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsAffordabilityOpen,
         isRenderGuideOpen,
         setIsRenderGuideOpen,
+        isPrivacyMode,
+        togglePrivacyMode,
+        isQuickSearchOpen,
+        setIsQuickSearchOpen,
+        isMobileMenuOpen,
+        setIsMobileMenuOpen,
+        isAlertsOpen,
+        setIsAlertsOpen,
+        financialAlerts: executiveSummary.alerts || [],
         accounts,
         creditCards,
         savingsAccounts,

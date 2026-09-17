@@ -1,5 +1,23 @@
 @import "tailwindcss";
 
+/* Privacy Mode Styling (Camouflage on Mobile & Public) */
+.privacy-active .privacy-blur {
+  filter: blur(8px);
+  user-select: none;
+  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.privacy-active .privacy-blur:hover,
+.privacy-active .privacy-blur:active {
+  filter: blur(0px);
+}
+
+/* Mobile viewport touch optimization */
+html {
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
 @media print {
   header, nav, #btn-new-transaction, #btn-open-affordability, #btn-open-render-guide, .no-print {
     display: none !important;

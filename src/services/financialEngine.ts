@@ -1423,6 +1423,7 @@ export class NexaFinancialEngine {
           Math.abs(negativeDay.endDayProjectedBalance) / 100
         ).toFixed(2)}. Revisa tus compromisos para evitar sobregiro.`,
         date: negativeDay.date,
+        targetTab: 'flujo',
       });
     }
 
@@ -1439,8 +1440,39 @@ export class NexaFinancialEngine {
         message: `Tus obligaciones próximas de $${(upcomingObligationsCommitted / 100).toFixed(
           2
         )} representan más del 80% de tu saldo disponible.`,
+        targetTab: 'dashboard',
       });
     }
+
+    // 2b. High credit card utilization alerts
+    creditCards.forEach((c) => {
+      if (c.isActive && c.limit > 0) {
+        const used = NexaFinancialEngine.calculateCardCurrentBalance(c, allTransactions).balance;
+        const util = (used / c.limit) * 100;
+        if (util >= 85) {
+          alerts.push({
+            id: `alert_card_util_${c.id}`,
+            type: 'warning',
+            title: `Tarjeta ${c.name} al ${Math.round(util)}%`,
+            message: `Has utilizado $${(used / 100).toFixed(2)} de tu límite de $${(c.limit / 100).toFixed(2)}. Procura liquidarla antes del corte.`,
+            targetTab: 'tarjetas',
+          });
+        }
+      }
+    });
+
+    // 2c. Savings milestone reached
+    (savingsAccounts || []).forEach((sav) => {
+      if (!sav.isArchived && sav.targetAmount > 0 && sav.currentBalance >= sav.targetAmount) {
+        alerts.push({
+          id: `alert_sav_goal_${sav.id}`,
+          type: 'success',
+          title: `¡Meta cumplida: ${sav.name}!`,
+          message: `Has alcanzado el 100% de tu objetivo con $${(sav.currentBalance / 100).toFixed(2)}. ¡Felicidades!`,
+          targetTab: 'ahorros',
+        });
+      }
+    });
 
     // 3. Over-budget alerts
     budgetItems.forEach((b) => {
@@ -1452,6 +1484,7 @@ export class NexaFinancialEngine {
           message: `Has gastado $${(b.realAmount / 100).toFixed(2)} de un presupuesto de $${(
             b.budgetedAmount / 100
           ).toFixed(2)} (${b.percentUsed}%).`,
+          targetTab: 'presupuesto',
         });
       } else if (b.status === 'alerta') {
         alerts.push({
@@ -1461,6 +1494,7 @@ export class NexaFinancialEngine {
           message: `Has consumido el ${b.percentUsed}% de tu presupuesto ($${(
             b.realAmount / 100
           ).toFixed(2)} de $${(b.budgetedAmount / 100).toFixed(2)}).`,
+          targetTab: 'presupuesto',
         });
       }
     });
@@ -1475,6 +1509,7 @@ export class NexaFinancialEngine {
           (totalRealizedIncome - totalRealizedExpense) /
           100
         ).toFixed(2)} en este período.`,
+        targetTab: 'ahorros',
       });
     }
 

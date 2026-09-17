@@ -49,7 +49,7 @@ export const NavigationBar: React.FC = () => {
   ];
 
   return (
-    <nav className="w-full bg-slate-950 border-b border-slate-800/80 px-4 sm:px-6">
+    <nav className="hidden md:block w-full bg-slate-950 border-b border-slate-800/80 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto scrollbar-none py-2">
         {navItems.map((item) => {
           const Icon = item.icon;

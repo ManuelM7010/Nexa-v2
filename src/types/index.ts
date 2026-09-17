@@ -379,6 +379,7 @@ export interface AlertItem {
   message: string;
   date?: string;
   actionUrl?: string;
+  targetTab?: string;
 }
 
 export interface CreditCardStatement {
