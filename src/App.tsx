@@ -26,6 +26,7 @@ import { AccountsView } from './components/views/AccountsView';
 import { ReportsView } from './components/views/ReportsView';
 import { AffordabilityView } from './components/views/AffordabilityView';
 import { SettingsView } from './components/views/SettingsView';
+import { SavingsView } from './components/views/SavingsView';
 
 const MainAppContent: React.FC = () => {
   const { activeTab, isLoading } = useFinance();
@@ -34,6 +35,8 @@ const MainAppContent: React.FC = () => {
     switch (activeTab) {
       case 'dashboard':
         return <DashboardView />;
+      case 'ahorros':
+        return <SavingsView />;
       case 'flujo':
         return <DailyCashFlowView />;
       case 'proyeccion-anual':

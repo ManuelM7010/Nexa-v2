@@ -19,6 +19,7 @@ import {
   GroceryItem,
   PlanNote,
   QuickTemplate,
+  SavingsAccount,
 } from '../types';
 import { storage, NexaFullBackup } from '../services/storage';
 import {
@@ -31,6 +32,7 @@ import {
   getDefaultCategories,
   getDefaultAppSettings,
   getDefaultQuickTemplates,
+  getDefaultSavingsAccounts,
   generateDemoSeedData,
 } from '../services/seedData';
 import { getTodayDateStr } from '../utils/formatters';
@@ -61,6 +63,7 @@ interface FinanceContextType {
   // Entities
   accounts: Account[];
   creditCards: CreditCard[];
+  savingsAccounts: SavingsAccount[];
   transactions: Transaction[];
   categories: Category[];
   budgets: Budget[];
@@ -94,6 +97,33 @@ interface FinanceContextType {
 
   saveAccount: (acc: Partial<Account> & { name: string }) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
+
+  saveSavingsAccount: (sav: Partial<SavingsAccount> & { name: string }) => Promise<void>;
+  deleteSavingsAccount: (id: string) => Promise<void>;
+  transferToSavings: (
+    fromAccountId: string,
+    toSavingsAccountId: string,
+    amount: number,
+    concept?: string,
+    date?: string,
+    notes?: string
+  ) => Promise<void>;
+  withdrawFromSavings: (
+    fromSavingsAccountId: string,
+    toAccountId: string,
+    amount: number,
+    concept?: string,
+    date?: string,
+    notes?: string
+  ) => Promise<void>;
+  spendFromSavings: (
+    fromSavingsAccountId: string,
+    amount: number,
+    concept: string,
+    categoryId?: string,
+    date?: string,
+    notes?: string
+  ) => Promise<void>;
 
   saveCreditCard: (card: Partial<CreditCard> & { name: string; limit: number }) => Promise<void>;
   deleteCreditCard: (id: string) => Promise<void>;
@@ -190,6 +220,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Storage entities
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+  const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -216,6 +247,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const [
         accList,
         cardList,
+        savList,
         txList,
         catList,
         bgtList,
@@ -234,6 +266,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ] = await Promise.all([
         storage.getAll<Account>('accounts'),
         storage.getAll<CreditCard>('creditCards'),
+        storage.getAll<SavingsAccount>('savingsAccounts'),
         storage.getAll<Transaction>('transactions'),
         storage.getAll<Category>('categories'),
         storage.getAll<Budget>('budgets'),
@@ -257,6 +290,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         await storage.putBatch('categories', demo.categories);
         await storage.putBatch('accounts', demo.accounts);
         await storage.putBatch('creditCards', demo.creditCards);
+        const demoSavings = demo.savingsAccounts || getDefaultSavingsAccounts();
+        await storage.putBatch('savingsAccounts', demoSavings);
         await storage.putBatch('budgets', demo.budgets);
         if (demo.itemBudgets?.length) await storage.putBatch('itemBudgets', demo.itemBudgets);
         await storage.putBatch('installmentPurchases', demo.installmentPurchases);
@@ -273,6 +308,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setCategories(demo.categories);
         setAccounts(demo.accounts);
         setCreditCards(demo.creditCards);
+        setSavingsAccounts(demoSavings);
         setBudgets(demo.budgets);
         setItemBudgets(demo.itemBudgets || []);
         setGroceryItems([]);
@@ -294,8 +330,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           loadedTemplates = defaultTemplates;
         }
 
+        // If savings is empty in existing DB, seed with default savings accounts
+        let loadedSavings = savList;
+        if (!isCleanSlate && savList.length === 0) {
+          const defaultSavings = getDefaultSavingsAccounts();
+          await storage.putBatch('savingsAccounts', defaultSavings);
+          loadedSavings = defaultSavings;
+        }
+
         setAccounts(accList);
         setCreditCards(cardList);
+        setSavingsAccounts(loadedSavings || []);
         setTransactions(txList);
         setCategories(catList.length > 0 ? catList : getDefaultCategories());
         setBudgets(bgtList);
@@ -431,7 +476,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       dailyCashFlow,
       allMonthTransactions,
       budgetAnalysis,
-      settings.liquidityStartDate || '2026-09-15'
+      settings.liquidityStartDate || '2026-09-15',
+      savingsAccounts
     );
   }, [
     selectedYear,
@@ -444,6 +490,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     allMonthTransactions,
     budgetAnalysis,
     settings.liquidityStartDate,
+    savingsAccounts,
   ]);
 
   // 12-Month Multi-Month Cash Flow & Net Savings Projection
@@ -505,6 +552,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       accountId: txData.accountId,
       creditCardId: txData.creditCardId,
       transferToAccountId: txData.transferToAccountId,
+      savingsAccountId: txData.savingsAccountId,
       status: txData.status || 'planificado',
       origin: txData.origin || 'manual',
       createdAt: txData.createdAt || now,
@@ -588,6 +636,118 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const deleteAccount = async (id: string) => {
     await storage.delete('accounts', id);
     setAccounts((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const saveSavingsAccount = async (savData: Partial<SavingsAccount> & { name: string }) => {
+    const now = new Date().toISOString();
+    const id = savData.id || `sav_${Date.now()}`;
+    const newSav: SavingsAccount = {
+      id,
+      name: savData.name,
+      targetAmount: savData.targetAmount || 0,
+      initialBalance: savData.initialBalance || 0,
+      currentBalance: savData.currentBalance ?? savData.initialBalance ?? 0,
+      color: savData.color || '#10b981',
+      icon: savData.icon || 'ShieldCheck',
+      category: savData.category || 'general',
+      targetDate: savData.targetDate,
+      notes: savData.notes,
+      isArchived: savData.isArchived || false,
+      createdAt: savData.createdAt || now,
+      updatedAt: now,
+    };
+    await storage.put('savingsAccounts', newSav);
+    setSavingsAccounts((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = newSav;
+        return copy;
+      }
+      return [...prev, newSav];
+    });
+  };
+
+  const deleteSavingsAccount = async (id: string) => {
+    await storage.delete('savingsAccounts', id);
+    setSavingsAccounts((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  // Transfer from bank/cash account to savings account (descuenta de cuenta bancaria y suma a la de ahorro)
+  const transferToSavings = async (
+    fromAccountId: string,
+    toSavingsAccountId: string,
+    amount: number,
+    concept?: string,
+    date?: string,
+    notes?: string
+  ) => {
+    const sourceAcc = accounts.find((a) => a.id === fromAccountId);
+    const targetSav = savingsAccounts.find((s) => s.id === toSavingsAccountId);
+    const txDate = date || todayStr;
+
+    await saveTransaction({
+      concept: concept || `Aporte a Ahorro: ${targetSav?.name || 'Fondo de Ahorro'}`,
+      amount,
+      date: txDate,
+      type: 'aporte_ahorro',
+      paymentMethodType: sourceAcc?.type === 'efectivo' ? 'efectivo' : 'banco',
+      accountId: fromAccountId,
+      savingsAccountId: toSavingsAccountId,
+      status: 'realizado',
+      notes: notes || `Transferencia desde ${sourceAcc?.name || 'Cuenta'} hacia fondo de ahorro`,
+    });
+  };
+
+  // Return savings back to bank/cash account to restore ordinary liquidity (devuelve a una cuenta, para dar liquidez)
+  const withdrawFromSavings = async (
+    fromSavingsAccountId: string,
+    toAccountId: string,
+    amount: number,
+    concept?: string,
+    date?: string,
+    notes?: string
+  ) => {
+    const sourceSav = savingsAccounts.find((s) => s.id === fromSavingsAccountId);
+    const targetAcc = accounts.find((a) => a.id === toAccountId);
+    const txDate = date || todayStr;
+
+    await saveTransaction({
+      concept: concept || `Reintegro a Liquidez: ${sourceSav?.name || 'Ahorro'}`,
+      amount,
+      date: txDate,
+      type: 'retiro_ahorro',
+      paymentMethodType: targetAcc?.type === 'efectivo' ? 'efectivo' : 'banco',
+      accountId: toAccountId,
+      savingsAccountId: fromSavingsAccountId,
+      status: 'realizado',
+      notes: notes || `Reintegro de ahorros a cuenta ${targetAcc?.name || 'Bancaria'} para restaurar liquidez disponible`,
+    });
+  };
+
+  // Spend directly from savings WITHOUT affecting ordinary liquidity (gasto que sale de esos ahorros y que no afecte a la liquidez ordinaria)
+  const spendFromSavings = async (
+    fromSavingsAccountId: string,
+    amount: number,
+    concept: string,
+    categoryId?: string,
+    date?: string,
+    notes?: string
+  ) => {
+    const sourceSav = savingsAccounts.find((s) => s.id === fromSavingsAccountId);
+    const txDate = date || todayStr;
+
+    await saveTransaction({
+      concept,
+      amount,
+      date: txDate,
+      type: 'gasto_desde_ahorro',
+      paymentMethodType: 'ahorros',
+      savingsAccountId: fromSavingsAccountId,
+      categoryId: categoryId || 'cat_otros_gastos',
+      status: 'realizado',
+      notes: notes || `Gasto pagado con cargo directo al fondo: ${sourceSav?.name || 'Ahorros'} (sin impacto en liquidez ordinaria)`,
+    });
   };
 
   const saveCreditCard = async (cardData: Partial<CreditCard> & { name: string; limit: number }) => {
@@ -1305,11 +1465,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await storage.putBatch('services', demo.services);
     await storage.put('initialPosition', demo.initialPosition);
     await storage.putBatch('transactions', demo.transactions);
+    const demoSavings = demo.savingsAccounts || getDefaultSavingsAccounts();
+    await storage.putBatch('savingsAccounts', demoSavings);
     await storage.put('appSettings', getDefaultAppSettings());
 
     setCategories(demo.categories);
     setAccounts(demo.accounts);
     setCreditCards(demo.creditCards);
+    setSavingsAccounts(demoSavings);
     setBudgets(demo.budgets);
     setItemBudgets(demo.itemBudgets || []);
     setGroceryItems([]);
@@ -1348,6 +1511,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setAccounts([]);
     setCreditCards([]);
+    setSavingsAccounts([]);
     setTransactions([]);
     setCategories(defaultCats);
     setBudgets([]);
@@ -1472,6 +1636,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsRenderGuideOpen,
         accounts,
         creditCards,
+        savingsAccounts,
         transactions,
         categories,
         budgets,
@@ -1500,6 +1665,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         toggleTransactionStatus,
         saveAccount,
         deleteAccount,
+        saveSavingsAccount,
+        deleteSavingsAccount,
+        transferToSavings,
+        withdrawFromSavings,
+        spendFromSavings,
         saveCreditCard,
         deleteCreditCard,
         saveCategory,

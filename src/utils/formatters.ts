@@ -92,6 +92,8 @@ export function formatDateEs(dateStr: string, options?: { withYear?: boolean; wi
   return `${d} ${monthName.substring(0, 3)}${options?.withYear ? ` ${y}` : ''}`;
 }
 
+export const formatDisplayDate = formatDateEs;
+
 export function formatPeriodEs(startStr: string, endStr: string): string {
   if (!startStr || !endStr) return '';
   const [sy, sm, sd] = startStr.split('-').map(Number);

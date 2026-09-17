@@ -16,10 +16,11 @@ import {
   GroceryItem,
   PlanNote,
   QuickTemplate,
+  SavingsAccount,
 } from '../types';
 
 const DB_NAME = 'NexaFinanceDB';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 export interface NexaFullBackup {
   version: number;
@@ -27,6 +28,7 @@ export interface NexaFullBackup {
   exportDate: string;
   data: {
     accounts: Account[];
+    savingsAccounts?: SavingsAccount[];
     creditCards: CreditCard[];
     transactions: Transaction[];
     categories: Category[];
@@ -65,6 +67,7 @@ class NexaStorageService {
 
         const storeNames = [
           'accounts',
+          'savingsAccounts',
           'creditCards',
           'transactions',
           'categories',
@@ -246,6 +249,7 @@ class NexaStorageService {
       initialPositions,
       monthlyCloses,
       settingsList,
+      savingsAccounts,
     ] = await Promise.all([
       this.getAll<Account>('accounts'),
       this.getAll<CreditCard>('creditCards'),
@@ -264,14 +268,16 @@ class NexaStorageService {
       this.getAll<InitialPosition>('initialPosition'),
       this.getAll<MonthlyClose>('monthlyCloses'),
       this.getAll<AppSettings>('appSettings'),
+      this.getAll<SavingsAccount>('savingsAccounts'),
     ]);
 
     const backup: NexaFullBackup = {
-      version: 5,
+      version: 6,
       appName: 'NEXA Finance',
       exportDate: new Date().toISOString(),
       data: {
         accounts,
+        savingsAccounts,
         creditCards,
         transactions,
         categories,
@@ -297,6 +303,7 @@ class NexaStorageService {
           encryptionEnabled: true,
           budgetAlertThreshold: 80,
           theme: 'fintech-dark',
+          liquidityStartDate: '2026-09-15',
         },
       },
     };
@@ -322,6 +329,7 @@ class NexaStorageService {
 
     const { data } = backup;
     if (data.accounts?.length) await this.putBatch('accounts', data.accounts);
+    if (data.savingsAccounts?.length) await this.putBatch('savingsAccounts', data.savingsAccounts);
     if (data.creditCards?.length) await this.putBatch('creditCards', data.creditCards);
     if (data.transactions?.length) await this.putBatch('transactions', data.transactions);
     if (data.categories?.length) await this.putBatch('categories', data.categories);

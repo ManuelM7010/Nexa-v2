@@ -19,6 +19,7 @@ import {
   StickyNote,
   LineChart,
   FileSpreadsheet,
+  PiggyBank,
 } from 'lucide-react';
 
 export const NavigationBar: React.FC = () => {
@@ -26,6 +27,7 @@ export const NavigationBar: React.FC = () => {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'ahorros', label: 'Ahorros & Metas', icon: PiggyBank },
     { id: 'flujo', label: 'Flujo Diario', icon: BarChart3 },
     { id: 'proyeccion-anual', label: 'Proyección 12M', icon: LineChart },
     { id: 'movimientos', label: 'Movimientos', icon: ArrowLeftRight },

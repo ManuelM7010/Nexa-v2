@@ -1,5 +1,5 @@
 export type AccountType = 'efectivo' | 'banco';
-export type PaymentMethodType = 'efectivo' | 'banco' | 'tarjeta_credito';
+export type PaymentMethodType = 'efectivo' | 'banco' | 'tarjeta_credito' | 'ahorros';
 export type TransactionType =
   | 'ingreso'
   | 'gasto'
@@ -10,10 +10,40 @@ export type TransactionType =
   | 'suscripcion'
   | 'servicio'
   | 'ajuste'
-  | 'movimiento_planificado';
+  | 'movimiento_planificado'
+  | 'aporte_ahorro'
+  | 'retiro_ahorro'
+  | 'gasto_desde_ahorro';
 
 export type TransactionStatus = 'planificado' | 'realizado' | 'cancelado';
 export type FrequencyType = 'diario' | 'semanal' | 'quincenal' | 'mensual' | 'anual';
+
+export type SavingsCategory =
+  | 'emergencia'
+  | 'meta'
+  | 'inversion'
+  | 'viaje'
+  | 'vehiculo'
+  | 'hogar'
+  | 'retiro'
+  | 'educacion'
+  | 'general';
+
+export interface SavingsAccount {
+  id: string;
+  name: string;
+  targetAmount: number; // in cents (optional, 0 if no target)
+  initialBalance: number; // in cents
+  currentBalance: number; // in cents
+  color: string;
+  icon: string;
+  category: SavingsCategory;
+  targetDate?: string; // YYYY-MM-DD
+  notes?: string;
+  isArchived?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Account {
   id: string;
@@ -112,6 +142,7 @@ export interface Transaction {
   accountId?: string; // For cash/bank
   creditCardId?: string; // For credit cards
   transferToAccountId?: string; // For transfers
+  savingsAccountId?: string; // For savings deposits, withdrawals, or direct expenses from savings
   status: TransactionStatus;
   origin?: string; // e.g. 'manual', 'suscripcion:xyz', 'prestamo:abc', 'cuota:123'
   recurrenceId?: string;

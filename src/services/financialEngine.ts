@@ -14,6 +14,7 @@ import {
   InitialPosition,
   DailyCashFlowItem,
   AlertItem,
+  SavingsAccount,
 } from '../types';
 import { daysInMonth, MONTH_NAMES_ES, addDays } from '../utils/formatters';
 
@@ -44,6 +45,8 @@ export interface ExecutiveSummary {
   currentRealCashBalance: number; // Cash + Banks actual
   bankBalance: number;
   cashBalance: number;
+  totalSavingsBalance: number; // Sum of all active savings accounts
+  totalLiquidWealth: number; // Cash + Banks + Savings
   projectedEndPeriodBalance: number;
   projectedEndBalance: number;
   lowestProjectedBalance: number;
@@ -694,9 +697,10 @@ export class NexaFinancialEngine {
         // Only transactions on or after liquidityStartDate and prior to this month start
         if (tx.date >= liquidityStartDate && tx.date < monthStartStr) {
           if (tx.type === 'transferencia') return;
+          if (tx.type === 'gasto_desde_ahorro') return;
           if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
 
-          if (tx.type === 'ingreso') {
+          if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
             cumulativeCash += tx.amount;
           } else {
             cumulativeCash -= tx.amount;
@@ -783,6 +787,10 @@ export class NexaFinancialEngine {
       let obligations = 0;
 
       dayTxs.forEach((tx) => {
+        if (tx.type === 'transferencia') return;
+        // Direct expense from savings does NOT impact ordinary bank liquidity
+        if (tx.type === 'gasto_desde_ahorro') return;
+
         // Card purchases do not deduct cash now; they are deferred obligations
         const isCashOutflow =
           tx.paymentMethodType !== 'tarjeta_credito' || tx.type === 'pago_tarjeta';
@@ -794,13 +802,13 @@ export class NexaFinancialEngine {
           tx.type === 'suscripcion' ||
           tx.type === 'servicio';
 
-        if (tx.type === 'ingreso') {
+        if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
           if (tx.status === 'realizado') {
             realizedIncome += tx.amount;
           } else {
             projectedIncome += tx.amount;
           }
-        } else if (tx.type !== 'transferencia') {
+        } else {
           if (isObligation) {
             obligations += tx.amount;
           }
@@ -1221,7 +1229,8 @@ export class NexaFinancialEngine {
     dailyFlow: DailyCashFlowItem[],
     allTransactions: Transaction[],
     budgetItems: BudgetAnalysisItem[],
-    liquidityStartDate: string = '2026-09-15'
+    liquidityStartDate: string = '2026-09-15',
+    savingsAccounts: SavingsAccount[] = []
   ): ExecutiveSummary {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     const daysInCurrentMonth = daysInMonth(year, month);
@@ -1250,16 +1259,20 @@ export class NexaFinancialEngine {
         // Only apply movements from liquidityStartDate onwards
         if (tx.date >= liquidityStartDate && tx.date <= todayStr) {
           if (tx.type === 'transferencia') return;
+          // Gasto con cargo a ahorros no afecta la liquidez bancaria ordinaria
+          if (tx.type === 'gasto_desde_ahorro') return;
           if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
 
           const targetAccount = accounts.find((a) => a.id === tx.accountId);
           const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
 
-          if (tx.type === 'ingreso') {
+          // Retiro de ahorro a banco incrementa la liquidez ordinaria
+          if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
             currentRealCashBalance += tx.amount;
             if (isCash) cashBalance += tx.amount;
             else bankBalance += tx.amount;
           } else {
+            // Aporte a ahorro o gasto ordinario descuenta de la liquidez
             currentRealCashBalance -= tx.amount;
             if (isCash) cashBalance -= tx.amount;
             else bankBalance -= tx.amount;
@@ -1267,6 +1280,26 @@ export class NexaFinancialEngine {
         }
       });
     }
+
+    // Savings Account Real Balances Calculation
+    let totalSavingsBalance = 0;
+    (savingsAccounts || []).forEach((sav) => {
+      if (sav.isArchived) return;
+      let bal = sav.initialBalance;
+      allTransactions.forEach((tx) => {
+        if (tx.status === 'cancelado') return;
+        if (tx.savingsAccountId === sav.id) {
+          if (tx.type === 'aporte_ahorro') {
+            bal += tx.amount;
+          } else if (tx.type === 'retiro_ahorro' || tx.type === 'gasto_desde_ahorro') {
+            bal -= tx.amount;
+          }
+        }
+      });
+      totalSavingsBalance += Math.max(0, bal);
+    });
+
+    const totalLiquidWealth = currentRealCashBalance + totalSavingsBalance;
 
     // Month totals
     const monthTxs = allTransactions.filter(
@@ -1454,6 +1487,8 @@ export class NexaFinancialEngine {
       currentRealCashBalance,
       bankBalance,
       cashBalance,
+      totalSavingsBalance,
+      totalLiquidWealth,
       projectedEndPeriodBalance,
       projectedEndBalance,
       lowestProjectedBalance,
@@ -1477,6 +1512,124 @@ export class NexaFinancialEngine {
       alerts,
       criticalAlerts,
     };
+  }
+
+  /**
+   * Calculates individual Savings Account Current Balance based on initial balance and all operations
+   */
+  static calculateSavingsAccountBalance(
+    account: SavingsAccount,
+    allTransactions: Transaction[]
+  ): {
+    currentBalance: number;
+    totalContributed: number;
+    totalWithdrawn: number;
+    totalSpent: number;
+    progressPercentage: number;
+  } {
+    let balance = account.initialBalance;
+    let totalContributed = 0;
+    let totalWithdrawn = 0;
+    let totalSpent = 0;
+
+    allTransactions.forEach((tx) => {
+      if (tx.status === 'cancelado') return;
+      if (tx.savingsAccountId === account.id) {
+        if (tx.type === 'aporte_ahorro') {
+          balance += tx.amount;
+          totalContributed += tx.amount;
+        } else if (tx.type === 'retiro_ahorro') {
+          balance -= tx.amount;
+          totalWithdrawn += tx.amount;
+        } else if (tx.type === 'gasto_desde_ahorro') {
+          balance -= tx.amount;
+          totalSpent += tx.amount;
+        }
+      }
+    });
+
+    const safeBalance = Math.max(0, balance);
+    const progressPercentage =
+      account.targetAmount > 0
+        ? Math.min(100, Math.round((safeBalance / account.targetAmount) * 100))
+        : 100;
+
+    return {
+      currentBalance: safeBalance,
+      totalContributed,
+      totalWithdrawn,
+      totalSpent,
+      progressPercentage,
+    };
+  }
+
+  /**
+   * Aggregates savings evolution over monthly intervals or chronological events
+   */
+  static getSavingsEvolutionTimeline(
+    savingsAccounts: SavingsAccount[],
+    allTransactions: Transaction[]
+  ): {
+    date: string;
+    label: string;
+    totalSavings: number;
+    aportes: number;
+    retiros: number;
+    gastos: number;
+  }[] {
+    const savingsTxs = allTransactions
+      .filter(
+        (tx) =>
+          tx.status !== 'cancelado' &&
+          (tx.type === 'aporte_ahorro' ||
+            tx.type === 'retiro_ahorro' ||
+            tx.type === 'gasto_desde_ahorro')
+      )
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Base savings initial sum
+    let runningTotal = savingsAccounts.reduce((acc, s) => acc + s.initialBalance, 0);
+
+    const timelineMap = new Map<
+      string,
+      { totalSavings: number; aportes: number; retiros: number; gastos: number }
+    >();
+
+    // Initial point
+    timelineMap.set('Inicio', {
+      totalSavings: runningTotal,
+      aportes: 0,
+      retiros: 0,
+      gastos: 0,
+    });
+
+    savingsTxs.forEach((tx) => {
+      if (tx.type === 'aporte_ahorro') {
+        runningTotal += tx.amount;
+      } else {
+        runningTotal = Math.max(0, runningTotal - tx.amount);
+      }
+
+      const existing = timelineMap.get(tx.date) || {
+        totalSavings: runningTotal,
+        aportes: 0,
+        retiros: 0,
+        gastos: 0,
+      };
+
+      if (tx.type === 'aporte_ahorro') existing.aportes += tx.amount;
+      if (tx.type === 'retiro_ahorro') existing.retiros += tx.amount;
+      if (tx.type === 'gasto_desde_ahorro') existing.gastos += tx.amount;
+      existing.totalSavings = runningTotal;
+
+      timelineMap.set(tx.date, existing);
+    });
+
+    return Array.from(timelineMap.entries()).map(([date, data]) => ({
+      date,
+      label: date,
+      ...data,
+    }));
   }
 
   /**

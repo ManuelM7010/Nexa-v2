@@ -11,7 +11,58 @@ import {
   InitialPosition,
   Transaction,
   AppSettings,
+  SavingsAccount,
 } from '../types';
+
+export function getDefaultSavingsAccounts(): SavingsAccount[] {
+  return [
+    {
+      id: 'sav_emergencia',
+      name: 'Fondo de Emergencia (6 Meses)',
+      targetAmount: 300000, // $3,000.00
+      initialBalance: 120000, // $1,200.00
+      currentBalance: 125000, // $1,250.00 (with aporte)
+      color: '#10b981',
+      icon: 'ShieldCheck',
+      category: 'emergencia',
+      targetDate: '2026-12-31',
+      notes: 'Colchón de seguridad para imprevistos médicos o laborales',
+      isArchived: false,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+    },
+    {
+      id: 'sav_viaje',
+      name: 'Vacaciones Fin de Año',
+      targetAmount: 80000, // $800.00
+      initialBalance: 40000, // $400.00
+      currentBalance: 34500, // $345.00 (after retiro & direct expense)
+      color: '#06b6d4',
+      icon: 'Plane',
+      category: 'viaje',
+      targetDate: '2026-12-15',
+      notes: 'Boletos, hospedaje y actividades vacacionales',
+      isArchived: false,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+    },
+    {
+      id: 'sav_inversion',
+      name: 'Fondo de Oportunidad / Inversión',
+      targetAmount: 150000, // $1,500.00
+      initialBalance: 50000, // $500.00
+      currentBalance: 50000,
+      color: '#8b5cf6',
+      icon: 'TrendingUp',
+      category: 'inversion',
+      targetDate: '2027-06-30',
+      notes: 'Capital apartado para instrumentos de inversión',
+      isArchived: false,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-15T00:00:00.000Z',
+    },
+  ];
+}
 
 export function getDefaultQuickTemplates(): import('../types').QuickTemplate[] {
   return [
@@ -206,6 +257,7 @@ export function generateDemoSeedData(): {
   services: ServiceItem[];
   initialPosition: InitialPosition;
   transactions: Transaction[];
+  savingsAccounts: SavingsAccount[];
 } {
   const categories = getDefaultCategories();
 
@@ -593,6 +645,59 @@ export function generateDemoSeedData(): {
       updatedAt: '2026-09-12T00:00:00.000Z',
     },
     {
+      id: 'tx_demo_sep15_aporte_ahorro',
+      date: '2026-09-15',
+      expectedDate: '2026-09-15',
+      realDate: '2026-09-15',
+      concept: 'Aporte Programado: Fondo de Emergencia',
+      notes: 'Transferencia a cuenta de ahorro para colchón de seguridad',
+      type: 'aporte_ahorro',
+      categoryId: 'cat_ahorro_inversion',
+      subcategoryId: 'Fondo Emergencia',
+      amount: 5000, // $50.00
+      paymentMethodType: 'banco',
+      accountId: 'acc_bac',
+      savingsAccountId: 'sav_emergencia',
+      status: 'realizado',
+      createdAt: '2026-09-15T08:00:00.000Z',
+      updatedAt: '2026-09-15T08:00:00.000Z',
+    },
+    {
+      id: 'tx_demo_sep16_retiro_ahorro',
+      date: '2026-09-16',
+      expectedDate: '2026-09-16',
+      realDate: '2026-09-16',
+      concept: 'Reintegro de Ahorro para Liquidez Bancaria',
+      notes: 'Retiro desde fondo de ahorro hacia cuenta bancaria para disponibilidad inmediata',
+      type: 'retiro_ahorro',
+      categoryId: 'cat_ahorro_inversion',
+      subcategoryId: 'Liquidez',
+      amount: 3000, // $30.00
+      paymentMethodType: 'banco',
+      accountId: 'acc_bac',
+      savingsAccountId: 'sav_viaje',
+      status: 'realizado',
+      createdAt: '2026-09-16T10:00:00.000Z',
+      updatedAt: '2026-09-16T10:00:00.000Z',
+    },
+    {
+      id: 'tx_demo_sep16_gasto_ahorro',
+      date: '2026-09-16',
+      expectedDate: '2026-09-16',
+      realDate: '2026-09-16',
+      concept: 'Reserva Hotel Paseo Playa',
+      notes: 'Gasto vacacional liquidado directamente desde fondo de ahorros (sin impacto en liquidez ordinaria)',
+      type: 'gasto_desde_ahorro',
+      categoryId: 'cat_entretenimiento',
+      subcategoryId: 'Vacaciones',
+      amount: 2500, // $25.00
+      paymentMethodType: 'ahorros',
+      savingsAccountId: 'sav_viaje',
+      status: 'realizado',
+      createdAt: '2026-09-16T14:30:00.000Z',
+      updatedAt: '2026-09-16T14:30:00.000Z',
+    },
+    {
       id: 'tx_demo_sep29_quincena2',
       date: '2026-09-29',
       expectedDate: '2026-09-29',
@@ -609,6 +714,8 @@ export function generateDemoSeedData(): {
       updatedAt: '2026-09-12T00:00:00.000Z',
     },
   ];
+
+  const savingsAccounts = getDefaultSavingsAccounts();
 
   const itemBudgets: ItemBudget[] = [
     {
@@ -703,5 +810,6 @@ export function generateDemoSeedData(): {
     services,
     initialPosition,
     transactions,
+    savingsAccounts,
   };
 }

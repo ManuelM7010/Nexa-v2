@@ -13,6 +13,7 @@ export const NewTransactionModal: React.FC = () => {
     setEditingTransaction,
     accounts,
     creditCards,
+    savingsAccounts,
     categories,
     quickTemplates,
     todayStr,
@@ -31,6 +32,7 @@ export const NewTransactionModal: React.FC = () => {
   const [accountId, setAccountId] = useState('');
   const [creditCardId, setCreditCardId] = useState('');
   const [transferToAccountId, setTransferToAccountId] = useState('');
+  const [savingsAccountId, setSavingsAccountId] = useState('');
   const [status, setStatus] = useState<TransactionStatus>('planificado');
   const [notes, setNotes] = useState('');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -46,6 +48,7 @@ export const NewTransactionModal: React.FC = () => {
       setAccountId(editingTransaction.accountId || '');
       setCreditCardId(editingTransaction.creditCardId || '');
       setTransferToAccountId(editingTransaction.transferToAccountId || '');
+      setSavingsAccountId(editingTransaction.savingsAccountId || savingsAccounts[0]?.id || '');
       setStatus(editingTransaction.status);
       setNotes(editingTransaction.notes || '');
     } else {
@@ -59,10 +62,11 @@ export const NewTransactionModal: React.FC = () => {
       setAccountId(accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || '');
       setCreditCardId(creditCards[0]?.id || '');
       setTransferToAccountId(accounts[1]?.id || '');
+      setSavingsAccountId(savingsAccounts[0]?.id || '');
       setStatus('planificado');
       setNotes('');
     }
-  }, [editingTransaction, isNewTxOpen, todayStr, categories, accounts, creditCards]);
+  }, [editingTransaction, isNewTxOpen, todayStr, categories, accounts, creditCards, savingsAccounts]);
 
   if (!isOpen) return null;
 
@@ -116,11 +120,12 @@ export const NewTransactionModal: React.FC = () => {
       amount: parsedAmountCents,
       date,
       type,
-      categoryId: type === 'transferencia' ? undefined : categoryId || undefined,
-      paymentMethodType,
-      accountId: paymentMethodType === 'tarjeta_credito' ? undefined : accountId,
+      categoryId: (type === 'transferencia' || type === 'aporte_ahorro' || type === 'retiro_ahorro') ? undefined : categoryId || undefined,
+      paymentMethodType: type === 'gasto_desde_ahorro' ? 'ahorros' : paymentMethodType,
+      accountId: (paymentMethodType === 'tarjeta_credito' || type === 'gasto_desde_ahorro') ? undefined : accountId,
       creditCardId: paymentMethodType === 'tarjeta_credito' ? creditCardId : undefined,
       transferToAccountId: type === 'transferencia' ? transferToAccountId : undefined,
+      savingsAccountId: (type === 'aporte_ahorro' || type === 'retiro_ahorro' || type === 'gasto_desde_ahorro') ? savingsAccountId : undefined,
       status,
       notes: notes.trim() || undefined,
       origin: editingTransaction?.origin || 'manual',
@@ -201,19 +206,33 @@ export const NewTransactionModal: React.FC = () => {
                 { id: 'ingreso', label: 'Ingreso' },
                 { id: 'pago_tarjeta', label: 'Pago Tarjeta' },
                 { id: 'transferencia', label: 'Transferencia' },
+                { id: 'aporte_ahorro', label: 'Aporte Ahorro' },
+                { id: 'retiro_ahorro', label: 'Retiro Ahorro' },
+                { id: 'gasto_desde_ahorro', label: 'Gasto con Ahorro' },
               ].map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => {
-                    setType(t.id as TransactionType);
-                    if (t.id === 'pago_tarjeta') {
+                    const newType = t.id as TransactionType;
+                    setType(newType);
+                    if (newType === 'pago_tarjeta') {
+                      setPaymentMethodType('banco');
+                    } else if (newType === 'gasto_desde_ahorro') {
+                      setPaymentMethodType('ahorros');
+                    } else if (paymentMethodType === 'ahorros') {
                       setPaymentMethodType('banco');
                     }
                   }}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  className={`py-2 px-2.5 rounded-xl text-xs font-bold transition cursor-pointer text-center ${
                     type === t.id
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                      ? t.id === 'aporte_ahorro'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
+                        : t.id === 'retiro_ahorro'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
+                        : t.id === 'gasto_desde_ahorro'
+                        ? 'bg-amber-600 text-white shadow-md shadow-amber-900/30'
+                        : 'bg-blue-600 text-white shadow-md shadow-blue-900/30'
                       : 'bg-slate-950 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-800'
                   }`}
                 >
@@ -314,8 +333,8 @@ export const NewTransactionModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Category (if not transfer) */}
-          {type !== 'transferencia' && (
+          {/* Category (for gasto, ingreso, gasto_desde_ahorro) */}
+          {(type === 'gasto' || type === 'ingreso' || type === 'gasto_desde_ahorro') && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-slate-300">
@@ -344,95 +363,220 @@ export const NewTransactionModal: React.FC = () => {
             </div>
           )}
 
-          {/* Payment Method / Account Selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Medio de Pago / Cuenta
-              </label>
-              <select
-                value={paymentMethodType}
-                onChange={(e) => {
-                  const val = e.target.value as PaymentMethodType;
-                  setPaymentMethodType(val);
-                }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-              >
-                <option value="banco">Cuenta Bancaria</option>
-                <option value="efectivo">Efectivo</option>
-                <option value="tarjeta_credito">Tarjeta de Crédito</option>
-              </select>
-            </div>
-
-            {paymentMethodType === 'banco' && (
+          {/* Special Selectors for APORTE A AHORRO */}
+          {type === 'aporte_ahorro' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Cuenta Origen
+                  Cuenta Bancaria de Origen *
+                </label>
+                <select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                >
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({formatMoney(a.initialBalance, settings.currencySymbol)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Fondo de Ahorro Destino *
+                </label>
+                <select
+                  value={savingsAccountId}
+                  onChange={(e) => setSavingsAccountId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                >
+                  {savingsAccounts.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Special Selectors for RETIRO AHORRO (HACIA LIQUIDEZ) */}
+          {type === 'retiro_ahorro' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Fondo de Ahorro de Origen *
+                </label>
+                <select
+                  value={savingsAccountId}
+                  onChange={(e) => setSavingsAccountId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                >
+                  {savingsAccounts.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Cuenta Bancaria Destino (Liquidez) *
                 </label>
                 <select
                   value={accountId}
                   onChange={(e) => setAccountId(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
-                  {accounts
-                    .filter((a) => a.type === 'banco')
-                    .map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({formatMoney(a.initialBalance, settings.currencySymbol)})
-                      </option>
-                    ))}
-                </select>
-              </div>
-            )}
-
-            {paymentMethodType === 'tarjeta_credito' && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Tarjeta de Crédito
-                </label>
-                <select
-                  value={creditCardId}
-                  onChange={(e) => setCreditCardId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                >
-                  {creditCards.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} (Disp: {formatMoney(c.limit - c.initialUsedBalance, settings.currencySymbol)})
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({formatMoney(a.initialBalance, settings.currencySymbol)})
                     </option>
                   ))}
                 </select>
               </div>
-            )}
+            </div>
+          )}
 
-            {type === 'transferencia' && (
+          {/* Special Selectors for GASTO DESDE AHORRO */}
+          {type === 'gasto_desde_ahorro' && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Fondo de Ahorro a Debitar *
+              </label>
+              <select
+                value={savingsAccountId}
+                onChange={(e) => setSavingsAccountId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+              >
+                {savingsAccounts.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.category})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Standard Payment Method / Account Selection (for ordinary types) */}
+          {type !== 'aporte_ahorro' && type !== 'retiro_ahorro' && type !== 'gasto_desde_ahorro' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Cuenta Destino
+                  Medio de Pago / Cuenta
                 </label>
                 <select
-                  value={transferToAccountId}
-                  onChange={(e) => setTransferToAccountId(e.target.value)}
+                  value={paymentMethodType}
+                  onChange={(e) => {
+                    const val = e.target.value as PaymentMethodType;
+                    setPaymentMethodType(val);
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
-                  {accounts
-                    .filter((a) => a.id !== accountId)
-                    .map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
+                  <option value="banco">Cuenta Bancaria</option>
+                  <option value="efectivo">Efectivo</option>
+                  <option value="tarjeta_credito">Tarjeta de Crédito</option>
                 </select>
               </div>
-            )}
-          </div>
 
-          {/* DYNAMIC CONTEXTUAL FEEDBACK BOX (Requirement 40) */}
+              {paymentMethodType === 'banco' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Cuenta Origen
+                  </label>
+                  <select
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    {accounts
+                      .filter((a) => a.type === 'banco')
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} ({formatMoney(a.initialBalance, settings.currencySymbol)})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {paymentMethodType === 'tarjeta_credito' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Tarjeta de Crédito
+                  </label>
+                  <select
+                    value={creditCardId}
+                    onChange={(e) => setCreditCardId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    {creditCards.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} (Disp: {formatMoney(c.limit - c.initialUsedBalance, settings.currencySymbol)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {type === 'transferencia' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Cuenta Destino
+                  </label>
+                  <select
+                    value={transferToAccountId}
+                    onChange={(e) => setTransferToAccountId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    {accounts
+                      .filter((a) => a.id !== accountId)
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DYNAMIC CONTEXTUAL FEEDBACK BOX */}
           <div className="rounded-xl bg-slate-950 border border-slate-800/80 p-3.5 text-xs">
             <span className="font-bold text-slate-300 block mb-1.5 uppercase tracking-wider text-[10px]">
-              Impacto Inmediato en Liquidez
+              Impacto Inmediato en Liquidez & Ahorros
             </span>
 
-            {paymentMethodType === 'efectivo' && (
+            {type === 'aporte_ahorro' && (
+              <div className="text-emerald-400 flex items-center justify-between">
+                <span>Descuenta de tu banco ordinario: <strong className="text-rose-400">-{formatMoney(parsedAmountCents, settings.currencySymbol)}</strong></span>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                <span>Suma a tu fondo de ahorro: <strong className="text-emerald-400">+{formatMoney(parsedAmountCents, settings.currencySymbol)}</strong></span>
+              </div>
+            )}
+
+            {type === 'retiro_ahorro' && (
+              <div className="text-blue-400 flex items-center justify-between">
+                <span>Resta de tu fondo de ahorro: <strong className="text-rose-400">-{formatMoney(parsedAmountCents, settings.currencySymbol)}</strong></span>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                <span>Restaura liquidez en banco: <strong className="text-emerald-400">+{formatMoney(parsedAmountCents, settings.currencySymbol)}</strong></span>
+              </div>
+            )}
+
+            {type === 'gasto_desde_ahorro' && (
+              <div className="text-amber-400 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>Debita únicamente de fondo de ahorro: <strong className="text-amber-300">-{formatMoney(parsedAmountCents, settings.currencySymbol)}</strong></span>
+                  <span className="text-emerald-400 font-bold text-[11px]">Cero impacto en liquidez ordinaria (0.00)</span>
+                </div>
+              </div>
+            )}
+
+            {type !== 'aporte_ahorro' && type !== 'retiro_ahorro' && type !== 'gasto_desde_ahorro' && paymentMethodType === 'efectivo' && (
               <div className="flex items-center justify-between text-slate-300">
                 <span>Efectivo disponible: <strong className="text-white">{formatMoney(balanceBefore, settings.currencySymbol)}</strong></span>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
@@ -440,7 +584,7 @@ export const NewTransactionModal: React.FC = () => {
               </div>
             )}
 
-            {paymentMethodType === 'banco' && (
+            {type !== 'aporte_ahorro' && type !== 'retiro_ahorro' && type !== 'gasto_desde_ahorro' && paymentMethodType === 'banco' && (
               <div className="flex items-center justify-between text-slate-300">
                 <span>Saldo en cuenta: <strong className="text-white">{formatMoney(balanceBefore, settings.currencySymbol)}</strong></span>
                 <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
@@ -448,7 +592,7 @@ export const NewTransactionModal: React.FC = () => {
               </div>
             )}
 
-            {paymentMethodType === 'tarjeta_credito' && (
+            {type !== 'aporte_ahorro' && type !== 'retiro_ahorro' && type !== 'gasto_desde_ahorro' && paymentMethodType === 'tarjeta_credito' && (
               <div className="space-y-1 text-slate-300">
                 <div className="flex items-center justify-between">
                   <span>Crédito disponible antes: <strong className="text-white">{formatMoney(cardAvailBefore, settings.currencySymbol)}</strong></span>
