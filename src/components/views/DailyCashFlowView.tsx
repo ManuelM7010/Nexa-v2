@@ -22,6 +22,7 @@ export const DailyCashFlowView: React.FC = () => {
     settings,
     setIsNewTxOpen,
     setEditingTransaction,
+    openNewTransactionModal,
     toggleTransactionStatus,
   } = useFinance();
 
@@ -218,7 +219,7 @@ export const DailyCashFlowView: React.FC = () => {
                           )}
                           <button
                             onClick={() => {
-                              setIsNewTxOpen(true);
+                              openNewTransactionModal({ date: day.date });
                             }}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
                             title="Agregar movimiento en este día"

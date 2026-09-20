@@ -352,6 +352,35 @@ export const SubscriptionsView: React.FC = () => {
                 )}
               </div>
 
+              <div>
+                <label className="block text-slate-300 mb-1 font-semibold">Categoría</label>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                >
+                  <option value="cat_suscripciones">Suscripciones & Streaming</option>
+                  {categories
+                    .filter((c) => c.type === 'gasto' && c.id !== 'cat_suscripciones')
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1 font-semibold">Notas / Comentarios (Opcional)</label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Detalles, usuario, etc."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600"
+                />
+              </div>
+
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"

@@ -598,12 +598,78 @@ export class NexaFinancialEngine {
       }
     }
 
+    // 6. Fixed Monthly Recurring Transactions (marked with isFixedMonthly: true)
+    if (data.existingTransactions) {
+      const fixedTxs = data.existingTransactions.filter((tx) => tx.isFixedMonthly);
+      for (const fTx of fixedTxs) {
+        const txMonthKey = fTx.date.slice(0, 7);
+        // Only project into months strictly after the original transaction month
+        if (monthKey > txMonthKey) {
+          const billingDay = Math.min(fTx.billingDay || Number(fTx.date.slice(8)) || 1, daysCount);
+          const dateStr = `${monthKey}-${String(billingDay).padStart(2, '0')}`;
+
+          const hasDuplicate = data.existingTransactions.some(
+            (t) =>
+              t.date.startsWith(monthKey) &&
+              (t.origin === `fixed:${fTx.id}` || t.recurrenceId === fTx.id)
+          );
+
+          if (!hasDuplicate) {
+            generated.push({
+              id: `gen_fixed_${fTx.id}_${monthKey}`,
+              date: dateStr,
+              expectedDate: dateStr,
+              concept: fTx.concept,
+              notes: fTx.notes ? `${fTx.notes} (Fijo recurrente)` : 'Fijo mensual recurrente',
+              type: fTx.type,
+              categoryId: fTx.categoryId,
+              subcategoryId: fTx.subcategoryId,
+              amount: fTx.amount,
+              paymentMethodType: fTx.paymentMethodType,
+              accountId: fTx.accountId,
+              creditCardId: fTx.creditCardId,
+              transferToAccountId: fTx.transferToAccountId,
+              savingsAccountId: fTx.savingsAccountId,
+              status: 'planificado',
+              origin: `fixed:${fTx.id}`,
+              isFixedMonthly: true,
+              billingDay,
+              createdAt: fTx.createdAt,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    }
+
     return generated;
   }
 
   /**
+   * Helper to determine cash flow direction and amount for an individual transaction.
+   */
+  static getCashMovementImpact(tx: Transaction): { isInflow: boolean; isOutflow: boolean; amount: number } {
+    if (tx.status === 'cancelado') return { isInflow: false, isOutflow: false, amount: 0 };
+    if (tx.type === 'transferencia') return { isInflow: false, isOutflow: false, amount: 0 };
+    if (tx.type === 'gasto_desde_ahorro') return { isInflow: false, isOutflow: false, amount: 0 };
+
+    // Credit card purchases do not deduct cash liquidity immediately; payment obligations do
+    if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') {
+      return { isInflow: false, isOutflow: false, amount: 0 };
+    }
+
+    if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
+      return { isInflow: true, isOutflow: false, amount: tx.amount };
+    }
+
+    // Outflow: gasto, aporte_ahorro, pago_tarjeta, cuota_prestamo, suscripcion, servicio, cuota_tarjeta
+    return { isInflow: false, isOutflow: true, amount: tx.amount };
+  }
+
+  /**
    * Calculates Daily Cash Flow Day-by-Day for the selected month or date range.
-   * Starts from the cumulative initial position.
+   * Ensures strict month-to-month balance continuity: the closing balance of month M-1
+   * is guaranteed to match the opening balance of month M.
    */
   static calculateDailyCashFlow(
     year: number,
@@ -612,7 +678,14 @@ export class NexaFinancialEngine {
     initialPos: InitialPosition | null,
     accounts: Account[],
     allTransactions: Transaction[],
-    liquidityStartDate: string = '2026-09-15'
+    liquidityStartDate: string = '2026-09-15',
+    financialData?: {
+      subscriptions: Subscription[];
+      services: ServiceItem[];
+      installmentPurchases: InstallmentPurchase[];
+      loans: Loan[];
+      creditCards: CreditCard[];
+    }
   ): DailyCashFlowItem[] {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     const daysInCurrentMonth = daysInMonth(year, month);
@@ -687,30 +760,98 @@ export class NexaFinancialEngine {
       return dailyItems;
     }
 
-    // CASE 2: Month is on or after liquidityStartDate
-    // If month starts on/after liquidityStartDate, cumulativeCash carries totalBaseCash + all cash movements since liquidityStartDate
-    let cumulativeCash = 0;
-    if (monthStartStr >= liquidityStartDate) {
-      cumulativeCash = totalBaseCash;
-      allTransactions.forEach((tx) => {
-        if (tx.status === 'cancelado') return;
-        // Only transactions on or after liquidityStartDate and prior to this month start
-        if (tx.date >= liquidityStartDate && tx.date < monthStartStr) {
-          if (tx.type === 'transferencia') return;
-          if (tx.type === 'gasto_desde_ahorro') return;
-          if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+    // Parse liquidity start date components
+    const [startYear, startMonth, startDay] = liquidityStartDate.split('-').map(Number);
 
-          if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
-            cumulativeCash += tx.amount;
-          } else {
-            cumulativeCash -= tx.amount;
+    // Calculate the opening balance for Day 1 of the requested month
+    // by simulating month-by-month from liquidityStartDate up to (year, month - 1)
+    let priorClosingBalance = 0;
+
+    if (year > startYear || (year === startYear && month > startMonth)) {
+      // Initialize with base liquidity at liquidityStartDate
+      let simBalance = totalBaseCash;
+
+      // 1. Simulate the remainder of startMonth from startDay onwards
+      const startMonthDays = daysInMonth(startYear, startMonth);
+      const startMonthKeyStr = `${startYear}-${String(startMonth).padStart(2, '0')}`;
+      const startExplicit = allTransactions.filter((t) => t.date.startsWith(startMonthKeyStr) && t.status !== 'cancelado');
+      const startProjected = financialData
+        ? NexaFinancialEngine.generateProjectedEvents(startYear, startMonth, {
+            ...financialData,
+            accounts,
+            existingTransactions: allTransactions,
+            todayStr,
+          })
+        : [];
+      const startMonthAllTxs = [...startExplicit, ...startProjected];
+
+      for (let d = startDay; d <= startMonthDays; d++) {
+        const dStr = `${startMonthKeyStr}-${String(d).padStart(2, '0')}`;
+        const dayTxs = startMonthAllTxs.filter((t) => t.date === dStr);
+        for (const tx of dayTxs) {
+          const impact = NexaFinancialEngine.getCashMovementImpact(tx);
+          if (impact.isInflow) simBalance += impact.amount;
+          else if (impact.isOutflow) simBalance -= impact.amount;
+        }
+      }
+
+      // 2. Simulate subsequent months between startMonth and target (year, month - 1)
+      let simY = startYear;
+      let simM = startMonth + 1;
+      if (simM > 12) {
+        simM = 1;
+        simY++;
+      }
+
+      while (simY < year || (simY === year && simM < month)) {
+        const simMonthKeyStr = `${simY}-${String(simM).padStart(2, '0')}`;
+        const simDaysCount = daysInMonth(simY, simM);
+        const simExplicit = allTransactions.filter((t) => t.date.startsWith(simMonthKeyStr) && t.status !== 'cancelado');
+        const simProjected = financialData
+          ? NexaFinancialEngine.generateProjectedEvents(simY, simM, {
+              ...financialData,
+              accounts,
+              existingTransactions: allTransactions,
+              todayStr,
+            })
+          : [];
+        const simAllMonthTxs = [...simExplicit, ...simProjected];
+
+        for (let d = 1; d <= simDaysCount; d++) {
+          const dStr = `${simMonthKeyStr}-${String(d).padStart(2, '0')}`;
+          const dayTxs = simAllMonthTxs.filter((t) => t.date === dStr);
+          for (const tx of dayTxs) {
+            const impact = NexaFinancialEngine.getCashMovementImpact(tx);
+            if (impact.isInflow) simBalance += impact.amount;
+            else if (impact.isOutflow) simBalance -= impact.amount;
           }
         }
-      });
+
+        simM++;
+        if (simM > 12) {
+          simM = 1;
+          simY++;
+        }
+      }
+
+      priorClosingBalance = simBalance;
     }
 
-    let runningProjectedBalance = cumulativeCash;
-    let runningRealBalance = cumulativeCash;
+    // Now calculate target month day-by-day
+    // Ensure target month contains projected events if financialData was passed
+    const targetMonthExplicit = allTransactions.filter((t) => t.date.startsWith(monthKey) && t.status !== 'cancelado');
+    const targetMonthProjected = financialData
+      ? NexaFinancialEngine.generateProjectedEvents(year, month, {
+          ...financialData,
+          accounts,
+          existingTransactions: allTransactions,
+          todayStr,
+        })
+      : [];
+    const targetMonthAllTxs = [...targetMonthExplicit, ...targetMonthProjected];
+
+    let runningProjectedBalance = priorClosingBalance;
+    let runningRealBalance = priorClosingBalance;
 
     for (let d = 1; d <= daysInCurrentMonth; d++) {
       const dayStr = String(d).padStart(2, '0');
@@ -722,7 +863,7 @@ export class NexaFinancialEngine {
       // If the day is strictly before liquidityStartDate (e.g. Sept 1 to Sept 14 when start is Sept 15):
       // Liquidity balance remains 0.00
       if (dateStr < liquidityStartDate) {
-        const dayTxs = allTransactions.filter((tx) => tx.date === dateStr && tx.status !== 'cancelado');
+        const dayTxs = targetMonthAllTxs.filter((tx) => tx.date === dateStr && tx.status !== 'cancelado');
         let obligations = 0;
         dayTxs.forEach((tx) => {
           if (
@@ -770,7 +911,7 @@ export class NexaFinancialEngine {
       }
 
       // If dateStr === liquidityStartDate: the liquidity activates on this day with totalBaseCash!
-      if (dateStr === liquidityStartDate && monthStartStr < liquidityStartDate) {
+      if (dateStr === liquidityStartDate) {
         runningProjectedBalance = totalBaseCash;
         runningRealBalance = totalBaseCash;
       }
@@ -778,7 +919,7 @@ export class NexaFinancialEngine {
       const dayStartProjected = runningProjectedBalance;
 
       // Filter events for this day
-      const dayTxs = allTransactions.filter((tx) => tx.date === dateStr && tx.status !== 'cancelado');
+      const dayTxs = targetMonthAllTxs.filter((tx) => tx.date === dateStr && tx.status !== 'cancelado');
 
       let realizedIncome = 0;
       let projectedIncome = 0;
@@ -787,13 +928,7 @@ export class NexaFinancialEngine {
       let obligations = 0;
 
       dayTxs.forEach((tx) => {
-        if (tx.type === 'transferencia') return;
-        // Direct expense from savings does NOT impact ordinary bank liquidity
-        if (tx.type === 'gasto_desde_ahorro') return;
-
-        // Card purchases do not deduct cash now; they are deferred obligations
-        const isCashOutflow =
-          tx.paymentMethodType !== 'tarjeta_credito' || tx.type === 'pago_tarjeta';
+        const impact = NexaFinancialEngine.getCashMovementImpact(tx);
 
         const isObligation =
           tx.type === 'pago_tarjeta' ||
@@ -802,23 +937,21 @@ export class NexaFinancialEngine {
           tx.type === 'suscripcion' ||
           tx.type === 'servicio';
 
-        if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
+        if (isObligation) {
+          obligations += tx.amount;
+        }
+
+        if (impact.isInflow) {
           if (tx.status === 'realizado') {
             realizedIncome += tx.amount;
           } else {
             projectedIncome += tx.amount;
           }
-        } else {
-          if (isObligation) {
-            obligations += tx.amount;
-          }
-
-          if (isCashOutflow) {
-            if (tx.status === 'realizado') {
-              realizedExpense += tx.amount;
-            } else {
-              projectedExpense += tx.amount;
-            }
+        } else if (impact.isOutflow) {
+          if (tx.status === 'realizado') {
+            realizedExpense += tx.amount;
+          } else {
+            projectedExpense += tx.amount;
           }
         }
       });

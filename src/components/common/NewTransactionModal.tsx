@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { TransactionType, PaymentMethodType, TransactionStatus } from '../../types';
 import { formatMoney, dollarsToCents, centsToDollars, getTodayDateStr } from '../../utils/formatters';
-import { X, ArrowRight, AlertCircle, CheckCircle, Plus, Zap } from 'lucide-react';
+import { X, ArrowRight, AlertCircle, CheckCircle, Plus, Zap, RefreshCw } from 'lucide-react';
 import { NewCategoryModal } from './NewCategoryModal';
 
 export const NewTransactionModal: React.FC = () => {
@@ -11,6 +11,10 @@ export const NewTransactionModal: React.FC = () => {
     setIsNewTxOpen,
     editingTransaction,
     setEditingTransaction,
+    newTxInitialDate,
+    setNewTxInitialDate,
+    newTxInitialType,
+    newTxInitialCategoryId,
     accounts,
     creditCards,
     savingsAccounts,
@@ -34,6 +38,7 @@ export const NewTransactionModal: React.FC = () => {
   const [transferToAccountId, setTransferToAccountId] = useState('');
   const [savingsAccountId, setSavingsAccountId] = useState('');
   const [status, setStatus] = useState<TransactionStatus>('planificado');
+  const [isFixedMonthly, setIsFixedMonthly] = useState(false);
   const [notes, setNotes] = useState('');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
@@ -50,13 +55,14 @@ export const NewTransactionModal: React.FC = () => {
       setTransferToAccountId(editingTransaction.transferToAccountId || '');
       setSavingsAccountId(editingTransaction.savingsAccountId || savingsAccounts[0]?.id || '');
       setStatus(editingTransaction.status);
+      setIsFixedMonthly(!!editingTransaction.isFixedMonthly);
       setNotes(editingTransaction.notes || '');
     } else {
       setConcept('');
       setAmountStr('');
-      setDate(getTodayDateStr());
-      setType('gasto');
-      const defaultCat = categories.find((c) => c.type === 'gasto')?.id || '';
+      setDate(newTxInitialDate || getTodayDateStr());
+      setType(newTxInitialType || 'gasto');
+      const defaultCat = newTxInitialCategoryId || categories.find((c) => c.type === (newTxInitialType || 'gasto'))?.id || '';
       setCategoryId(defaultCat);
       setPaymentMethodType('banco');
       setAccountId(accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || '');
@@ -64,15 +70,28 @@ export const NewTransactionModal: React.FC = () => {
       setTransferToAccountId(accounts[1]?.id || '');
       setSavingsAccountId(savingsAccounts[0]?.id || '');
       setStatus('planificado');
+      setIsFixedMonthly(false);
       setNotes('');
     }
-  }, [editingTransaction, isNewTxOpen, todayStr, categories, accounts, creditCards, savingsAccounts]);
+  }, [
+    editingTransaction,
+    isNewTxOpen,
+    todayStr,
+    newTxInitialDate,
+    newTxInitialType,
+    newTxInitialCategoryId,
+    categories,
+    accounts,
+    creditCards,
+    savingsAccounts,
+  ]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
     setIsNewTxOpen(false);
     setEditingTransaction(null);
+    setNewTxInitialDate(null);
   };
 
   const parsedAmountCents = dollarsToCents(amountStr || 0);
@@ -127,6 +146,8 @@ export const NewTransactionModal: React.FC = () => {
       transferToAccountId: type === 'transferencia' ? transferToAccountId : undefined,
       savingsAccountId: (type === 'aporte_ahorro' || type === 'retiro_ahorro' || type === 'gasto_desde_ahorro') ? savingsAccountId : undefined,
       status,
+      isFixedMonthly,
+      billingDay: isFixedMonthly ? (Number(date.slice(8)) || 1) : undefined,
       notes: notes.trim() || undefined,
       origin: editingTransaction?.origin || 'manual',
     });
@@ -640,6 +661,38 @@ export const NewTransactionModal: React.FC = () => {
                   <span>Deuda en tarjeta después: <strong className="text-amber-400">{formatMoney(cardUsedAfter, settings.currencySymbol)}</strong></span>
                   <span className="italic text-slate-300">Nota: No descuenta de tu banco hoy</span>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Fijo Mensual / Recurrencia */}
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <RefreshCw className={`w-4 h-4 ${isFixedMonthly ? 'text-blue-400 animate-spin-slow' : 'text-slate-400'}`} />
+                <div>
+                  <label htmlFor="isFixedMonthlyCheck" className="text-xs font-bold text-white cursor-pointer select-none">
+                    ¿Es Fijo Mensual? (Recurrente todos los meses)
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Se proyectará y repetirá automáticamente cada mes en el Flujo Diario y Presupuesto
+                  </p>
+                </div>
+              </div>
+              <input
+                id="isFixedMonthlyCheck"
+                type="checkbox"
+                checked={isFixedMonthly}
+                onChange={(e) => setIsFixedMonthly(e.target.checked)}
+                className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-blue-500 cursor-pointer"
+              />
+            </div>
+            {isFixedMonthly && (
+              <div className="pt-2 border-t border-slate-850 flex items-center justify-between text-xs text-blue-300">
+                <span>Día de cobro o pago recurrente:</span>
+                <span className="font-bold font-mono bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                  Día {Number(date.slice(8)) || 1} de cada mes
+                </span>
               </div>
             )}
           </div>

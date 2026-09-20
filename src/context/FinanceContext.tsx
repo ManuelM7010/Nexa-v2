@@ -3,6 +3,7 @@ import {
   Account,
   CreditCard,
   Transaction,
+  TransactionType,
   Category,
   Budget,
   ItemBudget,
@@ -56,6 +57,11 @@ interface FinanceContextType {
   setIsNewTxOpen: (open: boolean) => void;
   editingTransaction: Transaction | null;
   setEditingTransaction: (tx: Transaction | null) => void;
+  newTxInitialDate: string | null;
+  setNewTxInitialDate: (date: string | null) => void;
+  newTxInitialType?: TransactionType;
+  newTxInitialCategoryId?: string;
+  openNewTransactionModal: (opts?: { date?: string; type?: TransactionType; categoryId?: string }) => void;
   isAffordabilityOpen: boolean;
   setIsAffordabilityOpen: (open: boolean) => void;
   isRenderGuideOpen: boolean;
@@ -224,6 +230,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isNewTxOpen, setIsNewTxOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [newTxInitialDate, setNewTxInitialDate] = useState<string | null>(null);
+  const [newTxInitialType, setNewTxInitialType] = useState<TransactionType | undefined>(undefined);
+  const [newTxInitialCategoryId, setNewTxInitialCategoryId] = useState<string | undefined>(undefined);
+
+  const openNewTransactionModal = useCallback((opts?: { date?: string; type?: TransactionType; categoryId?: string }) => {
+    setEditingTransaction(null);
+    setNewTxInitialDate(opts?.date || null);
+    setNewTxInitialType(opts?.type);
+    setNewTxInitialCategoryId(opts?.categoryId);
+    setIsNewTxOpen(true);
+  }, []);
+
   const [isAffordabilityOpen, setIsAffordabilityOpen] = useState(false);
   const [isRenderGuideOpen, setIsRenderGuideOpen] = useState(false);
 
@@ -434,20 +452,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return combined.sort((a, b) => a.date.localeCompare(b.date));
   }, [selectedYear, selectedMonth, transactions, projectedEvents]);
 
-  // Daily Cash Flow calculation
+  // Daily Cash Flow calculation with strict month-to-month balance continuity
   const dailyCashFlow = useMemo(() => {
-    const monthStartStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
-    const priorTransactions = transactions.filter((t) => t.date < monthStartStr);
-    const fullTransactionsForCashFlow = [...priorTransactions, ...allMonthTransactions];
-
     return NexaFinancialEngine.calculateDailyCashFlow(
       selectedYear,
       selectedMonth,
       todayStr,
       initialPosition,
       accounts,
-      fullTransactionsForCashFlow,
-      settings.liquidityStartDate || '2026-09-15'
+      transactions,
+      settings.liquidityStartDate || '2026-09-15',
+      {
+        subscriptions,
+        services,
+        installmentPurchases,
+        loans,
+        creditCards,
+      }
     );
   }, [
     selectedYear,
@@ -456,7 +477,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     initialPosition,
     accounts,
     transactions,
-    allMonthTransactions,
+    subscriptions,
+    services,
+    installmentPurchases,
+    loans,
+    creditCards,
     settings.liquidityStartDate,
   ]);
 
@@ -583,6 +608,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       savingsAccountId: txData.savingsAccountId,
       status: txData.status || 'planificado',
       origin: txData.origin || 'manual',
+      isFixedMonthly: txData.isFixedMonthly,
+      billingDay: txData.billingDay,
       createdAt: txData.createdAt || now,
       updatedAt: now,
     };
@@ -1658,6 +1685,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsNewTxOpen,
         editingTransaction,
         setEditingTransaction,
+        newTxInitialDate,
+        setNewTxInitialDate,
+        newTxInitialType,
+        newTxInitialCategoryId,
+        openNewTransactionModal,
         isAffordabilityOpen,
         setIsAffordabilityOpen,
         isRenderGuideOpen,

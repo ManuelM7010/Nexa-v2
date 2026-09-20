@@ -597,6 +597,11 @@ export const TransactionsView: React.FC = () => {
                               Cuota
                             </span>
                           )}
+                          {(tx.isFixedMonthly || tx.origin?.startsWith('fixed:')) && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                              Fijo Mensual
+                            </span>
+                          )}
                         </div>
                         {tx.notes && (
                           <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5">

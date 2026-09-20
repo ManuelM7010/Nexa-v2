@@ -18,6 +18,7 @@ export const ServicesView: React.FC = () => {
     services,
     accounts,
     creditCards,
+    categories,
     saveService,
     deleteService,
     updateServiceMonthlyRecord,
@@ -39,6 +40,8 @@ export const ServicesView: React.FC = () => {
   const [paymentMethodType, setPaymentMethodType] = useState<'banco' | 'efectivo' | 'tarjeta_credito'>('banco');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [creditCardId, setCreditCardId] = useState(creditCards[0]?.id || '');
+  const [categoryId, setCategoryId] = useState('cat_servicios');
+  const [notes, setNotes] = useState('');
 
   // Quick edit monthly bill state
   const [billingServiceId, setBillingServiceId] = useState<string | null>(null);
@@ -51,8 +54,10 @@ export const ServicesView: React.FC = () => {
     setBudgetedAmountStr('40');
     setEstimatedDay(20);
     setPaymentMethodType('banco');
-    setAccountId(accounts[0]?.id || '');
+    setAccountId(accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || '');
     setCreditCardId(creditCards[0]?.id || '');
+    setCategoryId('cat_servicios');
+    setNotes('');
     setIsModalOpen(true);
   };
 
@@ -65,6 +70,8 @@ export const ServicesView: React.FC = () => {
     setPaymentMethodType(srv.paymentMethodType);
     setAccountId(srv.accountId || accounts[0]?.id || '');
     setCreditCardId(srv.creditCardId || creditCards[0]?.id || '');
+    setCategoryId(srv.categoryId || 'cat_servicios');
+    setNotes(srv.notes || '');
     setIsModalOpen(true);
   };
 
@@ -81,6 +88,8 @@ export const ServicesView: React.FC = () => {
       paymentMethodType,
       accountId: paymentMethodType === 'banco' || paymentMethodType === 'efectivo' ? accountId : undefined,
       creditCardId: paymentMethodType === 'tarjeta_credito' ? creditCardId : undefined,
+      categoryId,
+      notes: notes.trim() || undefined,
     });
 
     setIsModalOpen(false);
@@ -371,6 +380,77 @@ export const ServicesView: React.FC = () => {
                   <option value="efectivo">Efectivo</option>
                   <option value="tarjeta_credito">Tarjeta de Crédito</option>
                 </select>
+
+                {paymentMethodType === 'tarjeta_credito' ? (
+                  <div className="mt-2">
+                    <label className="block text-[11px] text-slate-400 mb-1">Tarjeta de Crédito</label>
+                    <select
+                      value={creditCardId}
+                      onChange={(e) => setCreditCardId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    >
+                      {creditCards.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      {paymentMethodType === 'efectivo' ? 'Caja / Cuenta de Efectivo' : 'Cuenta Bancaria'}
+                    </label>
+                    <select
+                      value={accountId}
+                      onChange={(e) => setAccountId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    >
+                      {accounts
+                        .filter((a) => (paymentMethodType === 'efectivo' ? a.type === 'efectivo' : a.type === 'banco'))
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      {accounts.filter((a) => (paymentMethodType === 'efectivo' ? a.type === 'efectivo' : a.type === 'banco')).length === 0 &&
+                        accounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1 font-semibold">Categoría</label>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                >
+                  <option value="cat_servicios">Servicios Básicos & Hogar</option>
+                  {categories
+                    .filter((c) => c.type === 'gasto' && c.id !== 'cat_servicios')
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1 font-semibold">Notas / Comentarios (Opcional)</label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Nº de contrato, clave, etc."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600"
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">

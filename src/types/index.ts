@@ -150,6 +150,8 @@ export interface Transaction {
   installmentPurchaseId?: string;
   loanId?: string;
   budgetId?: string;
+  isFixedMonthly?: boolean;
+  billingDay?: number;
   createdAt: string;
   updatedAt: string;
 }
