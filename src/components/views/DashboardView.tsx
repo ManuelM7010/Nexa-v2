@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import {
   formatMoney,
@@ -19,6 +19,9 @@ import {
   Sparkles,
   ChevronRight,
   Landmark,
+  X,
+  ExternalLink,
+  Zap,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -30,6 +33,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from 'recharts';
+import { motion, AnimatePresence } from 'motion/react';
 import { QuickExpenseTemplates } from '../common/QuickExpenseTemplates';
 
 export const DashboardView: React.FC = () => {
@@ -44,7 +48,14 @@ export const DashboardView: React.FC = () => {
     setIsAffordabilityOpen,
     allMonthTransactions,
     toggleTransactionStatus,
+    accounts,
+    creditCards,
+    loans,
   } = useFinance();
+
+  const [selectedCardModal, setSelectedCardModal] = useState<
+    'liquidez' | 'cierre' | 'disponible' | 'deuda' | null
+  >(null);
 
   // Prepare chart data from daily cash flow
   const chartData = dailyCashFlow.map((day) => ({
@@ -66,94 +77,132 @@ export const DashboardView: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. EXECUTIVE SUMMARY CARDS (Core Fintech Dashboard) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Card 1: Real Current Liquidity */}
-        <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 relative overflow-hidden shadow-lg shadow-black/20">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
-              Liquidez Real Hoy
-            </span>
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
-              <Wallet className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-white tracking-tight privacy-blur">
-            {formatMoney(executiveSummary.currentRealCashBalance, settings.currencySymbol)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1 privacy-blur">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-            Bancos ({formatMoney(executiveSummary.bankBalance, settings.currencySymbol)}) + Efectivo ({formatMoney(executiveSummary.cashBalance, settings.currencySymbol)})
-          </p>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+          <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-400">
+            Resumen Ejecutivo del Mes
+          </span>
+          <span className="text-[11px] text-blue-400 flex items-center gap-1 font-medium">
+            <Zap className="w-3 h-3" />
+            Toca una tarjeta para ver su desglose
+          </span>
         </div>
 
-        {/* Card 2: Projected End-of-Month Liquidity */}
-        <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 relative overflow-hidden shadow-lg shadow-black/20">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
-              Liquidez Proyectada Cierre
-            </span>
-            <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div
-            className={`text-2xl font-black tracking-tight privacy-blur ${
-              executiveSummary.projectedEndBalance < 0
-                ? 'text-rose-400'
-                : 'text-sky-300'
-            }`}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* Card 1: Real Current Liquidity */}
+          <motion.div
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setSelectedCardModal('liquidez')}
+            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
           >
-            {formatMoney(executiveSummary.projectedEndBalance, settings.currencySymbol)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
-            <span>Saldo al día {dailyCashFlow[dailyCashFlow.length - 1]?.date.slice(8) || 30}</span>
-            <span className={executiveSummary.lowestProjectedBalance < 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}>
-              Mín: {formatMoney(executiveSummary.lowestProjectedBalance, settings.currencySymbol)}
-            </span>
-          </p>
-        </div>
-
-        {/* Card 3: Free Cash After Obligations */}
-        <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 relative overflow-hidden shadow-lg shadow-black/20">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
-              Disponible Libre Real
-            </span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-              <ShieldCheck className="w-4 h-4" />
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">
+                Liquidez Real Hoy
+              </span>
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20 transition">
+                <Wallet className="w-4 h-4" />
+              </div>
             </div>
-          </div>
-          <div
-            className={`text-2xl font-black tracking-tight privacy-blur ${
-              executiveSummary.freeCashAfterObligations < 0
-                ? 'text-rose-400'
-                : 'text-emerald-400'
-            }`}
+            <div className="text-2xl font-black text-white tracking-tight privacy-blur">
+              {formatMoney(executiveSummary.currentRealCashBalance, settings.currencySymbol)}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
+              <span className="flex items-center gap-1 truncate">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
+                Bancos ({formatMoney(executiveSummary.bankBalance, settings.currencySymbol)}) + Efectivo ({formatMoney(executiveSummary.cashBalance, settings.currencySymbol)})
+              </span>
+              <span className="text-blue-400 group-hover:translate-x-0.5 transition font-semibold text-[10px] ml-1">Ver ↗</span>
+            </p>
+          </motion.div>
+
+          {/* Card 2: Projected End-of-Month Liquidity */}
+          <motion.div
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setSelectedCardModal('cierre')}
+            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
           >
-            {formatMoney(executiveSummary.freeCashAfterObligations, settings.currencySymbol)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1 privacy-blur">
-            Tras descontar {formatMoney(executiveSummary.upcomingObligationsCommitted, settings.currencySymbol)} en obligaciones próximas
-          </p>
-        </div>
-
-        {/* Card 4: Total Debt Outstanding */}
-        <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 relative overflow-hidden shadow-lg shadow-black/20">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">
-              Deuda Total Externa
-            </span>
-            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400">
-              <CreditCard className="w-4 h-4" />
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">
+                Liquidez Proyectada Cierre
+              </span>
+              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400 group-hover:bg-sky-500/20 transition">
+                <TrendingUp className="w-4 h-4" />
+              </div>
             </div>
-          </div>
-          <div className="text-2xl font-black text-rose-400 tracking-tight privacy-blur">
-            {formatMoney(executiveSummary.totalDebt, settings.currencySymbol)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
-            <span>Tarjetas: {formatMoney(executiveSummary.creditCardDebt, settings.currencySymbol)}</span>
-            <span>Préstamos: {formatMoney(executiveSummary.loanDebt, settings.currencySymbol)}</span>
-          </p>
+            <div
+              className={`text-2xl font-black tracking-tight privacy-blur ${
+                executiveSummary.projectedEndBalance < 0
+                  ? 'text-rose-400'
+                  : 'text-sky-300'
+              }`}
+            >
+              {formatMoney(executiveSummary.projectedEndBalance, settings.currencySymbol)}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
+              <span>Saldo al día {dailyCashFlow[dailyCashFlow.length - 1]?.date.slice(8) || 30}</span>
+              <span className="text-sky-400 group-hover:translate-x-0.5 transition font-semibold text-[10px]">
+                Mín: {formatMoney(executiveSummary.lowestProjectedBalance, settings.currencySymbol)} ↗
+              </span>
+            </p>
+          </motion.div>
+
+          {/* Card 3: Free Cash After Obligations */}
+          <motion.div
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setSelectedCardModal('disponible')}
+            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
+          >
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">
+                Disponible Libre Real
+              </span>
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20 transition">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+            </div>
+            <div
+              className={`text-2xl font-black tracking-tight privacy-blur ${
+                executiveSummary.freeCashAfterObligations < 0
+                  ? 'text-rose-400'
+                  : 'text-emerald-400'
+              }`}
+            >
+              {formatMoney(executiveSummary.freeCashAfterObligations, settings.currencySymbol)}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
+              <span className="truncate">
+                Descontando {formatMoney(executiveSummary.upcomingObligationsCommitted, settings.currencySymbol)} pendientes
+              </span>
+              <span className="text-emerald-400 group-hover:translate-x-0.5 transition font-semibold text-[10px] ml-1">Ver ↗</span>
+            </p>
+          </motion.div>
+
+          {/* Card 4: Total Debt Outstanding */}
+          <motion.div
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setSelectedCardModal('deuda')}
+            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-rose-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
+          >
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">
+                Deuda Total Externa
+              </span>
+              <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 group-hover:bg-rose-500/20 transition">
+                <CreditCard className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-rose-400 tracking-tight privacy-blur">
+              {formatMoney(executiveSummary.totalDebt, settings.currencySymbol)}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
+              <span>Tarjetas: {formatMoney(executiveSummary.creditCardDebt, settings.currencySymbol)}</span>
+              <span className="text-rose-400 group-hover:translate-x-0.5 transition font-semibold text-[10px]">Ver ↗</span>
+            </p>
+          </motion.div>
         </div>
       </div>
 
@@ -510,6 +559,238 @@ export const DashboardView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Drill-down Modal for Interactive Cards */}
+      <AnimatePresence>
+        {selectedCardModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-4"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                    {selectedCardModal === 'liquidez' && <Wallet className="w-5 h-5" />}
+                    {selectedCardModal === 'cierre' && <TrendingUp className="w-5 h-5" />}
+                    {selectedCardModal === 'disponible' && <ShieldCheck className="w-5 h-5" />}
+                    {selectedCardModal === 'deuda' && <CreditCard className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">
+                      {selectedCardModal === 'liquidez' && 'Desglose de Liquidez Real Hoy'}
+                      {selectedCardModal === 'cierre' && 'Proyección de Liquidez al Cierre'}
+                      {selectedCardModal === 'disponible' && 'Disponible Libre vs Obligaciones'}
+                      {selectedCardModal === 'deuda' && 'Estructura de Deuda Externa Vigente'}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Detalle interactivo para control y conciliación financiera
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedCardModal(null)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="space-y-3 text-xs text-slate-300">
+                {selectedCardModal === 'liquidez' && (
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="font-semibold text-slate-400">Total Tesorería Inmediata:</span>
+                      <span className="font-mono font-black text-emerald-400 text-sm">
+                        {formatMoney(executiveSummary.currentRealCashBalance, settings.currencySymbol)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold block">
+                        Cuentas Bancarias y Efectivo
+                      </span>
+                      <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+                        {accounts.map((acc) => {
+                          const percent = executiveSummary.currentRealCashBalance > 0
+                            ? Math.round((acc.initialBalance / executiveSummary.currentRealCashBalance) * 100)
+                            : 0;
+                          return (
+                            <div
+                              key={acc.id}
+                              className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80"
+                            >
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-white block">{acc.name}</span>
+                                <span className="text-[10px] text-slate-500 uppercase">{acc.type} {acc.bank ? `• ${acc.bank}` : ''}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-mono font-bold text-slate-100 block">
+                                  {formatMoney(acc.initialBalance, settings.currencySymbol)}
+                                </span>
+                                <span className="text-[10px] text-slate-500">{percent}% de liquidez</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedCardModal(null);
+                        setActiveTab('cuentas');
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-bold border border-blue-500/30 transition cursor-pointer"
+                    >
+                      <span>Gestionar Cuentas y Saldos</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {selectedCardModal === 'cierre' && (
+                  <div className="space-y-3">
+                    <p className="leading-relaxed">
+                      El saldo estimado al último día del mes es de <strong className="font-mono text-sky-300 font-bold">{formatMoney(executiveSummary.projectedEndBalance, settings.currencySymbol)}</strong>.
+                    </p>
+
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Ingresos Planificados del Mes:</span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          +{formatMoney(executiveSummary.totalPlannedIncome, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Gastos & Salidas Planificadas:</span>
+                        <span className="font-mono font-bold text-rose-400">
+                          -{formatMoney(executiveSummary.totalPlannedExpense, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+                        <span className="text-slate-400 font-semibold">Punto Mínimo del Mes:</span>
+                        <span className={`font-mono font-bold ${executiveSummary.lowestProjectedBalance < 0 ? 'text-rose-400' : 'text-amber-300'}`}>
+                          {formatMoney(executiveSummary.lowestProjectedBalance, settings.currencySymbol)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedCardModal(null);
+                        setActiveTab('flujo');
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 font-bold border border-sky-500/30 transition cursor-pointer"
+                    >
+                      <span>Abrir Flujo de Caja Diario</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {selectedCardModal === 'disponible' && (
+                  <div className="space-y-3">
+                    <p className="leading-relaxed">
+                      Tu margen de maniobra real hoy es de <strong className="font-mono text-emerald-400 font-bold">{formatMoney(executiveSummary.freeCashAfterObligations, settings.currencySymbol)}</strong>, calculado tras descontar las obligaciones inminentes ya comprometidas por <span className="font-mono text-amber-300">{formatMoney(executiveSummary.upcomingObligationsCommitted, settings.currencySymbol)}</span>.
+                    </p>
+
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-500 block font-semibold">
+                        Próximas Obligaciones Comprometidas
+                      </span>
+                      <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                        {allMonthTransactions
+                          .filter((t) => t.status === 'planificado' && ['gasto', 'cuota_prestamo', 'pago_tarjeta', 'suscripcion', 'servicio'].includes(t.type))
+                          .slice(0, 5)
+                          .map((t) => (
+                            <div key={t.id} className="flex justify-between items-center text-[11px] py-1 border-b border-slate-800/60 last:border-0">
+                              <span className="text-white truncate max-w-[200px]">{t.concept}</span>
+                              <span className="font-mono font-bold text-rose-400">-{formatMoney(t.amount, settings.currencySymbol)}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedCardModal(null);
+                        setActiveTab('calendario');
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold border border-emerald-500/30 transition cursor-pointer"
+                    >
+                      <span>Ver Calendario de Vencimientos</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {selectedCardModal === 'deuda' && (
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="font-semibold text-slate-400">Deuda Total Externa:</span>
+                      <span className="font-mono font-black text-rose-400 text-sm">
+                        {formatMoney(executiveSummary.totalDebt, settings.currencySymbol)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold block">
+                        Tarjetas de Crédito ({creditCards.length})
+                      </span>
+                      <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                        {creditCards.map((c) => {
+                          const usedPercent = c.limit > 0 ? Math.round((c.initialUsedBalance / c.limit) * 100) : 0;
+                          return (
+                            <div key={c.id} className="flex justify-between items-center p-2 rounded-lg bg-slate-950/60 border border-slate-800/80 text-[11px]">
+                              <div>
+                                <span className="font-bold text-white block">{c.name}</span>
+                                <span className="text-slate-500 text-[10px]">Uso: {usedPercent}%</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-mono font-bold text-rose-400">{formatMoney(c.initialUsedBalance, settings.currencySymbol)}</span>
+                                <span className="text-[10px] text-slate-500 block">Límite: {formatMoney(c.limit, settings.currencySymbol)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => {
+                          setSelectedCardModal(null);
+                          setActiveTab('estados-cuenta');
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 font-bold border border-blue-500/30 transition cursor-pointer"
+                      >
+                        <span>Estados de Cuenta</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedCardModal(null);
+                          setActiveTab('prestamos');
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-700 transition cursor-pointer"
+                      >
+                        <span>Ver Préstamos</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
