@@ -461,13 +461,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       initialPosition,
       accounts,
       transactions,
-      settings.liquidityStartDate || '2026-09-15',
+      settings.liquidityStartDate || '2026-09-01',
       {
         subscriptions,
         services,
         installmentPurchases,
         loans,
         creditCards,
+        monthlyCloses,
       }
     );
   }, [
@@ -482,6 +483,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     installmentPurchases,
     loans,
     creditCards,
+    monthlyCloses,
     settings.liquidityStartDate,
   ]);
 
@@ -586,9 +588,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const saveTransaction = async (
     txData: Partial<Transaction> & { concept: string; amount: number; date: string }
   ) => {
-    const isNew = !txData.id;
     const now = new Date().toISOString();
-    const id = txData.id || `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    // If the transaction ID is a generated projection (starts with 'gen_'), assign a persistent unique ID
+    const isGenerated = txData.id && txData.id.startsWith('gen_');
+    const id = isGenerated || !txData.id
+      ? `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+      : txData.id;
 
     const newTx: Transaction = {
       id,
@@ -604,6 +609,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       paymentMethodType: txData.paymentMethodType || 'banco',
       accountId: txData.accountId,
       creditCardId: txData.creditCardId,
+      creditCardCycleKey: txData.creditCardCycleKey,
       transferToAccountId: txData.transferToAccountId,
       savingsAccountId: txData.savingsAccountId,
       status: txData.status || 'planificado',

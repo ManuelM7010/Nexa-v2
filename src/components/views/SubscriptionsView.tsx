@@ -38,7 +38,7 @@ export const SubscriptionsView: React.FC = () => {
   const [concept, setConcept] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [billingDay, setBillingDay] = useState(15);
-  const [paymentMethodType, setPaymentMethodType] = useState<'tarjeta_credito' | 'banco'>('tarjeta_credito');
+  const [paymentMethodType, setPaymentMethodType] = useState<'tarjeta_credito' | 'banco' | 'efectivo'>('tarjeta_credito');
   const [creditCardId, setCreditCardId] = useState(creditCards[0]?.id || '');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [categoryId, setCategoryId] = useState('cat_suscripciones');
@@ -62,7 +62,7 @@ export const SubscriptionsView: React.FC = () => {
     setConcept(sub.concept);
     setAmountStr(centsToDollars(sub.amount).toFixed(2));
     setBillingDay(sub.billingDay);
-    setPaymentMethodType(sub.paymentMethodType === 'banco' ? 'banco' : 'tarjeta_credito');
+    setPaymentMethodType(sub.paymentMethodType || 'tarjeta_credito');
     setCreditCardId(sub.creditCardId || creditCards[0]?.id || '');
     setAccountId(sub.accountId || accounts[0]?.id || '');
     setCategoryId(sub.categoryId);
@@ -300,22 +300,22 @@ export const SubscriptionsView: React.FC = () => {
 
               <div>
                 <label className="block text-slate-300 mb-1 font-semibold">Medio de Pago</label>
-                <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="grid grid-cols-3 gap-2 mb-2">
                   <button
                     type="button"
                     onClick={() => setPaymentMethodType('tarjeta_credito')}
-                    className={`py-1.5 rounded-lg font-semibold ${
+                    className={`py-1.5 rounded-lg text-xs font-semibold ${
                       paymentMethodType === 'tarjeta_credito'
                         ? 'bg-blue-600 text-white'
                         : 'bg-slate-950 text-slate-400 border border-slate-800'
                     }`}
                   >
-                    Tarjeta de Crédito
+                    T. Crédito
                   </button>
                   <button
                     type="button"
                     onClick={() => setPaymentMethodType('banco')}
-                    className={`py-1.5 rounded-lg font-semibold ${
+                    className={`py-1.5 rounded-lg text-xs font-semibold ${
                       paymentMethodType === 'banco'
                         ? 'bg-blue-600 text-white'
                         : 'bg-slate-950 text-slate-400 border border-slate-800'
@@ -323,9 +323,20 @@ export const SubscriptionsView: React.FC = () => {
                   >
                     Cuenta Bancaria
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethodType('efectivo')}
+                    className={`py-1.5 rounded-lg text-xs font-semibold ${
+                      paymentMethodType === 'efectivo'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-950 text-slate-400 border border-slate-800'
+                    }`}
+                  >
+                    Efectivo
+                  </button>
                 </div>
 
-                {paymentMethodType === 'tarjeta_credito' ? (
+                {paymentMethodType === 'tarjeta_credito' && (
                   <select
                     value={creditCardId}
                     onChange={(e) => setCreditCardId(e.target.value)}
@@ -337,7 +348,9 @@ export const SubscriptionsView: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                ) : (
+                )}
+
+                {paymentMethodType === 'banco' && (
                   <select
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}

@@ -418,7 +418,7 @@ export const CreditCardStatementsView: React.FC = () => {
                         {statement.status === 'pagado'
                           ? '✓ Liquidado / Sin Saldo'
                           : statement.status === 'parcial'
-                          ? `⚡ Abono Parcial (${formatMoney(statement.appliedPayments || 0, settings.currencySymbol)} abonado)`
+                          ? `⚡ Abono Parcial (${formatMoney(statement.totalPayments || 0, settings.currencySymbol)} abonado)`
                           : statement.status === 'cortado'
                           ? '● Cortado (Pendiente de Pago)'
                           : '⚡ Ciclo en Curso'}
@@ -441,7 +441,7 @@ export const CreditCardStatementsView: React.FC = () => {
                     <span>
                       {statement.status === 'pagado'
                         ? 'Registrar Abono Adicional'
-                        : (statement.appliedPayments || 0) > 0
+                        : (statement.totalPayments || 0) > 0
                         ? `Pagar Restante (${formatMoney(statement.remainingDue, settings.currencySymbol)})`
                         : 'Abonar / Pagar TDDC'}
                     </span>
@@ -459,9 +459,9 @@ export const CreditCardStatementsView: React.FC = () => {
                 <div className="text-xl font-black text-rose-400">
                   {formatMoney(statement.totalDueAtCutOff, settings.currencySymbol)}
                 </div>
-                {(statement.appliedPayments || 0) > 0 ? (
+                {(statement.totalPayments || 0) > 0 ? (
                   <span className="text-[10px] text-amber-400 font-medium block">
-                    Abonado: -{formatMoney(statement.appliedPayments || 0, settings.currencySymbol)}
+                    Abonado: -{formatMoney(statement.totalPayments || 0, settings.currencySymbol)}
                   </span>
                 ) : (
                   <span className="text-[10px] text-slate-500">Monto total facturado</span>
@@ -524,7 +524,7 @@ export const CreditCardStatementsView: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500">Abonos Aplicados:</span>
                   <span className="font-mono font-bold text-emerald-400">
-                    -{formatMoney(statement.appliedPayments || statement.totalPayments, settings.currencySymbol)}
+                    -{formatMoney(statement.totalPayments || 0, settings.currencySymbol)}
                   </span>
                 </div>
                 <span className="text-slate-600 font-black">=</span>

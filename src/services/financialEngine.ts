@@ -15,6 +15,7 @@ import {
   DailyCashFlowItem,
   AlertItem,
   SavingsAccount,
+  MonthlyClose,
 } from '../types';
 import { daysInMonth, MONTH_NAMES_ES, addDays } from '../utils/formatters';
 
@@ -683,13 +684,14 @@ export class NexaFinancialEngine {
     initialPos: InitialPosition | null,
     accounts: Account[],
     allTransactions: Transaction[],
-    liquidityStartDate: string = '2026-09-15',
+    liquidityStartDate: string = '2026-09-01',
     financialData?: {
       subscriptions: Subscription[];
       services: ServiceItem[];
       installmentPurchases: InstallmentPurchase[];
       loans: Loan[];
       creditCards: CreditCard[];
+      monthlyCloses?: MonthlyClose[];
     }
   ): DailyCashFlowItem[] {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
@@ -706,10 +708,18 @@ export class NexaFinancialEngine {
 
     const dailyItems: DailyCashFlowItem[] = [];
 
+    // Parse liquidity start date components
+    const [startYear, startMonth, startDay] = liquidityStartDate.split('-').map(Number);
+
     // CASE 1: The entire month is strictly prior to liquidityStartDate (e.g. Jan-Aug 2026)
-    // As requested: "sea 0.00 desde enero hasta el 15 de septiembre 2026"
-    // Transactions exist (for CC statement calculations), but cash liquidity is 0.00
+    // Transactions exist (for CC statement calculations), but cash liquidity activates at liquidityStartDate.
+    // For the month directly preceding liquidityStartDate (e.g. August 2026), Day 31 ends with totalBaseCash
+    // so that its final balance perfectly matches the opening balance of the start month.
     if (monthEndStr < liquidityStartDate) {
+      const isDirectlyPrecedingMonth =
+        (year === startYear && month === startMonth - 1) ||
+        (startMonth === 1 && year === startYear - 1 && month === 12);
+
       for (let d = 1; d <= daysInCurrentMonth; d++) {
         const dayStr = String(d).padStart(2, '0');
         const dateStr = `${monthKey}-${dayStr}`;
@@ -731,6 +741,9 @@ export class NexaFinancialEngine {
           }
         });
 
+        const isTransitionDay = isDirectlyPrecedingMonth && d === daysInCurrentMonth;
+        const closingBal = isTransitionDay ? totalBaseCash : 0;
+
         dailyItems.push({
           date: dateStr,
           dayOfWeek,
@@ -749,9 +762,9 @@ export class NexaFinancialEngine {
           plannedExpense: 0,
           totalExpense: 0,
           obligations,
-          endDayRealBalance: 0,
-          endDayProjectedBalance: 0,
-          finalBalance: 0,
+          endDayRealBalance: closingBal,
+          endDayProjectedBalance: closingBal,
+          finalBalance: closingBal,
           variation: 0,
           events: dayTxs,
           movements: dayTxs,
@@ -765,38 +778,47 @@ export class NexaFinancialEngine {
       return dailyItems;
     }
 
-    // Parse liquidity start date components
-    const [startYear, startMonth, startDay] = liquidityStartDate.split('-').map(Number);
-
     // Calculate the opening balance for Day 1 of the requested month
     // by simulating month-by-month from liquidityStartDate up to (year, month - 1)
     let priorClosingBalance = 0;
 
-    if (year > startYear || (year === startYear && month > startMonth)) {
+    if (year === startYear && month === startMonth) {
+      priorClosingBalance = totalBaseCash;
+    } else if (year > startYear || (year === startYear && month > startMonth)) {
       // Initialize with base liquidity at liquidityStartDate
       let simBalance = totalBaseCash;
 
       // 1. Simulate the remainder of startMonth from startDay onwards
       const startMonthDays = daysInMonth(startYear, startMonth);
       const startMonthKeyStr = `${startYear}-${String(startMonth).padStart(2, '0')}`;
-      const startExplicit = allTransactions.filter((t) => t.date.startsWith(startMonthKeyStr) && t.status !== 'cancelado');
-      const startProjected = financialData
-        ? NexaFinancialEngine.generateProjectedEvents(startYear, startMonth, {
-            ...financialData,
-            accounts,
-            existingTransactions: allTransactions,
-            todayStr,
-          })
-        : [];
-      const startMonthAllTxs = [...startExplicit, ...startProjected];
+      const startClosed = financialData?.monthlyCloses?.find(
+        (mc) => mc.year === startYear && mc.month === startMonth && mc.isClosed
+      );
 
-      for (let d = startDay; d <= startMonthDays; d++) {
-        const dStr = `${startMonthKeyStr}-${String(d).padStart(2, '0')}`;
-        const dayTxs = startMonthAllTxs.filter((t) => t.date === dStr);
-        for (const tx of dayTxs) {
-          const impact = NexaFinancialEngine.getCashMovementImpact(tx);
-          if (impact.isInflow) simBalance += impact.amount;
-          else if (impact.isOutflow) simBalance -= impact.amount;
+      if (startClosed && startClosed.finalBalance !== undefined) {
+        simBalance = startClosed.finalBalance;
+      } else {
+        const startExplicit = allTransactions.filter(
+          (t) => t.date.startsWith(startMonthKeyStr) && t.status !== 'cancelado'
+        );
+        const startProjected = financialData
+          ? NexaFinancialEngine.generateProjectedEvents(startYear, startMonth, {
+              ...financialData,
+              accounts,
+              existingTransactions: allTransactions,
+              todayStr,
+            })
+          : [];
+        const startMonthAllTxs = [...startExplicit, ...startProjected];
+
+        for (let d = startDay; d <= startMonthDays; d++) {
+          const dStr = `${startMonthKeyStr}-${String(d).padStart(2, '0')}`;
+          const dayTxs = startMonthAllTxs.filter((t) => t.date === dStr);
+          for (const tx of dayTxs) {
+            const impact = NexaFinancialEngine.getCashMovementImpact(tx);
+            if (impact.isInflow) simBalance += impact.amount;
+            else if (impact.isOutflow) simBalance -= impact.amount;
+          }
         }
       }
 
@@ -811,24 +833,34 @@ export class NexaFinancialEngine {
       while (simY < year || (simY === year && simM < month)) {
         const simMonthKeyStr = `${simY}-${String(simM).padStart(2, '0')}`;
         const simDaysCount = daysInMonth(simY, simM);
-        const simExplicit = allTransactions.filter((t) => t.date.startsWith(simMonthKeyStr) && t.status !== 'cancelado');
-        const simProjected = financialData
-          ? NexaFinancialEngine.generateProjectedEvents(simY, simM, {
-              ...financialData,
-              accounts,
-              existingTransactions: allTransactions,
-              todayStr,
-            })
-          : [];
-        const simAllMonthTxs = [...simExplicit, ...simProjected];
+        const simClosed = financialData?.monthlyCloses?.find(
+          (mc) => mc.year === simY && mc.month === simM && mc.isClosed
+        );
 
-        for (let d = 1; d <= simDaysCount; d++) {
-          const dStr = `${simMonthKeyStr}-${String(d).padStart(2, '0')}`;
-          const dayTxs = simAllMonthTxs.filter((t) => t.date === dStr);
-          for (const tx of dayTxs) {
-            const impact = NexaFinancialEngine.getCashMovementImpact(tx);
-            if (impact.isInflow) simBalance += impact.amount;
-            else if (impact.isOutflow) simBalance -= impact.amount;
+        if (simClosed && simClosed.finalBalance !== undefined) {
+          simBalance = simClosed.finalBalance;
+        } else {
+          const simExplicit = allTransactions.filter(
+            (t) => t.date.startsWith(simMonthKeyStr) && t.status !== 'cancelado'
+          );
+          const simProjected = financialData
+            ? NexaFinancialEngine.generateProjectedEvents(simY, simM, {
+                ...financialData,
+                accounts,
+                existingTransactions: allTransactions,
+                todayStr,
+              })
+            : [];
+          const simAllMonthTxs = [...simExplicit, ...simProjected];
+
+          for (let d = 1; d <= simDaysCount; d++) {
+            const dStr = `${simMonthKeyStr}-${String(d).padStart(2, '0')}`;
+            const dayTxs = simAllMonthTxs.filter((t) => t.date === dStr);
+            for (const tx of dayTxs) {
+              const impact = NexaFinancialEngine.getCashMovementImpact(tx);
+              if (impact.isInflow) simBalance += impact.amount;
+              else if (impact.isOutflow) simBalance -= impact.amount;
+            }
           }
         }
 

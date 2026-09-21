@@ -40,6 +40,15 @@ export const DailyCashFlowView: React.FC = () => {
     return true;
   });
 
+  const monthInitialBalance = dailyCashFlow[0]?.initialBalance || 0;
+  const monthFinalBalance = dailyCashFlow[dailyCashFlow.length - 1]?.finalBalance || 0;
+  const totalPlannedIn = dailyCashFlow.reduce((acc, d) => acc + d.projectedIncome, 0);
+  const totalRealIn = dailyCashFlow.reduce((acc, d) => acc + d.realizedIncome, 0);
+  const totalPlannedOut = dailyCashFlow.reduce((acc, d) => acc + d.projectedExpense, 0);
+  const totalRealOut = dailyCashFlow.reduce((acc, d) => acc + d.realizedExpense, 0);
+  const totalMonthIncome = totalPlannedIn + totalRealIn;
+  const totalMonthExpense = totalPlannedOut + totalRealOut;
+
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
       {/* Header & Filters */}
@@ -50,7 +59,7 @@ export const DailyCashFlowView: React.FC = () => {
             Flujo de Caja & Liquidez Diaria
           </h2>
           <p className="text-xs text-slate-400">
-            Proyección matemática diaria del saldo disponible en efectivo y cuentas bancarias
+            Proyección matemática diaria del saldo disponible en efectivo y cuentas bancarias con continuidad estricta mes a mes
           </p>
         </div>
 
@@ -87,6 +96,69 @@ export const DailyCashFlowView: React.FC = () => {
               Solo alertas
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Continuity & Executive Balance Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Card 1: Saldo Inicial */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 relative overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span className="font-semibold uppercase tracking-wider text-[10px]">Saldo Inicial (Día 1)</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">Mes Anterior</span>
+          </div>
+          <div className="text-xl font-bold font-mono text-white">
+            {formatMoney(monthInitialBalance, settings.currencySymbol)}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+            <span>Coincide con saldo final del mes previo</span>
+          </p>
+        </div>
+
+        {/* Card 2: Ingresos Totales */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 relative overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between text-xs text-emerald-400 mb-1">
+            <span className="font-semibold uppercase tracking-wider text-[10px]">Ingresos del Mes</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </div>
+          <div className="text-xl font-bold font-mono text-emerald-400">
+            +{formatMoney(totalMonthIncome, settings.currencySymbol)}
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1 font-mono">
+            <span>Real: <strong className="text-emerald-300 font-semibold">{formatMoney(totalRealIn, settings.currencySymbol)}</strong></span>
+            <span>•</span>
+            <span>Plan: <strong className="text-slate-300 font-semibold">{formatMoney(totalPlannedIn, settings.currencySymbol)}</strong></span>
+          </div>
+        </div>
+
+        {/* Card 3: Egresos y Obligaciones */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 relative overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between text-xs text-rose-400 mb-1">
+            <span className="font-semibold uppercase tracking-wider text-[10px]">Gastos & Obligaciones</span>
+            <ArrowDownRight className="w-3.5 h-3.5" />
+          </div>
+          <div className="text-xl font-bold font-mono text-rose-400">
+            -{formatMoney(totalMonthExpense, settings.currencySymbol)}
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1 font-mono">
+            <span>Real: <strong className="text-rose-300 font-semibold">{formatMoney(totalRealOut, settings.currencySymbol)}</strong></span>
+            <span>•</span>
+            <span>Plan: <strong className="text-slate-300 font-semibold">{formatMoney(totalPlannedOut, settings.currencySymbol)}</strong></span>
+          </div>
+        </div>
+
+        {/* Card 4: Saldo Final / Apertura Mes Siguiente */}
+        <div className="bg-slate-900/90 border border-blue-900/50 rounded-2xl p-4 relative overflow-hidden shadow-sm bg-gradient-to-br from-blue-950/20 to-slate-900">
+          <div className="flex items-center justify-between text-xs text-blue-300 mb-1">
+            <span className="font-semibold uppercase tracking-wider text-[10px]">Saldo Final del Mes</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">Continuo ✓</span>
+          </div>
+          <div className={`text-xl font-bold font-mono ${monthFinalBalance < 0 ? 'text-rose-400' : 'text-blue-300'}`}>
+            {formatMoney(monthFinalBalance, settings.currencySymbol)}
+          </div>
+          <p className="text-[11px] text-emerald-400/90 mt-1 font-medium">
+            Saldo de apertura del mes siguiente
+          </p>
         </div>
       </div>
 
