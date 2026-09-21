@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { TransactionType, PaymentMethodType, TransactionStatus } from '../../types';
 import { formatMoney, dollarsToCents, centsToDollars, getTodayDateStr } from '../../utils/formatters';
-import { X, ArrowRight, AlertCircle, CheckCircle, Plus, Zap, RefreshCw } from 'lucide-react';
+import { X, ArrowRight, AlertCircle, CheckCircle, Plus, Zap, RefreshCw, CreditCard as CreditCardIcon } from 'lucide-react';
 import { NewCategoryModal } from './NewCategoryModal';
+import { NexaFinancialEngine } from '../../services/financialEngine';
 
 export const NewTransactionModal: React.FC = () => {
   const {
@@ -35,6 +36,7 @@ export const NewTransactionModal: React.FC = () => {
   const [paymentMethodType, setPaymentMethodType] = useState<PaymentMethodType>('banco');
   const [accountId, setAccountId] = useState('');
   const [creditCardId, setCreditCardId] = useState('');
+  const [creditCardCycleKey, setCreditCardCycleKey] = useState('');
   const [transferToAccountId, setTransferToAccountId] = useState('');
   const [savingsAccountId, setSavingsAccountId] = useState('');
   const [status, setStatus] = useState<TransactionStatus>('planificado');
@@ -52,6 +54,7 @@ export const NewTransactionModal: React.FC = () => {
       setPaymentMethodType(editingTransaction.paymentMethodType);
       setAccountId(editingTransaction.accountId || '');
       setCreditCardId(editingTransaction.creditCardId || '');
+      setCreditCardCycleKey(editingTransaction.creditCardCycleKey || '');
       setTransferToAccountId(editingTransaction.transferToAccountId || '');
       setSavingsAccountId(editingTransaction.savingsAccountId || savingsAccounts[0]?.id || '');
       setStatus(editingTransaction.status);
@@ -60,13 +63,22 @@ export const NewTransactionModal: React.FC = () => {
     } else {
       setConcept('');
       setAmountStr('');
-      setDate(newTxInitialDate || getTodayDateStr());
-      setType(newTxInitialType || 'gasto');
-      const defaultCat = newTxInitialCategoryId || categories.find((c) => c.type === (newTxInitialType || 'gasto'))?.id || '';
+      const targetDate = newTxInitialDate || getTodayDateStr();
+      setDate(targetDate);
+      const initialType = newTxInitialType || 'gasto';
+      setType(initialType);
+      const defaultCat = newTxInitialCategoryId || categories.find((c) => c.type === initialType)?.id || '';
       setCategoryId(defaultCat);
-      setPaymentMethodType('banco');
+      setPaymentMethodType(initialType === 'pago_tarjeta' ? 'banco' : 'banco');
       setAccountId(accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || '');
-      setCreditCardId(creditCards[0]?.id || '');
+      const firstCard = creditCards[0];
+      setCreditCardId(firstCard?.id || '');
+      if (firstCard) {
+        const defCycle = NexaFinancialEngine.determinePaymentCycleKey(firstCard, targetDate);
+        setCreditCardCycleKey(defCycle);
+      } else {
+        setCreditCardCycleKey('');
+      }
       setTransferToAccountId(accounts[1]?.id || '');
       setSavingsAccountId(savingsAccounts[0]?.id || '');
       setStatus('planificado');
@@ -139,17 +151,18 @@ export const NewTransactionModal: React.FC = () => {
       amount: parsedAmountCents,
       date,
       type,
-      categoryId: (type === 'transferencia' || type === 'aporte_ahorro' || type === 'retiro_ahorro') ? undefined : categoryId || undefined,
-      paymentMethodType: type === 'gasto_desde_ahorro' ? 'ahorros' : paymentMethodType,
-      accountId: (paymentMethodType === 'tarjeta_credito' || type === 'gasto_desde_ahorro') ? undefined : accountId,
-      creditCardId: paymentMethodType === 'tarjeta_credito' ? creditCardId : undefined,
+      categoryId: (type === 'transferencia' || type === 'aporte_ahorro' || type === 'retiro_ahorro' || type === 'pago_tarjeta') ? undefined : categoryId || undefined,
+      paymentMethodType: type === 'gasto_desde_ahorro' ? 'ahorros' : (type === 'pago_tarjeta' ? 'banco' : paymentMethodType),
+      accountId: (paymentMethodType === 'tarjeta_credito' && type !== 'pago_tarjeta' || type === 'gasto_desde_ahorro') ? undefined : accountId,
+      creditCardId: (paymentMethodType === 'tarjeta_credito' || type === 'pago_tarjeta') ? creditCardId : undefined,
+      creditCardCycleKey: type === 'pago_tarjeta' ? (creditCardCycleKey || undefined) : undefined,
       transferToAccountId: type === 'transferencia' ? transferToAccountId : undefined,
       savingsAccountId: (type === 'aporte_ahorro' || type === 'retiro_ahorro' || type === 'gasto_desde_ahorro') ? savingsAccountId : undefined,
       status,
       isFixedMonthly,
       billingDay: isFixedMonthly ? (Number(date.slice(8)) || 1) : undefined,
       notes: notes.trim() || undefined,
-      origin: editingTransaction?.origin || 'manual',
+      origin: editingTransaction?.origin || (type === 'pago_tarjeta' ? `pago_tarjeta:${creditCardId}` : 'manual'),
     });
 
     handleClose();
@@ -239,6 +252,16 @@ export const NewTransactionModal: React.FC = () => {
                     setType(newType);
                     if (newType === 'pago_tarjeta') {
                       setPaymentMethodType('banco');
+                      const card = creditCards.find((c) => c.id === creditCardId) || creditCards[0];
+                      if (card) {
+                        setCreditCardId(card.id);
+                        if (!creditCardCycleKey) {
+                          setCreditCardCycleKey(NexaFinancialEngine.determinePaymentCycleKey(card, date));
+                        }
+                      }
+                      if (!concept) {
+                        setConcept(`Abono Tarjeta ${card?.name || ''}`.trim());
+                      }
                     } else if (newType === 'gasto_desde_ahorro') {
                       setPaymentMethodType('ahorros');
                     } else if (paymentMethodType === 'ahorros') {
@@ -519,8 +542,89 @@ export const NewTransactionModal: React.FC = () => {
             </div>
           )}
 
+          {/* Dedicated Credit Card Payment & Abono Configuration */}
+          {type === 'pago_tarjeta' && (
+            <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-800/40 space-y-3">
+              <div className="flex items-center gap-2 text-blue-300 font-bold text-xs">
+                <CreditCardIcon className="w-4 h-4 text-blue-400" />
+                <span>Configuración del Abono / Pago a Tarjeta</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Tarjeta a la que abonas *
+                  </label>
+                  <select
+                    value={creditCardId}
+                    onChange={(e) => {
+                      const newCardId = e.target.value;
+                      setCreditCardId(newCardId);
+                      const c = creditCards.find((card) => card.id === newCardId);
+                      if (c) {
+                        setCreditCardCycleKey(NexaFinancialEngine.determinePaymentCycleKey(c, date));
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    {creditCards.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.bank})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Cuenta de Débito (Liquidez) *
+                  </label>
+                  <select
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({formatMoney(a.initialBalance, settings.currencySymbol)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Corte / Estado de Cuenta que se desea impactar */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Corte / Estado de Cuenta a Impactar *
+                  </label>
+                  <span className="text-[10px] text-blue-400 font-medium">
+                    Afecta el monto exigible de este corte
+                  </span>
+                </div>
+                <select
+                  value={creditCardCycleKey}
+                  onChange={(e) => setCreditCardCycleKey(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer font-mono"
+                >
+                  {selectedCreditCard &&
+                    NexaFinancialEngine.getAvailableBillingCycles(selectedCreditCard, date).map((c) => (
+                      <option key={c.cycleKey} value={c.cycleKey}>
+                        {c.cycleLabel} {c.isDefault ? '⭐ [Sugerido por fecha]' : ''}
+                      </option>
+                    ))}
+                  <option value="">Automático según fecha del abono</option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  En el <strong>flujo diario</strong> restará el <strong>{date}</strong>, pero en el <strong>estado de cuenta</strong> reducirá el saldo del corte seleccionado.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Standard Payment Method / Account Selection (for ordinary types) */}
-          {type !== 'aporte_ahorro' && type !== 'retiro_ahorro' && type !== 'gasto_desde_ahorro' && (
+          {type !== 'aporte_ahorro' && type !== 'retiro_ahorro' && type !== 'gasto_desde_ahorro' && type !== 'pago_tarjeta' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -608,6 +712,25 @@ export const NewTransactionModal: React.FC = () => {
             <span className="font-bold text-slate-300 block mb-1.5 uppercase tracking-wider text-[10px]">
               Impacto Inmediato en Liquidez & Ahorros
             </span>
+
+            {type === 'pago_tarjeta' && (
+              <div className="space-y-1.5 text-slate-300">
+                <div className="flex items-center justify-between text-xs">
+                  <span>Resta liquidez el <strong>{date}</strong> de: <strong>{selectedAccount?.name || 'Cuenta bancaria'}</strong></span>
+                  <span className="text-rose-400 font-bold">-{formatMoney(parsedAmountCents, settings.currencySymbol)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-emerald-400">
+                  <span>
+                    Abono aplicado a: <strong>{selectedCreditCard?.name || 'Tarjeta'}</strong> ({creditCardCycleKey ? `Corte ${creditCardCycleKey}` : 'Corte según fecha'})
+                  </span>
+                  <span className="text-emerald-300 font-bold">Reduce saldo exigible en estado de cuenta</span>
+                </div>
+                <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-900 flex justify-between">
+                  <span>Saldo banco tras pago: <strong className={balanceAfter < 0 ? 'text-rose-400' : 'text-emerald-400'}>{formatMoney(balanceAfter, settings.currencySymbol)}</strong></span>
+                  <span className="text-sky-300">Disponible tarjeta: <strong>{formatMoney(cardAvailAfter, settings.currencySymbol)}</strong></span>
+                </div>
+              </div>
+            )}
 
             {type === 'aporte_ahorro' && (
               <div className="text-emerald-400 flex items-center justify-between">

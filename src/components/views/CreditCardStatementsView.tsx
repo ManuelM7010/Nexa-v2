@@ -55,6 +55,8 @@ export const CreditCardStatementsView: React.FC = () => {
   // Quick Pay Modal State
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [payAmountStr, setPayAmountStr] = useState('');
+  const [payDate, setPayDate] = useState(todayStr);
+  const [payCycleKey, setPayCycleKey] = useState('');
   const [payAccountId, setPayAccountId] = useState(
     accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || ''
   );
@@ -124,9 +126,14 @@ export const CreditCardStatementsView: React.FC = () => {
     }
   };
 
-  const handleOpenPayModal = (card: CreditCard, amountCents: number) => {
+  const handleOpenPayModal = (card: CreditCard, defaultAmountCents?: number, defaultCycleKey?: string) => {
     setPayCardTarget(card);
-    setPayAmountStr(amountCents > 0 ? centsToDollars(amountCents).toFixed(2) : '');
+    const remaining = statement && statement.cardId === card.id ? (statement.remainingDue ?? statement.totalDueAtCutOff) : 0;
+    const initialAmount = defaultAmountCents !== undefined ? defaultAmountCents : remaining;
+    setPayAmountStr(initialAmount > 0 ? centsToDollars(initialAmount).toFixed(2) : '');
+    setPayDate(todayStr);
+    const targetCycle = defaultCycleKey || (statement && statement.cardId === card.id ? statement.cycleKey : NexaFinancialEngine.determinePaymentCycleKey(card, todayStr));
+    setPayCycleKey(targetCycle);
     setIsPayModalOpen(true);
   };
 
@@ -138,16 +145,17 @@ export const CreditCardStatementsView: React.FC = () => {
     if (amountCents <= 0) return;
 
     await saveTransaction({
-      concept: `Pago Estado de Cuenta: ${payCardTarget.name} (${payCardTarget.bank})`,
+      concept: `Abono Tarjeta: ${payCardTarget.name} (${payCardTarget.bank})`,
       amount: amountCents,
-      date: todayStr,
+      date: payDate,
       type: 'pago_tarjeta',
       paymentMethodType: 'banco',
       accountId: payAccountId,
       creditCardId: payCardTarget.id,
+      creditCardCycleKey: payCycleKey || undefined,
       status: 'realizado',
       origin: `pago_tarjeta:${payCardTarget.id}`,
-      notes: `Liquidación de TDDC corte ${statement?.cycleLabel || ''}`,
+      notes: payCycleKey ? `Abono aplicado al corte ${payCycleKey}` : 'Abono a tarjeta de crédito',
     });
 
     setIsPayModalOpen(false);
@@ -347,7 +355,8 @@ export const CreditCardStatementsView: React.FC = () => {
         {activeCards.map((card) => {
           const isSelected = card.id === currentCard?.id;
           const cardStmt = allStatements.find((s) => s.cardId === card.id);
-          const cardTDDC = cardStmt ? cardStmt.totalDueAtCutOff : 0;
+          const cardRemaining = cardStmt ? (cardStmt.remainingDue ?? cardStmt.totalDueAtCutOff) : 0;
+          const isFullyPaid = cardStmt?.status === 'pagado';
 
           return (
             <button
@@ -363,10 +372,14 @@ export const CreditCardStatementsView: React.FC = () => {
               <span>{card.name}</span>
               <span
                 className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md ${
-                  isSelected ? 'bg-rose-500/30 text-white' : 'bg-slate-800 text-slate-400'
+                  isFullyPaid
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : isSelected
+                    ? 'bg-rose-500/30 text-white'
+                    : 'bg-slate-800 text-slate-400'
                 }`}
               >
-                {formatMoney(cardTDDC, settings.currencySymbol)}
+                {isFullyPaid ? '✓ Liquidado' : formatMoney(cardRemaining, settings.currencySymbol)}
               </span>
             </button>
           );
@@ -392,16 +405,20 @@ export const CreditCardStatementsView: React.FC = () => {
                         {statement.bank}
                       </span>
                       <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                           statement.status === 'pagado'
                             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                            : statement.status === 'cortado'
+                            : statement.status === 'parcial'
                             ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                            : statement.status === 'cortado'
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                             : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
                         }`}
                       >
                         {statement.status === 'pagado'
                           ? '✓ Liquidado / Sin Saldo'
+                          : statement.status === 'parcial'
+                          ? `⚡ Abono Parcial (${formatMoney(statement.appliedPayments || 0, settings.currencySymbol)} abonado)`
                           : statement.status === 'cortado'
                           ? '● Cortado (Pendiente de Pago)'
                           : '⚡ Ciclo en Curso'}
@@ -417,11 +434,17 @@ export const CreditCardStatementsView: React.FC = () => {
 
                 <div className="flex items-center gap-2 no-print">
                   <button
-                    onClick={() => handleOpenPayModal(currentCard, statement.totalDueAtCutOff)}
+                    onClick={() => handleOpenPayModal(currentCard, statement.remainingDue !== undefined ? statement.remainingDue : statement.totalDueAtCutOff, statement.cycleKey)}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md shadow-emerald-600/30 cursor-pointer"
                   >
                     <DollarSign className="w-4 h-4" />
-                    <span>Pagar TDDC</span>
+                    <span>
+                      {statement.status === 'pagado'
+                        ? 'Registrar Abono Adicional'
+                        : (statement.appliedPayments || 0) > 0
+                        ? `Pagar Restante (${formatMoney(statement.remainingDue, settings.currencySymbol)})`
+                        : 'Abonar / Pagar TDDC'}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -431,33 +454,41 @@ export const CreditCardStatementsView: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-slate-800 bg-slate-950/60 text-xs">
               <div className="p-4 space-y-1">
                 <span className="text-slate-400 font-semibold block text-[11px]">
-                  TOTAL TDDC (Saldo al Corte)
+                  TOTAL TDDC (Facturado al Corte)
                 </span>
                 <div className="text-xl font-black text-rose-400">
                   {formatMoney(statement.totalDueAtCutOff, settings.currencySymbol)}
                 </div>
-                <span className="text-[10px] text-slate-500">Monto total a liquidar</span>
+                {(statement.appliedPayments || 0) > 0 ? (
+                  <span className="text-[10px] text-amber-400 font-medium block">
+                    Abonado: -{formatMoney(statement.appliedPayments || 0, settings.currencySymbol)}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-500">Monto total facturado</span>
+                )}
+              </div>
+
+              <div className="p-4 space-y-1">
+                <span className="text-slate-400 font-semibold block text-[11px]">
+                  Saldo Pendiente de Pago
+                </span>
+                <div className={`text-xl font-black ${statement.remainingDue === 0 ? 'text-emerald-400' : 'text-amber-300'}`}>
+                  {formatMoney(statement.remainingDue !== undefined ? statement.remainingDue : statement.totalDueAtCutOff, settings.currencySymbol)}
+                </div>
+                <span className="text-[10px] text-slate-500">
+                  {statement.remainingDue === 0 ? '✓ Totalmente cubierto' : 'Monto exigible restante'}
+                </span>
               </div>
 
               <div className="p-4 space-y-1">
                 <span className="text-slate-400 font-semibold block text-[11px]">
                   Fecha Límite de Pago
                 </span>
-                <div className="text-base font-bold text-amber-300 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-amber-400" />
+                <div className="text-base font-bold text-sky-300 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-sky-400" />
                   <span>{statement.paymentDueDate}</span>
                 </div>
                 <span className="text-[10px] text-slate-500">Día {currentCard.paymentDueDay} del mes</span>
-              </div>
-
-              <div className="p-4 space-y-1">
-                <span className="text-slate-400 font-semibold block text-[11px]">
-                  Pago para No Generar Intereses
-                </span>
-                <div className="text-base font-black text-emerald-400">
-                  {formatMoney(statement.cashPaymentNoInterest, settings.currencySymbol)}
-                </div>
-                <span className="text-[10px] text-slate-500">100% de los consumos al corte</span>
               </div>
 
               <div className="p-4 space-y-1">
@@ -477,30 +508,30 @@ export const CreditCardStatementsView: React.FC = () => {
             <div className="p-4 bg-slate-900 border-t border-b border-slate-800 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-3 text-slate-300">
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-500">Saldo Anterior / Inicial:</span>
+                  <span className="text-slate-500">Saldo Inicial:</span>
                   <span className="font-mono font-bold text-white">
                     {formatMoney(statement.previousCycleBalance, settings.currencySymbol)}
                   </span>
                 </div>
                 <span className="text-slate-600 font-black">+</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-500">Compras y Cargos del Mes:</span>
+                  <span className="text-slate-500">Compras del Mes:</span>
                   <span className="font-mono font-bold text-rose-400">
                     +{formatMoney(statement.totalPurchases, settings.currencySymbol)}
                   </span>
                 </div>
                 <span className="text-slate-600 font-black">-</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-500">Pagos y Abonos Registrados:</span>
+                  <span className="text-slate-500">Abonos Aplicados:</span>
                   <span className="font-mono font-bold text-emerald-400">
-                    -{formatMoney(statement.totalPayments, settings.currencySymbol)}
+                    -{formatMoney(statement.appliedPayments || statement.totalPayments, settings.currencySymbol)}
                   </span>
                 </div>
                 <span className="text-slate-600 font-black">=</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-200">Saldo Total TDDC:</span>
-                  <span className="font-mono font-black text-rose-400 text-sm">
-                    {formatMoney(statement.totalDueAtCutOff, settings.currencySymbol)}
+                  <span className="font-bold text-slate-200">Saldo Pendiente:</span>
+                  <span className={`font-mono font-black text-sm ${statement.remainingDue === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {formatMoney(statement.remainingDue !== undefined ? statement.remainingDue : statement.totalDueAtCutOff, settings.currencySymbol)}
                   </span>
                 </div>
               </div>
@@ -725,7 +756,7 @@ export const CreditCardStatementsView: React.FC = () => {
             <form onSubmit={handleExecutePayment} className="mt-4 space-y-4 text-xs">
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
-                  Monto a Pagar ({settings.currencySymbol}) *
+                  Monto a Abonar / Pagar ({settings.currencySymbol}) *
                 </label>
                 <div className="relative">
                   <input
@@ -737,18 +768,79 @@ export const CreditCardStatementsView: React.FC = () => {
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
                     placeholder="0.00"
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (statement) {
-                        setPayAmountStr(centsToDollars(statement.totalDueAtCutOff).toFixed(2));
-                      }
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[10px] font-bold"
-                  >
-                    100% Saldo
-                  </button>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {statement && statement.remainingDue !== undefined && statement.remainingDue > 0 && statement.remainingDue < statement.totalDueAtCutOff && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPayAmountStr(centsToDollars(statement.remainingDue).toFixed(2));
+                        }}
+                        className="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded text-[10px] font-bold"
+                      >
+                        Restante ({formatMoney(statement.remainingDue, settings.currencySymbol)})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (statement) {
+                          setPayAmountStr(centsToDollars(statement.totalDueAtCutOff).toFixed(2));
+                        }
+                      }}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[10px] font-bold"
+                    >
+                      100% Corte
+                    </button>
+                  </div>
                 </div>
+              </div>
+
+              {/* Fecha en que se efectúa el pago (Afecta liquidez este día) */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Fecha del Abono / Pago (Impacto en Liquidez) *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={payDate}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    setPayDate(newDate);
+                    if (payCardTarget && !payCycleKey) {
+                      setPayCycleKey(NexaFinancialEngine.determinePaymentCycleKey(payCardTarget, newDate));
+                    }
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Esta fecha define el día exacto en que se descontará de tu <strong>flujo diario de liquidez</strong>.
+                </p>
+              </div>
+
+              {/* Corte / Ciclo que amortizará en el Estado de Cuenta */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-300 font-semibold">
+                    Corte / Ciclo a Amortizar en el Estado de Cuenta *
+                  </label>
+                  <span className="text-[10px] text-sky-400">Reduce deuda de este corte</span>
+                </div>
+                <select
+                  value={payCycleKey}
+                  onChange={(e) => setPayCycleKey(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                >
+                  {NexaFinancialEngine.getAvailableBillingCycles(payCardTarget, payDate).map((c) => (
+                    <option key={c.cycleKey} value={c.cycleKey}>
+                      {c.cycleLabel} {c.isDefault ? '⭐ [Corte sugerido]' : ''}
+                    </option>
+                  ))}
+                  <option value="">Automático según fecha del pago</option>
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Puedes adelantar abonos antes de la fecha límite o abonar en cualquier día, afectando este corte específico.
+                </p>
               </div>
 
               <div>
@@ -766,9 +858,23 @@ export const CreditCardStatementsView: React.FC = () => {
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  El pago se descontará de tu saldo de efectivo real en el flujo de caja diario.
-                </p>
+              </div>
+
+              {/* Live Contextual Dual Impact Box */}
+              <div className="rounded-xl bg-slate-950 border border-slate-800 p-3 space-y-1.5 text-[11px]">
+                <div className="font-bold text-slate-300 uppercase tracking-wider text-[10px]">
+                  Resumen de Aplicación Contable:
+                </div>
+                <div className="flex items-center justify-between text-rose-400">
+                  <span>📉 Flujo Diario (Liquidez):</span>
+                  <span className="font-bold font-mono">Resta el día {payDate || 'hoy'}</span>
+                </div>
+                <div className="flex items-center justify-between text-emerald-400">
+                  <span>💳 Estado de Cuenta TDDC:</span>
+                  <span className="font-bold font-mono">
+                    Amortiza {payCycleKey ? `Corte ${payCycleKey}` : 'Corte por fecha'}
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
@@ -784,7 +890,7 @@ export const CreditCardStatementsView: React.FC = () => {
                   className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer shadow-md shadow-emerald-600/30 flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirmar Pago</span>
+                  <span>Confirmar Abono</span>
                 </button>
               </div>
             </form>

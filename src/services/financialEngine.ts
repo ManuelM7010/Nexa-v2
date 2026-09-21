@@ -527,14 +527,19 @@ export class NexaFinancialEngine {
         }
 
         // Deduct payments and abonos made to this card for this billing cycle:
-        // Includes abonos made during the cycle (e.g., Aug 20 for cycle Aug 13 - Sep 12)
-        // as well as explicit payments made up to the payment month
+        // Includes explicit abonos tied to this cycleKey, abonos made during the cycle,
+        // and payments made up to the payment month
         const monthEndStr = `${monthKey}-${String(daysCount).padStart(2, '0')}`;
+        const closingCycleKey = `${closingYear}-${String(closingMonth).padStart(2, '0')}`;
         const cyclePayments = data.existingTransactions.filter((tx) => {
           if (tx.status === 'cancelado') return false;
           if (tx.creditCardId !== card.id) return false;
           if (tx.type !== 'pago_tarjeta') return false;
           if (tx.id.startsWith('gen_')) return false; // Only count explicit user payments
+          // If transaction has an explicit target creditCardCycleKey
+          if (tx.creditCardCycleKey) {
+            return tx.creditCardCycleKey === closingCycleKey;
+          }
           return tx.date >= cycleStartDate && tx.date <= monthEndStr;
         });
 
@@ -2115,6 +2120,154 @@ export class NexaFinancialEngine {
   }
 
   /**
+   * Automatically determines the most appropriate billing cycle for a payment made on paymentDate.
+   * e.g. If cutOffDay is 12 and paymentDueDay is 5:
+   * - Cycle 2026-09 cut on 2026-09-12 and has paymentDueDate on 2026-10-05.
+   * - A payment on 2026-09-19 falls between 2026-09-12 and 2026-10-05, so it attributes to 2026-09.
+   */
+  static determinePaymentCycleKey(
+    card: { cutOffDay: number; paymentDueDay: number },
+    paymentDate: string
+  ): string {
+    const [yStr, mStr] = paymentDate.split('-');
+    const currentYear = Number(yStr) || new Date().getFullYear();
+    const currentMonth = Number(mStr) || (new Date().getMonth() + 1);
+
+    // Test candidate cycles from 3 months prior to 2 months ahead
+    const candidates: { cycleKey: string; cycleStartDate: string; cycleEndDate: string; paymentDueDate: string }[] = [];
+    for (let offset = -3; offset <= 2; offset++) {
+      let m = currentMonth + offset;
+      let y = currentYear;
+      while (m < 1) {
+        m += 12;
+        y -= 1;
+      }
+      while (m > 12) {
+        m -= 12;
+        y += 1;
+      }
+      const { cycleStartDate, cycleEndDate } = NexaFinancialEngine.getBillingCycleDates(card, y, m);
+
+      let payYear = y;
+      let payMonth = m;
+      if (card.paymentDueDay <= card.cutOffDay) {
+        payMonth = m + 1;
+        if (payMonth > 12) {
+          payMonth = 1;
+          payYear = y + 1;
+        }
+      }
+      const payMonthDays = daysInMonth(payYear, payMonth);
+      const payDayActual = Math.min(card.paymentDueDay, payMonthDays);
+      const paymentDueDate = `${payYear}-${String(payMonth).padStart(2, '0')}-${String(payDayActual).padStart(2, '0')}`;
+      const cycleKey = `${y}-${String(m).padStart(2, '0')}`;
+
+      candidates.push({ cycleKey, cycleStartDate, cycleEndDate, paymentDueDate });
+    }
+
+    // 1. Post-cutoff payment window: between cycleEndDate and paymentDueDate (e.g. Sept 19 for Sept 12 cutoff, due Oct 5)
+    const postCutoffMatch = candidates.find(
+      (c) => paymentDate >= c.cycleEndDate && paymentDate <= c.paymentDueDate
+    );
+    if (postCutoffMatch) return postCutoffMatch.cycleKey;
+
+    // 2. In-cycle payment: between cycleStartDate and cycleEndDate (advance payment)
+    const inCycleMatch = candidates.find(
+      (c) => paymentDate >= c.cycleStartDate && paymentDate < c.cycleEndDate
+    );
+    if (inCycleMatch) return inCycleMatch.cycleKey;
+
+    // 3. Fallback: closest upcoming payment due date
+    const upcoming = candidates.find((c) => c.paymentDueDate >= paymentDate);
+    return upcoming ? upcoming.cycleKey : `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+  }
+
+  /**
+   * Generates a list of selectable billing cycles for a card, centered around referenceDate.
+   */
+  static getAvailableBillingCycles(
+    card: { cutOffDay: number; paymentDueDay: number },
+    referenceDate: string = new Date().toISOString().split('T')[0]
+  ): Array<{
+    cycleKey: string;
+    year: number;
+    month: number;
+    cycleLabel: string;
+    shortLabel: string;
+    cycleStartDate: string;
+    cycleEndDate: string;
+    paymentDueDate: string;
+    isDefault: boolean;
+  }> {
+    const defaultCycleKey = NexaFinancialEngine.determinePaymentCycleKey(card, referenceDate);
+    const [yStr, mStr] = referenceDate.split('-');
+    const baseYear = Number(yStr) || new Date().getFullYear();
+    const baseMonth = Number(mStr) || (new Date().getMonth() + 1);
+
+    const monthNames = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const shortMonthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    const list = [];
+    // 4 months back to 3 months forward
+    for (let offset = -4; offset <= 3; offset++) {
+      let m = baseMonth + offset;
+      let y = baseYear;
+      while (m < 1) {
+        m += 12;
+        y -= 1;
+      }
+      while (m > 12) {
+        m -= 12;
+        y += 1;
+      }
+
+      const { cycleStartDate, cycleEndDate, cutOffDayActual } = NexaFinancialEngine.getBillingCycleDates(card, y, m);
+
+      let payYear = y;
+      let payMonth = m;
+      if (card.paymentDueDay <= card.cutOffDay) {
+        payMonth = m + 1;
+        if (payMonth > 12) {
+          payMonth = 1;
+          payYear = y + 1;
+        }
+      }
+      const payMonthDays = daysInMonth(payYear, payMonth);
+      const payDayActual = Math.min(card.paymentDueDay, payMonthDays);
+      const paymentDueDate = `${payYear}-${String(payMonth).padStart(2, '0')}-${String(payDayActual).padStart(2, '0')}`;
+      const cycleKey = `${y}-${String(m).padStart(2, '0')}`;
+
+      const [, sm, sd] = cycleStartDate.split('-');
+      const startDay = Number(sd);
+      const startMonthName = shortMonthNames[Number(sm) - 1];
+
+      const [, dm, dd] = paymentDueDate.split('-');
+      const dueDay = Number(dd);
+      const dueMonthName = shortMonthNames[Number(dm) - 1];
+
+      const cycleLabel = `Corte ${cutOffDayActual} de ${monthNames[m - 1]} ${y} (${startDay} ${startMonthName} - ${cutOffDayActual} ${shortMonthNames[m - 1]} · Vence ${dueDay} ${dueMonthName})`;
+      const shortLabel = `Corte ${cutOffDayActual} ${shortMonthNames[m - 1]} ${y} (Vence ${dueDay} ${dueMonthName})`;
+
+      list.push({
+        cycleKey,
+        year: y,
+        month: m,
+        cycleLabel,
+        shortLabel,
+        cycleStartDate,
+        cycleEndDate,
+        paymentDueDate,
+        isDefault: cycleKey === defaultCycleKey,
+      });
+    }
+
+    return list;
+  }
+
+  /**
    * Generates a complete Credit Card Billing Statement (Estado de Cuenta)
    * for a given card and billing cycle month (year, month).
    */
@@ -2141,8 +2294,9 @@ export class NexaFinancialEngine {
     const payMonthDays = daysInMonth(payYear, payMonth);
     const payDayActual = Math.min(card.paymentDueDay, payMonthDays);
     const paymentDueDate = `${payYear}-${String(payMonth).padStart(2, '0')}-${String(payDayActual).padStart(2, '0')}`;
+    const cycleMonthKey = `${year}-${String(month).padStart(2, '0')}`;
 
-    // Transactions inside this billing cycle (from day after previous cut-off to current cut-off day)
+    // Charges and purchases inside this billing cycle period [cycleStartDate, cycleEndDate]
     const cycleTxs = allTransactions.filter((tx) => {
       if (tx.creditCardId !== card.id) return false;
       if (tx.status === 'cancelado') return false;
@@ -2156,7 +2310,6 @@ export class NexaFinancialEngine {
     let purchasesSum = purchaseTxs.reduce((sum, tx) => sum + tx.amount, 0);
 
     // Active Installment Purchases for this card that apply to this cycle
-    const cycleMonthKey = `${year}-${String(month).padStart(2, '0')}`;
     installmentPurchases.forEach((ip) => {
       if (ip.creditCardId === card.id) {
         const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
@@ -2193,24 +2346,44 @@ export class NexaFinancialEngine {
       }
     });
 
-    // Payments in this cycle
-    const paymentTxs = cycleTxs.filter((tx) => tx.type === 'pago_tarjeta');
-    const paymentsSum = paymentTxs.reduce((sum, tx) => sum + tx.amount, 0);
-
-    // Prior cycle balance (for September 2026, include initialUsedBalance if any)
+    // Prior cycle balance (for initial month, include initialUsedBalance if any)
     let previousCycleBalance = 0;
     if (cycleMonthKey === '2026-09') {
       previousCycleBalance = card.initialUsedBalance || 0;
     }
 
-    const totalDueAtCutOff = Math.max(0, previousCycleBalance + purchasesSum - paymentsSum);
-    const availableCredit = Math.max(0, card.limit - totalDueAtCutOff);
-    const minimumPayment = totalDueAtCutOff > 0 ? Math.min(totalDueAtCutOff, Math.max(2500, Math.round(totalDueAtCutOff * 0.05))) : 0;
-    const cashPaymentNoInterest = totalDueAtCutOff;
+    // Original balance owed at cut-off (Saldo Exigible al Corte)
+    const totalDueAtCutOff = previousCycleBalance + purchasesSum;
 
-    let status: 'en_curso' | 'cortado' | 'pagado' = 'en_curso';
-    if (totalDueAtCutOff === 0) {
+    // Payments and abonos applied to this statement
+    // Includes:
+    // 1) Explicitly assigned via creditCardCycleKey === cycleMonthKey
+    // 2) Default window: payments made between cycleStartDate and paymentDueDate that are not assigned to another cycle
+    const effectivePayDeadline = paymentDueDate > cycleEndDate ? paymentDueDate : cycleEndDate;
+    const appliedPayments = allTransactions.filter((tx) => {
+      if (tx.creditCardId !== card.id) return false;
+      if (tx.status === 'cancelado') return false;
+      if (tx.type !== 'pago_tarjeta') return false;
+
+      if (tx.creditCardCycleKey) {
+        return tx.creditCardCycleKey === cycleMonthKey;
+      }
+
+      // Default: falls inside the settlement window for this statement
+      return tx.date >= cycleStartDate && tx.date <= effectivePayDeadline;
+    });
+
+    const totalPayments = appliedPayments.reduce((sum, tx) => sum + tx.amount, 0);
+    const remainingDue = Math.max(0, totalDueAtCutOff - totalPayments);
+    const availableCredit = Math.max(0, card.limit - remainingDue);
+    const minimumPayment = remainingDue > 0 ? Math.min(remainingDue, Math.max(2500, Math.round(remainingDue * 0.05))) : 0;
+    const cashPaymentNoInterest = remainingDue;
+
+    let status: 'en_curso' | 'cortado' | 'pagado' | 'parcial' = 'en_curso';
+    if (totalDueAtCutOff === 0 || remainingDue === 0) {
       status = 'pagado';
+    } else if (totalPayments > 0 && remainingDue < totalDueAtCutOff) {
+      status = 'parcial';
     } else if (todayStr > cycleEndDate) {
       status = 'cortado';
     } else {
@@ -2222,6 +2395,12 @@ export class NexaFinancialEngine {
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
     const cycleLabel = `Corte ${cutOffDayActual} de ${monthNames[month - 1]} ${year}`;
+
+    // Combine charges and applied payments for the itemized statement display
+    const combinedTransactions = [
+      ...cycleTxs,
+      ...appliedPayments.filter((p) => !cycleTxs.some((t) => t.id === p.id)),
+    ].sort((a, b) => b.date.localeCompare(a.date));
 
     return {
       cardId: card.id,
@@ -2235,13 +2414,15 @@ export class NexaFinancialEngine {
       paymentDueDate,
       limit: card.limit,
       totalPurchases: purchasesSum,
-      totalPayments: paymentsSum,
+      totalPayments,
       previousCycleBalance,
       totalDueAtCutOff,
+      remainingDue,
       availableCredit,
       minimumPayment,
       cashPaymentNoInterest,
-      transactions: cycleTxs.sort((a, b) => b.date.localeCompare(a.date)),
+      transactions: combinedTransactions,
+      appliedPayments: appliedPayments.sort((a, b) => b.date.localeCompare(a.date)),
       isCurrentCycle: todayStr >= cycleStartDate && todayStr <= cycleEndDate,
       status,
     };

@@ -150,6 +150,7 @@ export interface Transaction {
   installmentPurchaseId?: string;
   loanId?: string;
   budgetId?: string;
+  creditCardCycleKey?: string; // e.g. "2026-09" - Corte / Estado de Cuenta específico que impacta este pago/abono
   isFixedMonthly?: boolean;
   billingDay?: number;
   createdAt: string;
@@ -398,11 +399,13 @@ export interface CreditCardStatement {
   totalPurchases: number; // in cents (charges during this cycle)
   totalPayments: number; // in cents (payments during this cycle)
   previousCycleBalance: number; // in cents
-  totalDueAtCutOff: number; // in cents (Total TDDC / Saldo al corte)
-  availableCredit: number; // in cents (limit - totalDueAtCutOff)
-  minimumPayment: number; // in cents (suggested min payment)
-  cashPaymentNoInterest: number; // in cents (100% of balance to avoid interest)
+  totalDueAtCutOff: number; // in cents (Total TDDC / Saldo exigible original al corte)
+  remainingDue: number; // in cents (Saldo pendiente a pagar tras descontar abonos)
+  availableCredit: number; // in cents (limit - remainingDue)
+  minimumPayment: number; // in cents (suggested min payment based on remainingDue)
+  cashPaymentNoInterest: number; // in cents (saldo restante para no generar intereses)
   transactions: Transaction[]; // Itemized expenses and charges of this cycle
+  appliedPayments: Transaction[]; // Abonos y pagos aplicados a este corte
   isCurrentCycle: boolean;
-  status: 'en_curso' | 'cortado' | 'pagado';
+  status: 'en_curso' | 'cortado' | 'pagado' | 'parcial';
 }
