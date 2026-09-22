@@ -684,7 +684,7 @@ export class NexaFinancialEngine {
     initialPos: InitialPosition | null,
     accounts: Account[],
     allTransactions: Transaction[],
-    liquidityStartDate: string = '2026-09-01',
+    liquidityStartDate: string = '2026-09-15',
     financialData?: {
       subscriptions: Subscription[];
       services: ServiceItem[];
@@ -713,8 +713,7 @@ export class NexaFinancialEngine {
 
     // CASE 1: The entire month is strictly prior to liquidityStartDate (e.g. Jan-Aug 2026)
     // Transactions exist (for CC statement calculations), but cash liquidity activates at liquidityStartDate.
-    // For the month directly preceding liquidityStartDate (e.g. August 2026), Day 31 ends with totalBaseCash
-    // so that its final balance perfectly matches the opening balance of the start month.
+    // For months strictly prior, balances remain at 0.00 unless liquidity starts on Day 1 of the start month.
     if (monthEndStr < liquidityStartDate) {
       const isDirectlyPrecedingMonth =
         (year === startYear && month === startMonth - 1) ||
@@ -741,7 +740,9 @@ export class NexaFinancialEngine {
           }
         });
 
-        const isTransitionDay = isDirectlyPrecedingMonth && d === daysInCurrentMonth;
+        // Only transition on last day if liquidity begins on day 1 of next month.
+        // If liquidity begins on day 15 (e.g. 2026-09-15), preceding month ends cleanly at 0.
+        const isTransitionDay = isDirectlyPrecedingMonth && d === daysInCurrentMonth && startDay === 1;
         const closingBal = isTransitionDay ? totalBaseCash : 0;
 
         dailyItems.push({
@@ -783,7 +784,7 @@ export class NexaFinancialEngine {
     let priorClosingBalance = 0;
 
     if (year === startYear && month === startMonth) {
-      priorClosingBalance = totalBaseCash;
+      priorClosingBalance = startDay === 1 ? totalBaseCash : 0;
     } else if (year > startYear || (year === startYear && month > startMonth)) {
       // Initialize with base liquidity at liquidityStartDate
       let simBalance = totalBaseCash;
@@ -898,11 +899,25 @@ export class NexaFinancialEngine {
       const dayOfWeek = dayNames[dateObj.getDay()];
 
       // If the day is strictly before liquidityStartDate (e.g. Sept 1 to Sept 14 when start is Sept 15):
-      // Liquidity balance remains 0.00
+      // Cash liquidity balance remains 0.00 until official start date.
       if (dateStr < liquidityStartDate) {
         const dayTxs = targetMonthAllTxs.filter((tx) => tx.date === dateStr && tx.status !== 'cancelado');
+        let realizedIncome = 0;
+        let projectedIncome = 0;
+        let realizedExpense = 0;
+        let projectedExpense = 0;
         let obligations = 0;
+
         dayTxs.forEach((tx) => {
+          const impact = NexaFinancialEngine.getCashMovementImpact(tx);
+          if (impact.isInflow) {
+            if (tx.status === 'realizado') realizedIncome += impact.amount;
+            else projectedIncome += impact.amount;
+          } else if (impact.isOutflow) {
+            if (tx.status === 'realizado') realizedExpense += impact.amount;
+            else projectedExpense += impact.amount;
+          }
+
           if (
             tx.type === 'pago_tarjeta' ||
             tx.type === 'cuota_tarjeta' ||
@@ -921,16 +936,16 @@ export class NexaFinancialEngine {
           dayNameShort: dayOfWeek.slice(0, 3),
           startingBalance: 0,
           initialBalance: 0,
-          realizedIncome: 0,
-          realIncome: 0,
-          projectedIncome: 0,
-          plannedIncome: 0,
-          totalIncome: 0,
-          realizedExpense: 0,
-          realExpense: 0,
-          projectedExpense: 0,
-          plannedExpense: 0,
-          totalExpense: 0,
+          realizedIncome,
+          realIncome: realizedIncome,
+          projectedIncome,
+          plannedIncome: projectedIncome,
+          totalIncome: realizedIncome + projectedIncome,
+          realizedExpense,
+          realExpense: realizedExpense,
+          projectedExpense,
+          plannedExpense: projectedExpense,
+          totalExpense: realizedExpense + projectedExpense,
           obligations,
           endDayRealBalance: 0,
           endDayProjectedBalance: 0,

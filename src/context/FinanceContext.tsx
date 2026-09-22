@@ -401,7 +401,51 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setServices(srvList);
         setInitialPosition(posList[0] || null);
         setMonthlyCloses(closeList);
-        if (stgList[0]) setSettings(stgList[0]);
+        if (stgList[0]) {
+          const loadedStg = {
+            ...getDefaultAppSettings(),
+            ...stgList[0],
+            liquidityStartDate: stgList[0].liquidityStartDate || '2026-09-15',
+          };
+          if (!stgList[0].liquidityStartDate || stgList[0].liquidityStartDate === '2026-09-01') {
+            loadedStg.liquidityStartDate = '2026-09-15';
+            await storage.put('appSettings', loadedStg);
+          }
+          setSettings(loadedStg);
+        }
+
+        // Migrate any previous demo transactions from Sept 13/14 to Sept 15
+        let currentTxs = txList;
+        let didMigrateTx = false;
+        currentTxs = currentTxs.map((t) => {
+          if (t.id === 'tx_demo_sep14_quincena' || (t.concept === 'Pago 1ra Quincena Septiembre' && t.date === '2026-09-14')) {
+            didMigrateTx = true;
+            return {
+              ...t,
+              id: 'tx_demo_sep15_quincena',
+              date: '2026-09-15',
+              expectedDate: '2026-09-15',
+              realDate: '2026-09-15',
+              status: 'realizado',
+            };
+          }
+          if (t.id === 'tx_demo_sep13_combustible' || (t.concept === 'Gasolina Estación Texaco' && t.date === '2026-09-13')) {
+            didMigrateTx = true;
+            return {
+              ...t,
+              id: 'tx_demo_sep15_combustible',
+              date: '2026-09-15',
+              expectedDate: '2026-09-15',
+              realDate: '2026-09-15',
+              status: 'realizado',
+            };
+          }
+          return t;
+        });
+        if (didMigrateTx) {
+          await storage.putBatch('transactions', currentTxs);
+        }
+        setTransactions(currentTxs);
       }
     } catch (err) {
       console.error('Error loading NEXA data from IndexedDB:', err);
@@ -461,7 +505,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       initialPosition,
       accounts,
       transactions,
-      settings.liquidityStartDate || '2026-09-01',
+      settings.liquidityStartDate || '2026-09-15',
       {
         subscriptions,
         services,

@@ -16,6 +16,8 @@ import {
   Info,
   X,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Sliders,
   Sparkles,
   RefreshCw,
@@ -29,6 +31,14 @@ import {
   HelpCircle,
   Clock,
   ArrowRight,
+  Filter,
+  Check,
+  Award,
+  DollarSign,
+  Eye,
+  SlidersHorizontal,
+  Unlock,
+  Wallet,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -46,7 +56,17 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 type ViewMode = 'cards' | 'table' | 'charts';
-type KpiDetailType = 'ahorro' | 'cierre' | 'ingresos' | 'gastos' | 'critico' | 'salud' | null;
+type KpiDetailType =
+  | 'ahorro'
+  | 'cierre'
+  | 'ingresos'
+  | 'gastos'
+  | 'critico'
+  | 'salud'
+  | 'liberado'
+  | 'inversion'
+  | null;
+type CardFilterType = 'all' | 'surplus' | 'warning' | 'milestones' | 'q1' | 'q2' | 'q3' | 'q4';
 
 export const MultiMonthProjectionView: React.FC = () => {
   const {
@@ -75,6 +95,28 @@ export const MultiMonthProjectionView: React.FC = () => {
   const [selectedKpi, setSelectedKpi] = useState<KpiDetailType>(null);
   const [selectedMonthModal, setSelectedMonthModal] = useState<MonthProjection | null>(null);
 
+  // In-card interactivity states
+  const [expandedMonthKeys, setExpandedMonthKeys] = useState<Record<string, boolean>>({});
+  const [cardFilter, setCardFilter] = useState<CardFilterType>('all');
+  const [showGuide, setShowGuide] = useState<boolean>(false);
+
+  const toggleExpandMonth = (key: string) => {
+    setExpandedMonthKeys((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const expandAll = (expand: boolean) => {
+    const next: Record<string, boolean> = {};
+    if (expand) {
+      annualProjection.forEach((m) => {
+        next[m.monthKey] = true;
+      });
+    }
+    setExpandedMonthKeys(next);
+  };
+
   // Base Summary calculation
   const summary = useMemo(() => {
     if (!annualProjection.length) return null;
@@ -89,6 +131,7 @@ export const MultiMonthProjectionView: React.FC = () => {
     const highestMonth = annualProjection.find((m) => m.closingBalance === highestClosing);
     const finalBalance = annualProjection[annualProjection.length - 1]?.closingBalance || 0;
     const monthsInDeficit = annualProjection.filter((m) => m.status === 'deficit').length;
+    const monthsInSurplus = annualProjection.length - monthsInDeficit;
     const averageSavingsRate =
       totalIncome > 0 ? Math.round((totalSavings / totalIncome) * 100) : 0;
     const monthlyAverageIncome = Math.round(totalIncome / annualProjection.length);
@@ -99,6 +142,10 @@ export const MultiMonthProjectionView: React.FC = () => {
     const netGrowth = finalBalance - initialLiquidity;
     const growthPercent =
       initialLiquidity > 0 ? Math.round((netGrowth / initialLiquidity) * 100) : 0;
+
+    // Free capital beyond a 3-month fixed expense emergency cushion
+    const threeMonthEmergencyFund = totalFixed > 0 ? Math.round((totalFixed / 12) * 3) : monthlyAverageExpense * 3;
+    const freeInvestmentCapacity = Math.max(0, finalBalance - threeMonthEmergencyFund);
 
     return {
       totalIncome,
@@ -112,12 +159,15 @@ export const MultiMonthProjectionView: React.FC = () => {
       highestMonth,
       finalBalance,
       monthsInDeficit,
+      monthsInSurplus,
       averageSavingsRate,
       monthlyAverageIncome,
       monthlyAverageExpense,
       initialLiquidity,
       netGrowth,
       growthPercent,
+      threeMonthEmergencyFund,
+      freeInvestmentCapacity,
     };
   }, [annualProjection]);
 
@@ -207,6 +257,11 @@ export const MultiMonthProjectionView: React.FC = () => {
     return milestones.sort((a, b) => a.targetMonthIndex - b.targetMonthIndex);
   }, [annualProjection, loans, installmentPurchases]);
 
+  // Total monthly flow freed by finished obligations
+  const totalFreedMonthlyCents = useMemo(() => {
+    return debtReliefMilestones.reduce((acc, curr) => acc + curr.freedMonthlyCents, 0);
+  }, [debtReliefMilestones]);
+
   // Chart data
   const chartData = useMemo(() => {
     return (simulatedData?.list || annualProjection).map((m: any) => ({
@@ -234,6 +289,23 @@ export const MultiMonthProjectionView: React.FC = () => {
     setActiveTab(targetTab);
     setSelectedMonthModal(null);
   };
+
+  // Filtered months for cards view
+  const filteredMonths = useMemo(() => {
+    return annualProjection.filter((m, idx) => {
+      if (cardFilter === 'all') return true;
+      if (cardFilter === 'surplus') return m.savingsRate >= 20 && m.status === 'saludable';
+      if (cardFilter === 'warning') return m.status !== 'saludable';
+      if (cardFilter === 'milestones') {
+        return debtReliefMilestones.some((ms) => ms.targetMonthIndex === idx);
+      }
+      if (cardFilter === 'q1') return idx >= 0 && idx < 3;
+      if (cardFilter === 'q2') return idx >= 3 && idx < 6;
+      if (cardFilter === 'q3') return idx >= 6 && idx < 9;
+      if (cardFilter === 'q4') return idx >= 9 && idx < 12;
+      return true;
+    });
+  }, [annualProjection, cardFilter, debtReliefMilestones]);
 
   const CustomProjectionTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -286,11 +358,15 @@ export const MultiMonthProjectionView: React.FC = () => {
       {/* 1. VIEW HEADER */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
             <Calendar className="w-5 h-5 text-blue-400" />
             <h2 className="text-base sm:text-lg font-black text-white">
               Proyección Multimes & Flujo Anual (12 Meses Vista)
             </h2>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+              <Clock className="w-3 h-3 text-blue-400" />
+              Activación: 15 Sep 2026
+            </span>
           </div>
           <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
             Simulador predictivo integral de tesorería y acumulación patrimonial. Modela automáticamente vencimientos de préstamos, cuotas, suscripciones y capacidad real de ahorro mes a mes.
@@ -298,6 +374,19 @@ export const MultiMonthProjectionView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Guide Toggle */}
+          <button
+            onClick={() => setShowGuide(!showGuide)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+              showGuide
+                ? 'bg-blue-950/60 text-blue-300 border border-blue-500/40'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+            }`}
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
+            <span>{showGuide ? 'Ocultar Guía' : '¿Cómo Funciona?'}</span>
+          </button>
+
           {/* Simulator Trigger */}
           <button
             onClick={() => setIsSimulatorOpen(!isSimulatorOpen)}
@@ -355,6 +444,75 @@ export const MultiMonthProjectionView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* COLLAPSIBLE QUICK GUIDE */}
+      <AnimatePresence>
+        {showGuide && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-blue-500/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                  <Info className="w-4 h-4" />
+                  Reglas de Oro del Modelo Predictivo
+                </span>
+                <button
+                  onClick={() => setShowGuide(false)}
+                  className="text-slate-500 hover:text-slate-300 text-xs cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[10px] font-black">1</span>
+                    Inicio 15 de Septiembre
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    La proyección inicia formalmente el 15/09/2026. El saldo de apertura recoge tus saldos consolidados a esa fecha.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-black">2</span>
+                    Cadena de Tesorería
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Saldo Cierre = Saldo Inicial + Ingresos - Gastos. El cierre de un mes se convierte en la apertura del siguiente.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-black">3</span>
+                    Fijo vs Discrecional
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Diferencia compromisos estrictos (préstamos, cuotas, suscripciones) del presupuesto variable editable.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-black">4</span>
+                    Flujo Liberado 🎉
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Cuando un préstamo o cuota llega a su fin, ese monto se libera automáticamente para mayor ahorro e inversión.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 2. INTERACTIVE WHAT-IF SIMULATOR DRAWER (IF OPEN OR ACTIVE) */}
       <AnimatePresence>
@@ -490,20 +648,20 @@ export const MultiMonthProjectionView: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* 3. INTERACTIVE KPI CARDS STRIP (CLICKABLE WITH RICH DATA DISCOVERY) */}
+      {/* 3. INTERACTIVE KPI CARDS STRIP (8 CARDS - CLICKABLE WITH RICH DATA DISCOVERY) */}
       {summary && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-400 px-1">
             <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-400">
-              Métricas Clave del Horizonte (Toca cualquier tarjeta para ver su análisis)
+              Métricas Clave del Horizonte Anual (Toca cualquier tarjeta para ver su análisis)
             </span>
             <span className="text-[11px] text-blue-400 flex items-center gap-1 font-medium">
               <Zap className="w-3 h-3" />
-              6 Tarjetas Interactivas
+              8 Tarjetas Interactivas
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-3">
             {/* Card 1: Cumulative Net Savings */}
             <motion.div
               whileHover={{ y: -2 }}
@@ -644,7 +802,31 @@ export const MultiMonthProjectionView: React.FC = () => {
               </div>
             </motion.div>
 
-            {/* Card 6: Annual Viability & Health */}
+            {/* Card 6: Freed Monthly Cash Flow */}
+            <motion.div
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setSelectedKpi('liberado')}
+              className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
+            >
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                  Flujo Liberado (Fin Deudas)
+                </span>
+                <div className="p-1.5 rounded-xl bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20 transition">
+                  <Unlock className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl font-black text-emerald-400 tracking-tight">
+                +{formatMoney(totalFreedMonthlyCents, settings.currencySymbol)}<span className="text-xs text-slate-400 font-normal">/m</span>
+              </div>
+              <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
+                <span>{debtReliefMilestones.length} obligaciones concluyen</span>
+                <span className="text-purple-400 group-hover:translate-x-0.5 transition font-semibold">Ver ↗</span>
+              </div>
+            </motion.div>
+
+            {/* Card 7: Annual Viability & Health */}
             <motion.div
               whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
@@ -653,7 +835,7 @@ export const MultiMonthProjectionView: React.FC = () => {
             >
               <div className="flex items-center justify-between text-slate-400 mb-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
-                  Sostenibilidad
+                  Sostenibilidad Anual
                 </span>
                 <div className="p-1.5 rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20 transition">
                   <ShieldCheck className="w-4 h-4" />
@@ -663,12 +845,40 @@ export const MultiMonthProjectionView: React.FC = () => {
                 {summary.monthsInDeficit === 0 ? (
                   <span className="text-emerald-400">100% Sostenible</span>
                 ) : (
-                  <span className="text-rose-400">{12 - summary.monthsInDeficit}/12 Meses</span>
+                  <span className="text-rose-400">{summary.monthsInSurplus}/12 Meses</span>
                 )}
               </div>
               <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
-                <span>{summary.monthsInDeficit === 0 ? 'Sin meses rojos' : 'Requiere ajuste'}</span>
+                <span>{summary.monthsInDeficit === 0 ? 'Sin meses rojos' : `${summary.monthsInDeficit} en riesgo`}</span>
                 <span className="text-blue-400 group-hover:translate-x-0.5 transition font-semibold">Ver ↗</span>
+              </div>
+            </motion.div>
+
+            {/* Card 8: Free Investment Capacity (After Emergency Reserve) */}
+            <motion.div
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setSelectedKpi('inversion')}
+              className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
+            >
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                  Excedente para Inversión
+                </span>
+                <div className="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 transition">
+                  <Wallet className="w-4 h-4" />
+                </div>
+              </div>
+              <div
+                className={`text-xl font-black tracking-tight ${
+                  summary.freeInvestmentCapacity > 0 ? 'text-indigo-300' : 'text-slate-400'
+                }`}
+              >
+                {formatMoney(Math.max(0, summary.freeInvestmentCapacity), settings.currencySymbol)}
+              </div>
+              <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
+                <span>Sobre fondo 3m reserva</span>
+                <span className="text-indigo-400 group-hover:translate-x-0.5 transition font-semibold">Ver ↗</span>
               </div>
             </motion.div>
           </div>
@@ -726,27 +936,140 @@ export const MultiMonthProjectionView: React.FC = () => {
 
       {/* 5. MAIN CONTENT BASED ON SELECTED VIEW MODE */}
       {viewMode === 'cards' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <LayoutGrid className="w-3.5 h-3.5 text-blue-400" />
-              Horizonte de 12 Meses (Tarjetas Individuales Desplegables)
-            </span>
-            <span className="text-[11px] text-slate-400">
-              Toca <strong className="text-white">"Ver Detalle"</strong> en cualquier mes para desglosar sus números
-            </span>
+        <div className="space-y-4">
+          {/* Header of Cards section with Filter Chips & Batch Controls */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1">
+                <Filter className="w-3.5 h-3.5 text-blue-400" />
+                Filtrar:
+              </span>
+              <button
+                onClick={() => setCardFilter('all')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  cardFilter === 'all'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-400 hover:text-white'
+                }`}
+              >
+                Todos ({annualProjection.length})
+              </button>
+              <button
+                onClick={() => setCardFilter('surplus')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  cardFilter === 'surplus'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-400 hover:text-emerald-400'
+                }`}
+              >
+                🟢 Superávit Alto
+              </button>
+              <button
+                onClick={() => setCardFilter('warning')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  cardFilter === 'warning'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'bg-slate-800 text-slate-400 hover:text-rose-400'
+                }`}
+              >
+                ⚠️ Ajustados / Riesgo
+              </button>
+              {debtReliefMilestones.length > 0 && (
+                <button
+                  onClick={() => setCardFilter('milestones')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    cardFilter === 'milestones'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-400 hover:text-purple-400'
+                  }`}
+                >
+                  🎉 Fin de Obligaciones
+                </button>
+              )}
+              <div className="hidden md:flex items-center gap-1 border-l border-slate-800 pl-2">
+                <button
+                  onClick={() => setCardFilter('q1')}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+                    cardFilter === 'q1' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  Q1
+                </button>
+                <button
+                  onClick={() => setCardFilter('q2')}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+                    cardFilter === 'q2' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  Q2
+                </button>
+                <button
+                  onClick={() => setCardFilter('q3')}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+                    cardFilter === 'q3' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  Q3
+                </button>
+                <button
+                  onClick={() => setCardFilter('q4')}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+                    cardFilter === 'q4' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  Q4
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <button
+                onClick={() => expandAll(true)}
+                className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold px-2 py-1 rounded bg-blue-500/10 hover:bg-blue-500/20 transition cursor-pointer"
+              >
+                Expandir Todo
+              </button>
+              <button
+                onClick={() => expandAll(false)}
+                className="text-[11px] text-slate-400 hover:text-slate-200 font-medium px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition cursor-pointer"
+              >
+                Contraer Todo
+              </button>
+            </div>
           </div>
 
           {/* Responsive Card Grid: 1 col on mobile, 2 on sm, 3 on lg, 4 on xl */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {annualProjection.map((m, idx) => {
-              const isCurrent = idx === 0;
-              const savingsRatio = m.projectedIncome > 0 ? Math.min(100, Math.max(0, (m.netSavings / m.projectedIncome) * 100)) : 0;
+            {filteredMonths.map((m) => {
+              const originalIdx = annualProjection.findIndex((p) => p.monthKey === m.monthKey);
+              const isCurrent = originalIdx === 0;
+              const savingsRatio =
+                m.projectedIncome > 0
+                  ? Math.min(100, Math.max(0, (m.netSavings / m.projectedIncome) * 100))
+                  : 0;
+
+              // Check if a milestone concludes in this month
+              const freedInThisMonth = debtReliefMilestones.filter(
+                (ms) => ms.targetMonthIndex === originalIdx
+              );
+
+              // MoM comparison
+              const prevMonth = originalIdx > 0 ? annualProjection[originalIdx - 1] : null;
+              const deltaClosing = prevMonth ? m.closingBalance - prevMonth.closingBalance : 0;
+              const deltaSavings = prevMonth ? m.netSavings - prevMonth.netSavings : 0;
+
+              // Active obligations counts
+              const activeLoansCount = loans.filter((l) => l.remainingInstallments > originalIdx).length;
+              const activeInstCount = installmentPurchases.filter(
+                (ip) => (ip.remainingInstallmentsCount || 0) > originalIdx
+              ).length;
+
+              const isExpanded = !!expandedMonthKeys[m.monthKey];
 
               return (
                 <motion.div
                   key={m.monthKey}
-                  whileHover={{ y: -3 }}
+                  whileHover={{ y: -2 }}
                   className={`rounded-2xl bg-slate-900/90 border transition-all p-4.5 shadow-xl flex flex-col justify-between relative overflow-hidden ${
                     m.status === 'deficit'
                       ? 'border-rose-500/40 hover:border-rose-400'
@@ -764,7 +1087,7 @@ export const MultiMonthProjectionView: React.FC = () => {
                         <span className="text-sm font-black text-white">{m.monthName}</span>
                         {isCurrent && (
                           <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-500/20 text-blue-400 border border-blue-500/30 uppercase">
-                            Actual
+                            Inicio
                           </span>
                         )}
                       </div>
@@ -825,18 +1148,22 @@ export const MultiMonthProjectionView: React.FC = () => {
                       </div>
 
                       {/* Fixed vs Discretionary breakdown pill */}
-                      <div className="flex justify-between items-center text-[10px] text-slate-400 pl-4 border-l border-slate-800">
-                        <span>• Fijos (crédito/cuotas):</span>
-                        <span className="font-mono text-amber-300">{formatMoney(m.fixedObligations, settings.currencySymbol)}</span>
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 pl-3 border-l border-slate-800">
+                        <span>• Fijos (obligaciones):</span>
+                        <span className="font-mono text-amber-300">
+                          {formatMoney(m.fixedObligations, settings.currencySymbol)}
+                        </span>
                       </div>
-                      <div className="flex justify-between items-center text-[10px] text-slate-400 pl-4 border-l border-slate-800">
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 pl-3 border-l border-slate-800">
                         <span>• Presupuesto variable:</span>
-                        <span className="font-mono text-slate-300">{formatMoney(m.discretionaryBudget, settings.currencySymbol)}</span>
+                        <span className="font-mono text-slate-300">
+                          {formatMoney(m.discretionaryBudget, settings.currencySymbol)}
+                        </span>
                       </div>
                     </div>
 
                     {/* Net Savings & Savings Bar */}
-                    <div className="pt-2 border-t border-slate-800/80 space-y-1.5 mb-3">
+                    <div className="pt-2 border-t border-slate-800/80 space-y-1.5 mb-2">
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-400 font-semibold">Ahorro Neto:</span>
                         <span
@@ -848,7 +1175,6 @@ export const MultiMonthProjectionView: React.FC = () => {
                           {formatMoney(m.netSavings, settings.currencySymbol)} ({m.savingsRate}%)
                         </span>
                       </div>
-                      {/* Mini visual savings bar */}
                       <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                         <div
                           className={`h-full ${
@@ -858,14 +1184,124 @@ export const MultiMonthProjectionView: React.FC = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Milestone Banner (if an obligation ends this month) */}
+                    {freedInThisMonth.length > 0 && (
+                      <div className="my-2 p-2 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-between text-[11px]">
+                        <span className="text-purple-300 font-semibold flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-purple-400" />
+                          ¡Fin de {freedInThisMonth.length} deuda!
+                        </span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          +{formatMoney(freedInThisMonth.reduce((acc, c) => acc + c.freedMonthlyCents, 0), settings.currencySymbol)}/m
+                        </span>
+                      </div>
+                    )}
+
+                    {/* INTERACTIVE IN-CARD ACCORDION TRIGGER */}
+                    <button
+                      onClick={() => toggleExpandMonth(m.monthKey)}
+                      className="w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-slate-950/60 hover:bg-slate-950 text-slate-400 hover:text-slate-200 text-[11px] font-semibold transition border border-slate-800/80 cursor-pointer my-2"
+                    >
+                      <span>{isExpanded ? 'Ocultar Resumen Detallado' : 'Desplegar Resumen & Compromisos'}</span>
+                      {isExpanded ? (
+                        <ChevronUp className="w-3.5 h-3.5 text-blue-400" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                      )}
+                    </button>
+
+                    {/* IN-CARD EXPANDABLE CONTENT DRAWER */}
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden space-y-2.5 pt-1 pb-2 text-[11px]"
+                        >
+                          {/* Obligations breakdown */}
+                          <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1.5 text-slate-300">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block border-b border-slate-800 pb-1">
+                              Composición de Gastos Fijos
+                            </span>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400">Préstamos Activos:</span>
+                              <span className="font-mono text-white">
+                                {activeLoansCount} ({formatMoney(m.fixedBreakdown.loans, settings.currencySymbol)})
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400">Cuotas a Plazos:</span>
+                              <span className="font-mono text-white">
+                                {activeInstCount} ({formatMoney(m.fixedBreakdown.installments, settings.currencySymbol)})
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400">Suscripciones & Serv:</span>
+                              <span className="font-mono text-white">
+                                {formatMoney(m.fixedBreakdown.subscriptions + m.fixedBreakdown.services, settings.currencySymbol)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* MoM Comparison */}
+                          {prevMonth && (
+                            <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1 text-slate-300">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block border-b border-slate-800 pb-1">
+                                Evolución vs {prevMonth.monthName.split(' ')[0]}
+                              </span>
+                              <div className="flex justify-between items-center">
+                                <span className="text-slate-400">Variación Saldo:</span>
+                                <span
+                                  className={`font-mono font-bold ${
+                                    deltaClosing >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                  }`}
+                                >
+                                  {deltaClosing >= 0 ? '+' : ''}
+                                  {formatMoney(deltaClosing, settings.currencySymbol)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-slate-400">Variación Ahorro:</span>
+                                <span
+                                  className={`font-mono font-bold ${
+                                    deltaSavings >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                  }`}
+                                >
+                                  {deltaSavings >= 0 ? '+' : ''}
+                                  {formatMoney(deltaSavings, settings.currencySymbol)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Quick module navigation shortcuts */}
+                          <div className="grid grid-cols-2 gap-1.5 pt-1">
+                            <button
+                              onClick={() => handleJumpToMonth(m, 'daily')}
+                              className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold transition text-center cursor-pointer"
+                            >
+                              Flujo Diario ↗
+                            </button>
+                            <button
+                              onClick={() => handleJumpToMonth(m, 'budget')}
+                              className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold transition text-center cursor-pointer"
+                            >
+                              Presupuesto ↗
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
-                  {/* Action button: Opens month modal */}
+                  {/* Action button: Opens month modal / bottom sheet */}
                   <button
                     onClick={() => setSelectedMonthModal(m)}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition border border-slate-700/60 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition border border-slate-700/60 cursor-pointer mt-2"
                   >
-                    <span>Ver Detalle del Mes</span>
+                    <span>Ver Radiografía Completa</span>
                     <ChevronRight className="w-3.5 h-3.5 text-blue-400" />
                   </button>
                 </motion.div>
@@ -1269,7 +1705,9 @@ export const MultiMonthProjectionView: React.FC = () => {
                       {selectedKpi === 'ingresos' && 'Análisis de Capacidad de Ingresos'}
                       {selectedKpi === 'gastos' && 'Estructura de Gastos & Compromisos Fijos'}
                       {selectedKpi === 'critico' && 'Evaluación del Punto Crítico de Liquidez'}
+                      {selectedKpi === 'liberado' && 'Proyección de Flujo Mensual Liberado'}
                       {selectedKpi === 'salud' && 'Diagnóstico de Sostenibilidad Anual'}
+                      {selectedKpi === 'inversion' && 'Capacidad de Inversión Libre Post-Reserva'}
                     </h3>
                     <p className="text-xs text-slate-400">
                       Desglose explicativo para toma de decisiones patrimoniales
@@ -1388,18 +1826,67 @@ export const MultiMonthProjectionView: React.FC = () => {
                   </div>
                 )}
 
+                {selectedKpi === 'liberado' && (
+                  <div className="space-y-3">
+                    <p className="leading-relaxed">
+                      A lo largo de los próximos 12 meses concluyen <strong className="text-white">{debtReliefMilestones.length} compromisos de deuda</strong>, liberando un flujo mensual acumulado de <strong className="text-emerald-400 font-mono">+{formatMoney(totalFreedMonthlyCents, settings.currencySymbol)}/mes</strong>.
+                    </p>
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                      {debtReliefMilestones.map((ms, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-[11px] border-b border-slate-800/60 pb-1.5 last:border-b-0 last:pb-0">
+                          <div>
+                            <span className="text-white font-medium block">{ms.title}</span>
+                            <span className="text-[10px] text-slate-400">Finaliza en: {ms.targetMonthName}</span>
+                          </div>
+                          <span className="font-mono font-bold text-emerald-400">
+                            +{formatMoney(ms.freedMonthlyCents, settings.currencySymbol)}/m
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {selectedKpi === 'salud' && (
                   <div className="space-y-3">
                     <p className="leading-relaxed">
                       {summary?.monthsInDeficit === 0
                         ? 'Tu flujo financiero a 12 meses cuenta con una calificación de sostenibilidad óptima (100%), ya que ningún mes proyecta caer en saldo rojo.'
-                        : `Se detectaron ${summary?.monthsInDeficit} meses con riesgo de déficit. Ajustando gastos variables en el simulador puedes identificar alternativas de equilibrio.`}
+                        : `Se detectaron ${summary?.monthsInDeficit} meses con riesgo de déficit (${summary?.monthsInSurplus} meses en superávit). Ajustando gastos variables en el simulador puedes identificar alternativas de equilibrio.`}
                     </p>
                     <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
                       <span className="text-slate-400 text-[11px] block">Acción recomendada:</span>
                       <span className="text-white font-medium text-[11px]">
                         Utiliza el botón superior "Simulador de Escenarios" para probar recortes de 5% a 10% en gastos variables y asegurar tus metas patrimoniales.
                       </span>
+                    </div>
+                  </div>
+                )}
+
+                {selectedKpi === 'inversion' && (
+                  <div className="space-y-3">
+                    <p className="leading-relaxed">
+                      Manteniendo un colchón mínimo de seguridad recomendado de 3 meses de gastos fijos (<strong className="text-amber-300 font-mono">{formatMoney(summary?.threeMonthEmergencyFund || 0, settings.currencySymbol)}</strong>), tu capacidad proyectada de capital libre para inversión o metas patrimoniales es de <strong className="text-indigo-300 font-mono">{formatMoney(Math.max(0, summary?.freeInvestmentCapacity || 0), settings.currencySymbol)}</strong>.
+                    </p>
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Saldo Cierre Mes 12:</span>
+                        <span className="font-mono font-bold text-sky-300">
+                          {formatMoney(summary?.finalBalance || 0, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Reserva 3 Meses Gastos:</span>
+                        <span className="font-mono font-bold text-amber-300">
+                          -{formatMoney(summary?.threeMonthEmergencyFund || 0, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-800 pt-1">
+                        <span className="text-white font-semibold">Excedente Libre para Inversión:</span>
+                        <span className="font-mono font-bold text-indigo-300">
+                          {formatMoney(Math.max(0, summary?.freeInvestmentCapacity || 0), settings.currencySymbol)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}
