@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { Category } from '../../types';
 import {
@@ -20,9 +20,22 @@ import {
   TrendingUp,
   TrendingDown,
   Calendar,
+  Bell,
+  Smartphone,
+  Volume2,
+  Check,
 } from 'lucide-react';
 import { dollarsToCents, centsToDollars, formatDateEs } from '../../utils/formatters';
 import { NewCategoryModal } from '../common/NewCategoryModal';
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendTestNotification,
+  isNotificationSupported,
+  NotificationPreferences,
+} from '../../utils/notificationService';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -48,6 +61,37 @@ export const SettingsView: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryModalType, setCategoryModalType] = useState<'gasto' | 'ingreso'>('gasto');
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'gasto' | 'ingreso'>('all');
+
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>(getNotificationPreferences);
+  const [notifPermission, setNotifPermission] = useState<string>('default');
+
+  useEffect(() => {
+    setNotifPermission(getNotificationPermission());
+  }, []);
+
+  const handleToggleNotifPermission = async () => {
+    const granted = await requestNotificationPermission();
+    setNotifPermission(granted ? 'granted' : 'denied');
+    const updated = { ...notifPrefs, enabled: granted };
+    setNotifPrefs(updated);
+    saveNotificationPreferences(updated);
+    if (granted) {
+      showNotification('¡Notificaciones del navegador activadas con éxito!');
+    }
+  };
+
+  const handleUpdateNotifPref = (key: keyof NotificationPreferences, val: boolean) => {
+    const next = { ...notifPrefs, [key]: val };
+    setNotifPrefs(next);
+    saveNotificationPreferences(next);
+    showNotification('Preferencia de notificación actualizada.');
+  };
+
+  const handleTriggerTest = async () => {
+    const res = await sendTestNotification();
+    setNotifPermission(getNotificationPermission());
+    showNotification(res.message);
+  };
 
   const showNotification = (msg: string) => {
     setSuccessMsg(msg);
@@ -493,6 +537,107 @@ export const SettingsView: React.FC = () => {
               Descarga la relación cronológica de movimientos para análisis en Excel, Google Sheets o PowerBI.
             </p>
           </button>
+        </div>
+      </div>
+
+      {/* Local Web Notifications & Reminders (100% Free & Local-First) */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Bell className="w-4 h-4 text-amber-400" />
+              <span>Avisos & Notificaciones en tu Dispositivo</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              Notificaciones nativas en Celular o PC • Sin costos recurrentes ni servidores externos
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isNotificationSupported() ? (
+              notifPermission === 'granted' ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Activas en este navegador</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleToggleNotifPermission}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                >
+                  Activar Notificaciones
+                </button>
+              )
+            ) : (
+              <span className="text-xs text-slate-500">No soportado en este entorno</span>
+            )}
+
+            {isNotificationSupported() && (
+              <button
+                type="button"
+                onClick={handleTriggerTest}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+              >
+                <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                <span>Probar Notificación</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-slate-950/60 rounded-xl p-4 border border-slate-800/80 space-y-3">
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Tu navegador emite alertas locales basadas en las fechas registradas en tus tarjetas y préstamos.
+            No requiere correo, ni suscripciones pagas, ni enviar tus datos a la nube.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            {/* Pref 1: Corte de tarjetas */}
+            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                id="pref-card-cutoff"
+                checked={notifPrefs.notifyCardCutoff}
+                onChange={(e) => handleUpdateNotifPref('notifyCardCutoff', e.target.checked)}
+                className="mt-0.5 rounded bg-slate-950 border-slate-700 text-blue-600 focus:ring-0 cursor-pointer"
+              />
+              <label htmlFor="pref-card-cutoff" className="text-xs text-slate-300 cursor-pointer">
+                <span className="font-bold text-white block">Corte de Tarjetas</span>
+                Avisar 2 días antes del día de corte de tus tarjetas de crédito
+              </label>
+            </div>
+
+            {/* Pref 2: Fecha límite de pago */}
+            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                id="pref-payment-due"
+                checked={notifPrefs.notifyPaymentDue}
+                onChange={(e) => handleUpdateNotifPref('notifyPaymentDue', e.target.checked)}
+                className="mt-0.5 rounded bg-slate-950 border-slate-700 text-blue-600 focus:ring-0 cursor-pointer"
+              />
+              <label htmlFor="pref-payment-due" className="text-xs text-slate-300 cursor-pointer">
+                <span className="font-bold text-white block">Límite de Pagos</span>
+                Avisar 3 días antes del vencimiento de cuotas o préstamos
+              </label>
+            </div>
+
+            {/* Pref 3: Liquidez negativa */}
+            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                id="pref-neg-balance"
+                checked={notifPrefs.notifyNegativeBalance}
+                onChange={(e) => handleUpdateNotifPref('notifyNegativeBalance', e.target.checked)}
+                className="mt-0.5 rounded bg-slate-950 border-slate-700 text-blue-600 focus:ring-0 cursor-pointer"
+              />
+              <label htmlFor="pref-neg-balance" className="text-xs text-slate-300 cursor-pointer">
+                <span className="font-bold text-white block">Alerta de Sobregiro</span>
+                Aviso inmediato si una proyección proyecta saldo bancario negativo
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 

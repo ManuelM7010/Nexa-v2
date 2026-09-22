@@ -32,6 +32,20 @@ export const Header: React.FC = () => {
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
+  const [privacyToast, setPrivacyToast] = useState<string | null>(null);
+
+  const handleTogglePrivacy = () => {
+    togglePrivacyMode();
+    const willBePrivate = !isPrivacyMode;
+    setPrivacyToast(
+      willBePrivate
+        ? '👁️‍🗨️ Modo Privacidad ACTIVO: Saldos difuminados ($ ••••)'
+        : '👁️ Modo Privacidad DESACTIVADO: Saldos visibles'
+    );
+    setTimeout(() => {
+      setPrivacyToast(null);
+    }, 2200);
+  };
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -119,7 +133,7 @@ export const Header: React.FC = () => {
           {/* Privacy Camouflage Mode toggle */}
           <button
             id="btn-header-privacy"
-            onClick={togglePrivacyMode}
+            onClick={handleTogglePrivacy}
             className={`flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold cursor-pointer transition active:scale-95 ${
               isPrivacyMode
                 ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm shadow-amber-500/10'
@@ -217,6 +231,13 @@ export const Header: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Floating Privacy Mode Notice Toast */}
+      {privacyToast && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 px-4 py-2 rounded-full bg-slate-900/95 border border-amber-500/50 text-amber-300 text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 pointer-events-none transition">
+          <span>{privacyToast}</span>
+        </div>
+      )}
     </header>
   );
 };

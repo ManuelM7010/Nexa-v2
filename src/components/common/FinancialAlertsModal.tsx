@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import {
   Bell,
@@ -9,8 +9,17 @@ import {
   X,
   ArrowRight,
   ExternalLink,
+  Volume2,
+  Smartphone,
+  Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendTestNotification,
+  isNotificationSupported,
+} from '../../utils/notificationService';
 
 export const FinancialAlertsModal: React.FC = () => {
   const {
@@ -21,8 +30,32 @@ export const FinancialAlertsModal: React.FC = () => {
   } = useFinance();
 
   const [filter, setFilter] = useState<'todas' | 'danger' | 'warning' | 'success'>('todas');
+  const [notifPermission, setNotifPermission] = useState<string>('default');
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAlertsOpen) {
+      setNotifPermission(getNotificationPermission());
+    }
+  }, [isAlertsOpen]);
 
   if (!isAlertsOpen) return null;
+
+  const handleEnableNotifications = async () => {
+    const granted = await requestNotificationPermission();
+    setNotifPermission(granted ? 'granted' : 'denied');
+    if (granted) {
+      setTestResult('¡Notificaciones activadas en este dispositivo!');
+      setTimeout(() => setTestResult(null), 3000);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    const res = await sendTestNotification();
+    setTestResult(res.message);
+    setNotifPermission(getNotificationPermission());
+    setTimeout(() => setTestResult(null), 4000);
+  };
 
   const filteredAlerts = financialAlerts.filter((a) => {
     if (filter === 'todas') return true;
@@ -78,7 +111,7 @@ export const FinancialAlertsModal: React.FC = () => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -88,14 +121,17 @@ export const FinancialAlertsModal: React.FC = () => {
           className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
         />
 
-        {/* Modal Window */}
+        {/* Modal Window / Mobile Bottom Sheet */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ duration: 0.15 }}
-          className="relative w-full max-w-xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[85vh]"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 30 }}
+          transition={{ duration: 0.18 }}
+          className="relative w-full max-w-xl bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[92vh] sm:max-h-[85vh]"
         >
+          {/* Mobile Drag Indicator Handle */}
+          <div className="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto my-2.5 sm:hidden cursor-grab" />
+
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
             <div className="flex items-center gap-2.5">
@@ -104,7 +140,7 @@ export const FinancialAlertsModal: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  Centro de Alertas Financieras
+                  Centro de Alertas & Notificaciones
                   {financialAlerts.length > 0 && (
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                       {financialAlerts.length}
@@ -112,7 +148,7 @@ export const FinancialAlertsModal: React.FC = () => {
                   )}
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Detección en tiempo real de liquidez, límites y compromisos
+                  Detección en tiempo real de liquidez, límites y recordatorios
                 </p>
               </div>
             </div>
@@ -124,6 +160,53 @@ export const FinancialAlertsModal: React.FC = () => {
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Browser / Device Local Notification Bar */}
+          {isNotificationSupported() && (
+            <div className="px-4 py-2.5 bg-slate-950/90 border-b border-slate-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-sky-400 flex-shrink-0" />
+                <span className="text-slate-300">
+                  Avisos en este dispositivo:
+                </span>
+                {notifPermission === 'granted' ? (
+                  <span className="inline-flex items-center gap-1 font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 text-[10px]">
+                    <Check className="w-3 h-3" />
+                    Activas ($0 local)
+                  </span>
+                ) : (
+                  <span className="text-slate-400 text-[11px]">
+                    {notifPermission === 'denied' ? 'Bloqueadas en navegador' : 'Sin activar'}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {notifPermission !== 'granted' && (
+                  <button
+                    onClick={handleEnableNotifications}
+                    className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] transition cursor-pointer"
+                  >
+                    Activar en mi Celular / PC
+                  </button>
+                )}
+                <button
+                  onClick={handleTestNotification}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1"
+                >
+                  <Volume2 className="w-3 h-3 text-amber-400" />
+                  <span>Probar aviso</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {testResult && (
+            <div className="px-4 py-1.5 bg-blue-900/40 border-b border-blue-500/30 text-blue-200 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+              <span>{testResult}</span>
+            </div>
+          )}
 
           {/* Filter Pills */}
           <div className="px-4 sm:px-5 py-2.5 border-b border-slate-800/80 bg-slate-900/60 flex items-center gap-1.5 overflow-x-auto text-xs">
@@ -224,7 +307,7 @@ export const FinancialAlertsModal: React.FC = () => {
 
           {/* Footer */}
           <div className="p-3 bg-slate-950/60 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-            <span>Las alertas se calculan con base en tu flujo diario y presupuestos</span>
+            <span>Alertas y avisos 100% locales en tu navegador • Sin suscripciones</span>
             <button
               onClick={() => setIsAlertsOpen(false)}
               className="text-blue-400 hover:text-blue-300 font-medium cursor-pointer"
@@ -237,3 +320,4 @@ export const FinancialAlertsModal: React.FC = () => {
     </AnimatePresence>
   );
 };
+

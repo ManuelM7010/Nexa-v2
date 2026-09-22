@@ -8,6 +8,7 @@ import { AffordabilityModal } from './components/common/AffordabilityModal';
 import { RenderGuideModal } from './components/common/RenderGuideModal';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import { MobileMenuDrawer } from './components/common/MobileMenuDrawer';
+import { MobileQuickExpenseFAB } from './components/common/MobileQuickExpenseFAB';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
 import { FinancialAlertsModal } from './components/common/FinancialAlertsModal';
 
@@ -118,8 +119,9 @@ const MainAppContent: React.FC = () => {
       <QuickSearchModal />
       <FinancialAlertsModal />
 
-      {/* Mobile-Dedicated Bottom Navigation & Drawer Menu */}
+      {/* Mobile-Dedicated Bottom Navigation, Speed FAB & Drawer Menu */}
       <MobileBottomNav />
+      <MobileQuickExpenseFAB />
       <MobileMenuDrawer />
 
       {/* Fintech Footer */}
