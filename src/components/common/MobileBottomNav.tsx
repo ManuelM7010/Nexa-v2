@@ -36,8 +36,13 @@ export const MobileBottomNav: React.FC = () => {
     { id: 'movimientos', label: 'Movs', icon: ArrowLeftRight },
   ];
 
-  const handleQuickAction = (actionType: 'gasto' | 'ingreso' | 'aporte' | 'simulador') => {
+  const handleQuickAction = (actionType: 'gasto' | 'ingreso' | 'aporte' | 'simulador' | 'movimientos') => {
     setIsFabMenuOpen(false);
+    if (actionType === 'movimientos') {
+      setActiveTab('movimientos');
+      return;
+    }
+
     if (actionType === 'simulador') {
       setIsAffordabilityOpen(true);
       return;
@@ -134,6 +139,17 @@ export const MobileBottomNav: React.FC = () => {
                   <span className="text-[10px] text-slate-400">Simulador de compra</span>
                 </button>
               </div>
+
+              {/* Direct Quick History button inside speed dial */}
+              <div className="mt-3 pt-2.5 border-t border-slate-800">
+                <button
+                  onClick={() => handleQuickAction('movimientos')}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-300 text-xs font-bold transition active:scale-95 cursor-pointer"
+                >
+                  <ArrowLeftRight className="w-4 h-4 text-emerald-400" />
+                  <span>Ver Historial de Movimientos & Auditoría</span>
+                </button>
+              </div>
             </motion.div>
           </>
         )}
@@ -166,22 +182,22 @@ export const MobileBottomNav: React.FC = () => {
             )}
           </button>
 
-          {/* Tab 2: Ahorros */}
+          {/* Tab 2: Flujo Diario */}
           <button
-            id="mobile-nav-ahorros"
+            id="mobile-nav-flujo"
             onClick={() => {
-              setActiveTab('ahorros');
+              setActiveTab('flujo');
               setIsFabMenuOpen(false);
             }}
             className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer min-w-[54px] ${
-              activeTab === 'ahorros'
+              activeTab === 'flujo'
                 ? 'text-blue-400 font-bold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <PiggyBank className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Ahorros</span>
-            {activeTab === 'ahorros' && (
+            <BarChart3 className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] tracking-tight">Flujo</span>
+            {activeTab === 'flujo' && (
               <span className="w-1 h-1 bg-blue-500 rounded-full mt-0.5" />
             )}
           </button>
@@ -203,22 +219,22 @@ export const MobileBottomNav: React.FC = () => {
             </button>
           </div>
 
-          {/* Tab 3: Flujo */}
+          {/* Tab 3: Historial Rápido de Movimientos */}
           <button
-            id="mobile-nav-flujo"
+            id="mobile-nav-movimientos"
             onClick={() => {
-              setActiveTab('flujo');
+              setActiveTab('movimientos');
               setIsFabMenuOpen(false);
             }}
             className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer min-w-[54px] ${
-              activeTab === 'flujo'
+              activeTab === 'movimientos'
                 ? 'text-blue-400 font-bold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <BarChart3 className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Flujo</span>
-            {activeTab === 'flujo' && (
+            <ArrowLeftRight className="w-5 h-5 mb-0.5 text-emerald-400" />
+            <span className="text-[10px] tracking-tight">Movs</span>
+            {activeTab === 'movimientos' && (
               <span className="w-1 h-1 bg-blue-500 rounded-full mt-0.5" />
             )}
           </button>
@@ -230,10 +246,14 @@ export const MobileBottomNav: React.FC = () => {
               setIsMobileMenuOpen(true);
               setIsFabMenuOpen(false);
             }}
-            className="flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer min-w-[54px] text-slate-400 hover:text-slate-200"
+            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer min-w-[54px] ${
+              activeTab !== 'dashboard' && activeTab !== 'flujo' && activeTab !== 'movimientos'
+                ? 'text-blue-400 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
           >
             <Menu className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">Más</span>
+            <span className="text-[10px] tracking-tight">Menú</span>
           </button>
         </div>
       </nav>

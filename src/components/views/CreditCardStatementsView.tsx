@@ -28,6 +28,18 @@ import {
   Layers,
   ChevronLeft,
   ChevronRight,
+  Search,
+  Filter,
+  CalendarRange,
+  TrendingDown,
+  TrendingUp,
+  ArrowUpDown,
+  Sparkles,
+  ExternalLink,
+  Edit2,
+  X,
+  PieChart,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 export const CreditCardStatementsView: React.FC = () => {
@@ -45,7 +57,23 @@ export const CreditCardStatementsView: React.FC = () => {
     settings,
     todayStr,
     setActiveTab,
+    setIsNewTxOpen,
+    setEditingTransaction,
+    openNewTransactionModal,
   } = useFinance();
+
+  // Top view mode switcher: 'cortes' (Estados de Cuenta TDDC Oficiales) vs 'rango_calendario' (Consulta por Rango de Fechas Calendario)
+  const [statementViewMode, setStatementViewMode] = useState<'cortes' | 'rango_calendario'>('cortes');
+
+  // Calendar Date Range state
+  const [rangeCardId, setRangeCardId] = useState<string>(
+    creditCards[0]?.id || 'all'
+  );
+  const [rangeStartDate, setRangeStartDate] = useState<string>('2026-08-01');
+  const [rangeEndDate, setRangeEndDate] = useState<string>(todayStr || '2026-09-27');
+  const [rangeSearch, setRangeSearch] = useState<string>('');
+  const [rangeTypeFilter, setRangeTypeFilter] = useState<'cargos' | 'abonos' | 'todos'>('cargos');
+  const [rangeStatusFilter, setRangeStatusFilter] = useState<'todos' | 'realizado' | 'planificado'>('todos');
 
   // Active Card filter (empty string = All cards overview)
   const [selectedCardId, setSelectedCardId] = useState<string>(
@@ -107,6 +135,192 @@ export const CreditCardStatementsView: React.FC = () => {
   const totalGlobalAvailable = useMemo(() => {
     return Math.max(0, totalGlobalLimit - totalGlobalTDDC);
   }, [totalGlobalLimit, totalGlobalTDDC]);
+
+  // Calendar Range Filtered Transactions
+  const rangeTransactions = useMemo(() => {
+    return transactions
+      .filter((tx) => {
+        // Is credit card related
+        const isCard =
+          tx.paymentMethodType === 'tarjeta_credito' ||
+          !!tx.creditCardId ||
+          tx.type === 'pago_tarjeta' ||
+          tx.type === 'cuota_tarjeta';
+
+        if (!isCard) return false;
+
+        // Card match
+        if (rangeCardId !== 'all') {
+          if (tx.creditCardId !== rangeCardId) return false;
+        }
+
+        // Date range match (inclusive)
+        if (rangeStartDate && tx.date < rangeStartDate) return false;
+        if (rangeEndDate && tx.date > rangeEndDate) return false;
+
+        // Type filter
+        if (rangeTypeFilter === 'cargos') {
+          // Cargos / Compras / Cuotas (not abonos/pagos)
+          if (tx.type === 'pago_tarjeta') return false;
+        } else if (rangeTypeFilter === 'abonos') {
+          // Solo abonos / pagos a la tarjeta
+          if (tx.type !== 'pago_tarjeta') return false;
+        }
+
+        // Status filter
+        if (rangeStatusFilter !== 'todos' && tx.status !== rangeStatusFilter) {
+          return false;
+        }
+
+        // Search query
+        if (rangeSearch.trim()) {
+          const q = rangeSearch.toLowerCase();
+          const matchesConcept = (tx.concept || '').toLowerCase().includes(q);
+          const matchesNotes = (tx.notes || '').toLowerCase().includes(q);
+          const cat = categories.find((c) => c.id === tx.categoryId);
+          const matchesCat = cat ? (cat.name || '').toLowerCase().includes(q) : false;
+          if (!matchesConcept && !matchesNotes && !matchesCat) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [
+    transactions,
+    rangeCardId,
+    rangeStartDate,
+    rangeEndDate,
+    rangeTypeFilter,
+    rangeStatusFilter,
+    rangeSearch,
+    categories,
+  ]);
+
+  // Aggregate Metrics for Calendar Range
+  const calendarMetrics = useMemo(() => {
+    const allInRange = transactions.filter((tx) => {
+      const isCard =
+        tx.paymentMethodType === 'tarjeta_credito' ||
+        !!tx.creditCardId ||
+        tx.type === 'pago_tarjeta' ||
+        tx.type === 'cuota_tarjeta';
+      if (!isCard) return false;
+      if (rangeCardId !== 'all' && tx.creditCardId !== rangeCardId) return false;
+      if (rangeStartDate && tx.date < rangeStartDate) return false;
+      if (rangeEndDate && tx.date > rangeEndDate) return false;
+      return true;
+    });
+
+    let totalCargosCents = 0;
+    let totalAbonosCents = 0;
+    let cargosCount = 0;
+    let abonosCount = 0;
+    let maxCargoTx: Transaction | null = null;
+    const catMap = new Map<string, { id: string; name: string; color: string; totalCents: number; count: number }>();
+
+    allInRange.forEach((tx) => {
+      if (tx.type === 'pago_tarjeta') {
+        totalAbonosCents += tx.amount;
+        abonosCount += 1;
+      } else {
+        totalCargosCents += tx.amount;
+        cargosCount += 1;
+        if (!maxCargoTx || tx.amount > maxCargoTx.amount) {
+          maxCargoTx = tx;
+        }
+
+        // Category aggregation
+        const cat = categories.find((c) => c.id === tx.categoryId);
+        const catId = cat ? cat.id : 'sin_categoria';
+        const catName = cat ? cat.name : 'General / Sin Categoría';
+        const catColor = cat ? cat.color : '#64748b';
+        const current = catMap.get(catId) || { id: catId, name: catName, color: catColor, totalCents: 0, count: 0 };
+        current.totalCents += tx.amount;
+        current.count += 1;
+        catMap.set(catId, current);
+      }
+    });
+
+    const avgCargoCents = cargosCount > 0 ? Math.round(totalCargosCents / cargosCount) : 0;
+    const netVariationCents = totalCargosCents - totalAbonosCents;
+    const categoryList = Array.from(catMap.values()).sort((a, b) => b.totalCents - a.totalCents);
+
+    return {
+      totalCargosCents,
+      totalAbonosCents,
+      netVariationCents,
+      cargosCount,
+      abonosCount,
+      avgCargoCents,
+      maxCargoTx,
+      categoryList,
+    };
+  }, [transactions, rangeCardId, rangeStartDate, rangeEndDate, categories]);
+
+  // Export CSV for Calendar Date Range
+  const handleExportRangeCSV = () => {
+    const targetCardObj = activeCards.find((c) => c.id === rangeCardId);
+    const cardTitle = targetCardObj ? `${targetCardObj.name} (${targetCardObj.bank})` : 'Todas las Tarjetas';
+
+    const headers = [
+      'Fecha',
+      'Tarjeta',
+      'Banco',
+      'Concepto / Comercio',
+      'Categoría',
+      'Tipo de Cargo',
+      'Monto ($)',
+      'Estado',
+      'Notas',
+    ];
+
+    const rows = rangeTransactions.map((tx) => {
+      const card = activeCards.find((c) => c.id === tx.creditCardId);
+      const cat = categories.find((c) => c.id === tx.categoryId);
+      const isPayment = tx.type === 'pago_tarjeta';
+      return [
+        tx.date,
+        `"${(card?.name || 'Tarjeta de Crédito').replace(/"/g, '""')}"`,
+        `"${(card?.bank || '').replace(/"/g, '""')}"`,
+        `"${(tx.concept || '').replace(/"/g, '""')}"`,
+        `"${(cat?.name || 'General').replace(/"/g, '""')}"`,
+        `"${isPayment ? 'Abono / Pago TDC' : tx.installmentPurchaseId ? 'Cuota a Plazos' : 'Compra / Cargo Regular'}"`,
+        (centsToDollars(tx.amount) * (isPayment ? -1 : 1)).toFixed(2),
+        `"${tx.status === 'realizado' ? 'Confirmado' : 'Planificado'}"`,
+        `"${(tx.notes || '').replace(/"/g, '""')}"`,
+      ];
+    });
+
+    const summaryLines = [
+      ['REPORTE DE CARGOS A TARJETA DE CREDITO POR RANGO CALENDARIO'],
+      ['Tarjeta / Alcance', cardTitle],
+      ['Rango de Fechas Calendario', `${rangeStartDate} al ${rangeEndDate}`],
+      ['Total Cargos / Compras ($)', centsToDollars(calendarMetrics.totalCargosCents).toFixed(2)],
+      ['Total Abonos / Pagos ($)', centsToDollars(calendarMetrics.totalAbonosCents).toFixed(2)],
+      ['Variación Neta ($)', centsToDollars(calendarMetrics.netVariationCents).toFixed(2)],
+      ['Transacciones Listadas', rangeTransactions.length.toString()],
+      [],
+      headers,
+    ];
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      summaryLines.map((e) => e.join(',')).join('\n') +
+      '\n' +
+      rows.map((e) => e.join(',')).join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    const filenameCard = targetCardObj ? targetCardObj.name.replace(/\s+/g, '_') : 'Todas_TDC';
+    link.setAttribute(
+      'download',
+      `Cargos_TDC_${filenameCard}_${rangeStartDate}_al_${rangeEndDate}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handlePrevMonth = () => {
     if (selectedMonth === 1) {
@@ -253,61 +467,93 @@ export const CreditCardStatementsView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl no-print">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <FileSpreadsheet className="w-5 h-5 text-rose-400" />
-            <h2 className="text-base font-bold text-white">
-              Estados de Cuenta TDDC & Detalle de Gastos
-            </h2>
-          </div>
-          <p className="text-xs text-slate-400">
-            Total de Deuda de Tarjeta de Crédito (TDDC) según fechas de corte y detalle de compras
-          </p>
-        </div>
+      {/* Top View Mode Selector: Cortes Oficiales vs Consulta Rango Calendario */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-1.5 bg-slate-900 border border-slate-800 rounded-2xl no-print">
+        <button
+          onClick={() => setStatementViewMode('cortes')}
+          className={`flex-1 flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-xs font-bold transition cursor-pointer ${
+            statementViewMode === 'cortes'
+              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm shadow-rose-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850 border border-transparent'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4 text-rose-400" />
+          <span>Estados de Cuenta por Corte (TDDC Oficial)</span>
+        </button>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Month Selector Controls */}
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 text-xs">
-            <button
-              onClick={handlePrevMonth}
-              className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
-              title="Mes anterior"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-3 font-bold text-white min-w-[130px] text-center">
-              {MONTH_NAMES_ES[selectedMonth - 1]} {selectedYear}
-            </span>
-            <button
-              onClick={handleNextMonth}
-              className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
-              title="Mes siguiente"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
-            title="Exportar a CSV / Excel"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">CSV</span>
-          </button>
-
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-bold transition cursor-pointer"
-            title="Imprimir o guardar como PDF"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Imprimir / PDF</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setStatementViewMode('rango_calendario')}
+          className={`flex-1 flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-xs font-bold transition cursor-pointer ${
+            statementViewMode === 'rango_calendario'
+              ? 'bg-blue-600/20 text-blue-300 border border-blue-500/40 shadow-sm shadow-blue-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850 border border-transparent'
+          }`}
+        >
+          <CalendarRange className="w-4 h-4 text-sky-400" />
+          <span>Consulta de Cargos por Rango Calendario</span>
+          <span className="px-1.5 py-0.5 rounded text-[9px] bg-sky-500/20 text-sky-300 border border-sky-500/30 uppercase font-black">
+            Sin Cortes
+          </span>
+        </button>
       </div>
+
+      {statementViewMode === 'cortes' ? (
+        <>
+          {/* Header & Controls */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl no-print">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <FileSpreadsheet className="w-5 h-5 text-rose-400" />
+                <h2 className="text-base font-bold text-white">
+                  Estados de Cuenta TDDC & Detalle de Gastos
+                </h2>
+              </div>
+              <p className="text-xs text-slate-400">
+                Total de Deuda de Tarjeta de Crédito (TDDC) según fechas de corte y detalle de compras
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Month Selector Controls */}
+              <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 text-xs">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition cursor-pointer"
+                  title="Mes anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="px-3 font-bold text-white min-w-[130px] text-center">
+                  {MONTH_NAMES_ES[selectedMonth - 1]} {selectedYear}
+                </span>
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition cursor-pointer"
+                  title="Mes siguiente"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button
+                onClick={handleExportCSV}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+                title="Exportar a CSV / Excel"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">CSV</span>
+              </button>
+
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-bold transition cursor-pointer"
+                title="Imprimir o guardar como PDF"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir / PDF</span>
+              </button>
+            </div>
+          </div>
 
       {/* Global TDDC Summary Header */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -728,6 +974,659 @@ export const CreditCardStatementsView: React.FC = () => {
           </div>
         </div>
       )}
+      </>
+    ) : (
+      /* Comprehensive Calendar Date Range View (Sin Cortes) */
+      <div className="space-y-6">
+        {/* Header & Controls for Calendar Date Range */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl no-print">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <CalendarRange className="w-5 h-5 text-sky-400" />
+              <h2 className="text-base font-bold text-white">
+                Consulta de Cargos por Rango Calendario
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                Sin Cortes
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Visualiza compras, cargos y abonos entre fechas calendario exactas para cualquier tarjeta de crédito
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleExportRangeCSV}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+              title="Exportar reporte de rango a CSV / Excel"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Exportar CSV</span>
+            </button>
+
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-bold transition cursor-pointer"
+              title="Imprimir o guardar como PDF"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir / PDF</span>
+            </button>
+
+            <button
+              onClick={() => openNewTransactionModal({ type: 'gasto', categoryId: 'cat_alimentacion' })}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white text-xs font-bold transition shadow-md shadow-blue-600/20 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Nuevo Cargo TDC</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Card Selector & Calendar Date Range Controls */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 no-print shadow-xl">
+          {/* Card Selection Tabs */}
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+              1. Selecciona la Tarjeta de Crédito:
+            </label>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                onClick={() => setRangeCardId('all')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
+                  rangeCardId === 'all'
+                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm'
+                    : 'bg-slate-950 text-slate-400 hover:text-white border-slate-800 hover:bg-slate-850'
+                }`}
+              >
+                <CreditCardIcon className="w-3.5 h-3.5" />
+                <span>Todas las Tarjetas ({activeCards.length})</span>
+              </button>
+
+              {activeCards.map((card) => {
+                const isSelected = rangeCardId === card.id;
+                return (
+                  <button
+                    key={card.id}
+                    onClick={() => setRangeCardId(card.id)}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
+                      isSelected
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm'
+                        : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
+                    }`}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: card.color || '#ef4444' }}
+                    />
+                    <span>{card.name}</span>
+                    <span className="text-[10px] text-slate-400">({card.bank})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Date Range Pickers & Preset Chips */}
+          <div className="pt-2 border-t border-slate-800/80">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                2. Rango de Fechas Calendario:
+              </label>
+
+              {/* Exact user examples and quick presets */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                <span className="text-[10px] text-slate-400 font-semibold mr-1 shrink-0">
+                  Acceso Rápido:
+                </span>
+                <button
+                  onClick={() => {
+                    setRangeStartDate('2026-08-01');
+                    setRangeEndDate('2026-09-15');
+                  }}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
+                    rangeStartDate === '2026-08-01' && rangeEndDate === '2026-09-15'
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
+                  }`}
+                  title="Ejemplo explícito: 01 de Agosto al 15 de Septiembre"
+                >
+                  📌 01 Ago - 15 Sep
+                </button>
+
+                <button
+                  onClick={() => {
+                    setRangeStartDate('2026-08-01');
+                    setRangeEndDate(todayStr || '2026-09-27');
+                  }}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
+                    rangeStartDate === '2026-08-01' && rangeEndDate === (todayStr || '2026-09-27')
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
+                  }`}
+                  title="Ejemplo explícito: 01 de Agosto hasta hoy (27 de Septiembre)"
+                >
+                  ⚡ 01 Ago - 27 Sep (Hoy)
+                </button>
+
+                <button
+                  onClick={() => {
+                    setRangeStartDate('2026-09-01');
+                    setRangeEndDate(todayStr || '2026-09-27');
+                  }}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
+                    rangeStartDate === '2026-09-01' && rangeEndDate === (todayStr || '2026-09-27')
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
+                  }`}
+                >
+                  Mes a Hoy (01-27 Sep)
+                </button>
+
+                <button
+                  onClick={() => {
+                    setRangeStartDate('2026-09-01');
+                    setRangeEndDate('2026-09-30');
+                  }}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
+                    rangeStartDate === '2026-09-01' && rangeEndDate === '2026-09-30'
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
+                  }`}
+                >
+                  Septiembre Completo
+                </button>
+
+                <button
+                  onClick={() => {
+                    setRangeStartDate('2026-08-01');
+                    setRangeEndDate('2026-08-31');
+                  }}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
+                    rangeStartDate === '2026-08-01' && rangeEndDate === '2026-08-31'
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
+                  }`}
+                >
+                  Agosto Completo
+                </button>
+
+                <button
+                  onClick={() => {
+                    setRangeStartDate('2026-01-01');
+                    setRangeEndDate('2026-12-31');
+                  }}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
+                    rangeStartDate === '2026-01-01' && rangeEndDate === '2026-12-31'
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
+                  }`}
+                >
+                  Todo 2026
+                </button>
+              </div>
+            </div>
+
+            {/* Date Inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
+                <Calendar className="w-4 h-4 text-sky-400 shrink-0" />
+                <span className="text-xs text-slate-400 font-medium shrink-0">Desde:</span>
+                <input
+                  type="date"
+                  value={rangeStartDate}
+                  onChange={(e) => setRangeStartDate(e.target.value)}
+                  className="bg-transparent text-xs text-white focus:outline-none w-full font-mono cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
+                <Calendar className="w-4 h-4 text-sky-400 shrink-0" />
+                <span className="text-xs text-slate-400 font-medium shrink-0">Hasta:</span>
+                <input
+                  type="date"
+                  value={rangeEndDate}
+                  onChange={(e) => setRangeEndDate(e.target.value)}
+                  className="bg-transparent text-xs text-white focus:outline-none w-full font-mono cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Executive KPI Metric Cards for the Calendar Range */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* KPI 1: Total Cargos */}
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 relative overflow-hidden shadow-lg">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider">
+                Total Cargos al Corte Calendario
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-rose-400 tracking-tight font-mono">
+              {formatMoney(calendarMetrics.totalCargosCents, settings.currencySymbol)}
+            </div>
+            <span className="text-[11px] text-slate-400 mt-1 block">
+              {calendarMetrics.cargosCount} compras o cargos en el rango
+            </span>
+          </div>
+
+          {/* KPI 2: Total Abonos */}
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 relative overflow-hidden shadow-lg">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider">
+                Abonos / Pagos Realizados
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-emerald-400 tracking-tight font-mono">
+              {formatMoney(calendarMetrics.totalAbonosCents, settings.currencySymbol)}
+            </div>
+            <span className="text-[11px] text-slate-400 mt-1 block">
+              {calendarMetrics.abonosCount} abonos aplicados en el rango
+            </span>
+          </div>
+
+          {/* KPI 3: Saldo Neto Generado */}
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 relative overflow-hidden shadow-lg">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider">
+                Flujo Neto en Tarjeta
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                <ArrowUpDown className="w-4 h-4" />
+              </div>
+            </div>
+            <div
+              className={`text-2xl font-black tracking-tight font-mono ${
+                calendarMetrics.netVariationCents > 0
+                  ? 'text-amber-300'
+                  : calendarMetrics.netVariationCents < 0
+                  ? 'text-emerald-400'
+                  : 'text-white'
+              }`}
+            >
+              {calendarMetrics.netVariationCents > 0 ? '+' : ''}
+              {formatMoney(calendarMetrics.netVariationCents, settings.currencySymbol)}
+            </div>
+            <span className="text-[11px] text-slate-400 mt-1 block">
+              {calendarMetrics.netVariationCents > 0
+                ? 'Incremento de saldo exigible'
+                : calendarMetrics.netVariationCents < 0
+                ? 'Reducción de saldo exigible'
+                : 'Balance neutro en periodo'}
+            </span>
+          </div>
+
+          {/* KPI 4: Promedio & Mayor Cargo */}
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 relative overflow-hidden shadow-lg">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider">
+                Ticket Promedio
+              </span>
+              <div className="w-7 h-7 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-purple-300 tracking-tight font-mono">
+              {formatMoney(calendarMetrics.avgCargoCents, settings.currencySymbol)}
+            </div>
+            <span className="text-[11px] text-slate-400 mt-1 block truncate">
+              {calendarMetrics.maxCargoTx
+                ? `Mayor: ${calendarMetrics.maxCargoTx.concept} (${formatMoney(calendarMetrics.maxCargoTx.amount, settings.currencySymbol)})`
+                : 'Sin cargos en el rango'}
+            </span>
+          </div>
+        </div>
+
+        {/* Category Spending Breakdown in Selected Calendar Window */}
+        {calendarMetrics.categoryList.length > 0 && (
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-3 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PieChart className="w-4 h-4 text-sky-400" />
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Distribución de Cargos por Categoría ({rangeStartDate} al {rangeEndDate})
+                </h3>
+              </div>
+              <span className="text-[11px] text-slate-400 font-mono">
+                {calendarMetrics.categoryList.length} categorías activas
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {calendarMetrics.categoryList.map((cat) => {
+                const pct =
+                  calendarMetrics.totalCargosCents > 0
+                    ? Math.round((cat.totalCents / calendarMetrics.totalCargosCents) * 100)
+                    : 0;
+                return (
+                  <div
+                    key={cat.id}
+                    className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex flex-col justify-between gap-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <span className="text-xs font-semibold text-white truncate">
+                          {cat.name}
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-rose-400 shrink-0">
+                        {formatMoney(cat.totalCents, settings.currencySymbol)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span>{cat.count} {cat.count === 1 ? 'cargo' : 'cargos'}</span>
+                      <span className="font-mono font-bold text-slate-300">{pct}% del total</span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full bg-slate-850 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min(100, Math.max(2, pct))}%`,
+                          backgroundColor: cat.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Itemized Transactions Section */}
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-2xl">
+          {/* Filters Bar */}
+          <div className="p-4 bg-slate-950/70 border-b border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={rangeSearch}
+                onChange={(e) => setRangeSearch(e.target.value)}
+                placeholder="Buscar por concepto, comercio o notas..."
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
+              />
+              {rangeSearch && (
+                <button
+                  onClick={() => setRangeSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Type & Status Filters */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-xs">
+                <button
+                  onClick={() => setRangeTypeFilter('cargos')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                    rangeTypeFilter === 'cargos'
+                      ? 'bg-rose-500/20 text-rose-300 font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Solo Cargos
+                </button>
+                <button
+                  onClick={() => setRangeTypeFilter('abonos')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                    rangeTypeFilter === 'abonos'
+                      ? 'bg-emerald-500/20 text-emerald-300 font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Solo Abonos
+                </button>
+                <button
+                  onClick={() => setRangeTypeFilter('todos')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                    rangeTypeFilter === 'todos'
+                      ? 'bg-sky-500/20 text-sky-300 font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Todos ({rangeTransactions.length})
+                </button>
+              </div>
+
+              <select
+                value={rangeStatusFilter}
+                onChange={(e) => setRangeStatusFilter(e.target.value as any)}
+                className="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none cursor-pointer"
+              >
+                <option value="todos">Todos los Estados</option>
+                <option value="realizado">Solo Confirmados</option>
+                <option value="planificado">Solo Planificados</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Table Content */}
+          {rangeTransactions.length === 0 ? (
+            <div className="p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400 mx-auto">
+                <CreditCardIcon className="w-6 h-6" />
+              </div>
+              <h4 className="text-sm font-bold text-white">
+                No se encontraron movimientos en este rango calendario
+              </h4>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                No hay compras o abonos para la tarjeta seleccionada entre el{' '}
+                <strong className="text-slate-200">{rangeStartDate}</strong> y el{' '}
+                <strong className="text-slate-200">{rangeEndDate}</strong>.
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setRangeStartDate('2026-08-01');
+                    setRangeEndDate(todayStr || '2026-09-27');
+                    setRangeCardId('all');
+                    setRangeSearch('');
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer"
+                >
+                  Restablecer a 01 Ago - Hoy
+                </button>
+                <button
+                  onClick={() => openNewTransactionModal({ type: 'gasto', categoryId: 'cat_alimentacion' })}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition cursor-pointer"
+                >
+                  + Registrar Cargo Ahora
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-950/80 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider font-semibold">
+                    <th className="py-3 px-4">Fecha</th>
+                    <th className="py-3 px-4">Concepto / Comercio</th>
+                    <th className="py-3 px-3">Tarjeta / Banco</th>
+                    <th className="py-3 px-3">Categoría</th>
+                    <th className="py-3 px-3">Tipo</th>
+                    <th className="py-3 px-3 text-right">Monto</th>
+                    <th className="py-3 px-3 text-center">Estado</th>
+                    <th className="py-3 px-3 text-center no-print">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-medium">
+                  {rangeTransactions.map((tx) => {
+                    const card = activeCards.find((c) => c.id === tx.creditCardId);
+                    const cat = categories.find((c) => c.id === tx.categoryId);
+                    const isPayment = tx.type === 'pago_tarjeta';
+
+                    return (
+                      <tr
+                        key={tx.id}
+                        className={`hover:bg-slate-850/60 transition ${
+                          isPayment ? 'bg-emerald-950/10' : ''
+                        }`}
+                      >
+                        {/* Fecha */}
+                        <td className="py-3 px-4 font-mono text-slate-300 whitespace-nowrap">
+                          {tx.date}
+                        </td>
+
+                        {/* Concepto & Comercio */}
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-white flex items-center gap-1.5">
+                            <span>{tx.concept}</span>
+                            {tx.installmentPurchaseId && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
+                                Cuota
+                              </span>
+                            )}
+                          </div>
+                          {tx.notes && (
+                            <div className="text-[10px] text-slate-400 mt-0.5">{tx.notes}</div>
+                          )}
+                        </td>
+
+                        {/* Tarjeta & Banco */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          {card ? (
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: card.color || '#ef4444' }}
+                              />
+                              <div>
+                                <span className="font-semibold text-slate-200 block text-xs">
+                                  {card.name}
+                                </span>
+                                <span className="text-[10px] text-slate-400 block">{card.bank}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs">Tarjeta de Crédito</span>
+                          )}
+                        </td>
+
+                        {/* Categoría */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          {cat ? (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border"
+                              style={{
+                                borderColor: `${cat.color || '#3b82f6'}40`,
+                                backgroundColor: `${cat.color || '#3b82f6'}15`,
+                                color: cat.color || '#60a5fa',
+                              }}
+                            >
+                              <span
+                                className="w-1.5 h-1.5 rounded-full"
+                                style={{ backgroundColor: cat.color || '#3b82f6' }}
+                              />
+                              <span>{cat.name}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-[10px]">General</span>
+                          )}
+                        </td>
+
+                        {/* Tipo */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                              isPayment
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : tx.installmentPurchaseId || tx.origin?.startsWith('cuota:')
+                                ? 'bg-purple-500/20 text-purple-300'
+                                : 'bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            {isPayment
+                              ? 'Abono / Pago'
+                              : tx.installmentPurchaseId || tx.origin?.startsWith('cuota:')
+                              ? 'Cuota a Plazos'
+                              : 'Compra Regular'}
+                          </span>
+                        </td>
+
+                        {/* Monto */}
+                        <td className="py-3 px-3 text-right font-mono font-bold whitespace-nowrap">
+                          <span className={isPayment ? 'text-emerald-400' : 'text-rose-400'}>
+                            {isPayment ? '-' : '+'}
+                            {formatMoney(tx.amount, settings.currencySymbol)}
+                          </span>
+                        </td>
+
+                        {/* Estado */}
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                              tx.status === 'realizado'
+                                ? 'bg-emerald-500/15 text-emerald-400'
+                                : 'bg-amber-500/15 text-amber-400'
+                            }`}
+                          >
+                            {tx.status === 'realizado' ? 'Confirmado' : 'Planificado'}
+                          </span>
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="py-3 px-3 text-center whitespace-nowrap no-print">
+                          <button
+                            onClick={() => {
+                              setEditingTransaction(tx);
+                              setIsNewTxOpen(true);
+                            }}
+                            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                            title="Editar o corregir este movimiento"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* Table Summary Footer */}
+              <div className="p-4 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <span className="text-slate-400">
+                  Mostrando <strong className="text-white">{rangeTransactions.length}</strong> movimientos en el rango del{' '}
+                  <strong className="text-white">{rangeStartDate}</strong> al{' '}
+                  <strong className="text-white">{rangeEndDate}</strong>
+                </span>
+
+                <div className="flex items-center gap-4 text-xs font-mono font-bold">
+                  <div>
+                    <span className="text-slate-400 font-sans font-normal mr-1.5">Total en Pantalla:</span>
+                    <span className="text-rose-400">
+                      {formatMoney(
+                        rangeTransactions.reduce((acc, t) => acc + (t.type === 'pago_tarjeta' ? -t.amount : t.amount), 0),
+                        settings.currencySymbol
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
 
       {/* Quick Pay Modal */}
       {isPayModalOpen && payCardTarget && (

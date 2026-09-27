@@ -12,6 +12,7 @@ import {
   EyeOff,
   Bell,
   Menu,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { formatDateEs } from '../../utils/formatters';
 
@@ -27,6 +28,8 @@ export const Header: React.FC = () => {
     setIsAlertsOpen,
     setIsMobileMenuOpen,
     financialAlerts,
+    activeTab,
+    setActiveTab,
   } = useFinance();
 
   const [isOnline, setIsOnline] = useState(
@@ -116,6 +119,21 @@ export const Header: React.FC = () => {
 
         {/* Right: Quick actions */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Quick Transaction History button */}
+          <button
+            id="btn-header-movimientos"
+            onClick={() => setActiveTab('movimientos')}
+            className={`flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold cursor-pointer transition active:scale-95 border ${
+              activeTab === 'movimientos'
+                ? 'bg-blue-600/20 border-blue-500/50 text-blue-300 shadow-sm shadow-blue-500/10'
+                : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+            }`}
+            title="Historial rápido de movimientos y auditoría"
+          >
+            <ArrowLeftRight className="w-4 h-4 text-emerald-400" />
+            <span className="hidden md:inline">Movs</span>
+          </button>
+
           {/* Universal Quick Search button */}
           <button
             id="btn-header-search"

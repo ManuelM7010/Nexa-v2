@@ -18,10 +18,17 @@
   filter: blur(0px) !important;
 }
 
-/* Mobile viewport touch optimization */
+/* Mobile viewport touch optimization & clean compact typography */
 html {
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+  }
 }
 
 @media print {

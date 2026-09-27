@@ -105,29 +105,38 @@ export const QuickSearchModal: React.FC = () => {
 
   const matchingTransactions = useMemo(() => {
     if (!q) return [];
-    const catMap = new Map<string, string>(categories.map((c) => [c.id, c.name.toLowerCase()]));
+    const catMap = new Map<string, string>(categories.map((c) => [c.id, (c.name || '').toLowerCase()]));
     return transactions
       .filter((t) => {
-        const conceptMatch = t.concept.toLowerCase().includes(q);
+        const conceptMatch = (t.concept || '').toLowerCase().includes(q);
+        const notesMatch = (t.notes || '').toLowerCase().includes(q);
         const catName = t.categoryId ? catMap.get(t.categoryId) || '' : '';
         const catMatch = catName.includes(q);
         const amountDollars = (t.amount / 100).toFixed(2);
         const amountMatch = amountDollars.includes(q);
-        const dateMatch = t.date.includes(q);
-        return conceptMatch || catMatch || amountMatch || dateMatch;
+        const dateMatch = (t.date || '').includes(q);
+        return conceptMatch || notesMatch || catMatch || amountMatch || dateMatch;
       })
-      .slice(0, 10);
+      .slice(0, 15);
   }, [q, transactions, categories]);
 
   const matchingAccounts = useMemo(() => {
-    if (!q) return [];
+    if (!q) {
+      return { matchedAccs: [], matchedCards: [], matchedSavings: [] };
+    }
     const matchedAccs = accounts.filter(
-      (a) => a.name.toLowerCase().includes(q) || (a.bankName && a.bankName.toLowerCase().includes(q))
+      (a) =>
+        (a.name || '').toLowerCase().includes(q) ||
+        (a.bankName && a.bankName.toLowerCase().includes(q))
     );
     const matchedCards = creditCards.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.bank.toLowerCase().includes(q)
+      (c) =>
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.bank || '').toLowerCase().includes(q)
     );
-    const matchedSavings = savingsAccounts.filter((s) => s.name.toLowerCase().includes(q));
+    const matchedSavings = (savingsAccounts || []).filter((s) =>
+      (s.name || '').toLowerCase().includes(q)
+    );
 
     return { matchedAccs, matchedCards, matchedSavings };
   }, [q, accounts, creditCards, savingsAccounts]);
@@ -146,11 +155,11 @@ export const QuickSearchModal: React.FC = () => {
   if (!isQuickSearchOpen) return null;
 
   const totalResults =
-    matchingViews.length +
-    matchingTransactions.length +
-    matchingAccounts.matchedAccs.length +
-    matchingAccounts.matchedCards.length +
-    matchingAccounts.matchedSavings.length;
+    (matchingViews?.length || 0) +
+    (matchingTransactions?.length || 0) +
+    (matchingAccounts?.matchedAccs?.length || 0) +
+    (matchingAccounts?.matchedCards?.length || 0) +
+    (matchingAccounts?.matchedSavings?.length || 0);
 
   return (
     <AnimatePresence>
