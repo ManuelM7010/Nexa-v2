@@ -70,6 +70,9 @@ export interface ExecutiveSummary {
   thisWeekObligations: Transaction[];
   alerts: AlertItem[];
   criticalAlerts: AlertItem[];
+  accountBalances: Record<string, number>;
+  periodLabel: string;
+  isCurrentMonth: boolean;
 }
 
 export interface MonthProjection {
@@ -1415,56 +1418,195 @@ export class NexaFinancialEngine {
     allTransactions: Transaction[],
     budgetItems: BudgetAnalysisItem[],
     liquidityStartDate: string = '2026-09-15',
-    savingsAccounts: SavingsAccount[] = []
+    savingsAccounts: SavingsAccount[] = [],
+    monthTransactions?: Transaction[]
   ): ExecutiveSummary {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     const daysInCurrentMonth = daysInMonth(year, month);
     const monthEndStr = `${monthKey}-${String(daysInCurrentMonth).padStart(2, '0')}`;
+    const todayMonthKey = todayStr.slice(0, 7);
+    const isCurrentMonth = monthKey === todayMonthKey;
+    const isFutureMonth = monthKey > todayMonthKey;
+    const isPastMonth = monthKey < todayMonthKey;
 
-    // Real cash balance right now (cash accounts + bank accounts + realized transactions from liquidityStartDate up to today)
+    // Real cash balance right now (cash accounts + bank accounts + realized transactions from liquidityStartDate up to cutoff)
     let currentRealCashBalance = 0;
     let bankBalance = 0;
     let cashBalance = 0;
+    const accountBalances: Record<string, number> = {};
 
-    // Only compute real cash if today is on or after liquidityStartDate
-    if (todayStr >= liquidityStartDate) {
-      accounts.forEach((acc) => {
-        if (acc.isActive) {
-          currentRealCashBalance += acc.initialBalance;
-          if (acc.type === 'efectivo') {
-            cashBalance += acc.initialBalance;
-          } else {
-            bankBalance += acc.initialBalance;
+    accounts.forEach((acc) => {
+      if (acc.isActive) {
+        accountBalances[acc.id] = acc.initialBalance;
+      }
+    });
+
+    if (monthEndStr >= liquidityStartDate) {
+      if (isCurrentMonth) {
+        // Current month: compute exact real cash balance as of todayStr
+        accounts.forEach((acc) => {
+          if (acc.isActive) {
+            currentRealCashBalance += acc.initialBalance;
+            if (acc.type === 'efectivo') {
+              cashBalance += acc.initialBalance;
+            } else {
+              bankBalance += acc.initialBalance;
+            }
           }
-        }
-      });
+        });
 
-      allTransactions.forEach((tx) => {
-        if (tx.status !== 'realizado') return;
-        // Only apply movements from liquidityStartDate onwards
-        if (tx.date >= liquidityStartDate && tx.date <= todayStr) {
-          if (tx.type === 'transferencia') return;
-          // Gasto con cargo a ahorros no afecta la liquidez bancaria ordinaria
-          if (tx.type === 'gasto_desde_ahorro') return;
-          if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+        allTransactions.forEach((tx) => {
+          if (tx.status !== 'realizado') return;
+          if (tx.date >= liquidityStartDate && tx.date <= todayStr) {
+            if (tx.type === 'transferencia') {
+              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
+                accountBalances[tx.accountId] -= tx.amount;
+              }
+              if (tx.transferToAccountId && accountBalances[tx.transferToAccountId] !== undefined) {
+                accountBalances[tx.transferToAccountId] += tx.amount;
+              }
+              return;
+            }
+            if (tx.type === 'gasto_desde_ahorro') return;
+            if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
 
-          const targetAccount = accounts.find((a) => a.id === tx.accountId);
-          const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
+            const targetAccount = accounts.find((a) => a.id === tx.accountId);
+            const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
 
-          // Retiro de ahorro a banco incrementa la liquidez ordinaria
-          if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
-            currentRealCashBalance += tx.amount;
-            if (isCash) cashBalance += tx.amount;
-            else bankBalance += tx.amount;
-          } else {
-            // Aporte a ahorro o gasto ordinario descuenta de la liquidez
-            currentRealCashBalance -= tx.amount;
-            if (isCash) cashBalance -= tx.amount;
-            else bankBalance -= tx.amount;
+            if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
+              currentRealCashBalance += tx.amount;
+              if (isCash) cashBalance += tx.amount;
+              else bankBalance += tx.amount;
+              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
+                accountBalances[tx.accountId] += tx.amount;
+              }
+            } else {
+              currentRealCashBalance -= tx.amount;
+              if (isCash) cashBalance -= tx.amount;
+              else bankBalance -= tx.amount;
+              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
+                accountBalances[tx.accountId] -= tx.amount;
+              }
+            }
           }
+        });
+      } else if (isFutureMonth) {
+        // Future month (e.g. October, November 2026 onwards):
+        // Inherits continuous liquidity from prior month closing (dailyFlow day 1 initialBalance)
+        // plus any realized transactions specifically registered in this month
+        const openingMonthLiquidity =
+          dailyFlow && dailyFlow.length > 0 ? (dailyFlow[0].initialBalance ?? dailyFlow[0].startingBalance ?? 0) : 0;
+
+        // Apply realized movements up to monthEndStr to account balances
+        allTransactions.forEach((tx) => {
+          if (tx.status !== 'realizado') return;
+          if (tx.date >= liquidityStartDate && tx.date <= monthEndStr) {
+            if (tx.type === 'transferencia') {
+              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
+                accountBalances[tx.accountId] -= tx.amount;
+              }
+              if (tx.transferToAccountId && accountBalances[tx.transferToAccountId] !== undefined) {
+                accountBalances[tx.transferToAccountId] += tx.amount;
+              }
+              return;
+            }
+            if (tx.type === 'gasto_desde_ahorro') return;
+            if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+
+            if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
+              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
+                accountBalances[tx.accountId] += tx.amount;
+              }
+            } else {
+              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
+                accountBalances[tx.accountId] -= tx.amount;
+              }
+            }
+          }
+        });
+
+        // Any realized transactions in this future month
+        const realizedInFutureMonth = allTransactions.filter(
+          (tx) => tx.date.startsWith(monthKey) && tx.status === 'realizado'
+        );
+        let netRealizedInMonth = 0;
+        realizedInFutureMonth.forEach((tx) => {
+          const impact = NexaFinancialEngine.getCashMovementImpact(tx);
+          if (impact.isInflow) netRealizedInMonth += impact.amount;
+          else if (impact.isOutflow) netRealizedInMonth -= impact.amount;
+        });
+
+        currentRealCashBalance = openingMonthLiquidity + netRealizedInMonth;
+
+        // Proportional allocation between banks and cash based on tracked balances
+        const rawBank = accounts
+          .filter((a) => a.isActive && a.type !== 'efectivo')
+          .reduce((acc, a) => acc + Math.max(0, accountBalances[a.id] || 0), 0);
+        const rawCash = accounts
+          .filter((a) => a.isActive && a.type === 'efectivo')
+          .reduce((acc, a) => acc + Math.max(0, accountBalances[a.id] || 0), 0);
+        const rawTotal = rawBank + rawCash;
+
+        if (rawTotal > 0 && currentRealCashBalance > 0) {
+          bankBalance = Math.round((rawBank / rawTotal) * currentRealCashBalance);
+          cashBalance = currentRealCashBalance - bankBalance;
+        } else {
+          bankBalance = currentRealCashBalance;
+          cashBalance = 0;
         }
-      });
+      } else {
+        // Past month: compute up to monthEndStr
+        accounts.forEach((acc) => {
+          if (acc.isActive) {
+            currentRealCashBalance += acc.initialBalance;
+            if (acc.type === 'efectivo') cashBalance += acc.initialBalance;
+            else bankBalance += acc.initialBalance;
+          }
+        });
+
+        allTransactions.forEach((tx) => {
+          if (tx.status !== 'realizado') return;
+          if (tx.date >= liquidityStartDate && tx.date <= monthEndStr) {
+            if (tx.type === 'transferencia') {
+              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
+                accountBalances[tx.accountId] -= tx.amount;
+              }
+              if (tx.transferToAccountId && accountBalances[tx.transferToAccountId] !== undefined) {
+                accountBalances[tx.transferToAccountId] += tx.amount;
+              }
+              return;
+            }
+            if (tx.type === 'gasto_desde_ahorro') return;
+            if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+
+            const targetAccount = accounts.find((a) => a.id === tx.accountId);
+            const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
+
+            if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
+              currentRealCashBalance += tx.amount;
+              if (isCash) cashBalance += tx.amount;
+              else bankBalance += tx.amount;
+              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
+                accountBalances[tx.accountId] += tx.amount;
+              }
+            } else {
+              currentRealCashBalance -= tx.amount;
+              if (isCash) cashBalance -= tx.amount;
+              else bankBalance -= tx.amount;
+              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
+                accountBalances[tx.accountId] -= tx.amount;
+              }
+            }
+          }
+        });
+      }
     }
+
+    const periodLabel = isCurrentMonth
+      ? 'Hoy'
+      : isFutureMonth
+      ? `Apertura ${MONTH_NAMES_ES[month - 1] || 'Mes'}`
+      : `Cierre ${MONTH_NAMES_ES[month - 1] || 'Mes'}`;
 
     // Savings Account Real Balances Calculation
     let totalSavingsBalance = 0;
@@ -1487,7 +1629,7 @@ export class NexaFinancialEngine {
     const totalLiquidWealth = currentRealCashBalance + totalSavingsBalance;
 
     // Month totals
-    const monthTxs = allTransactions.filter(
+    const monthTxs = (monthTransactions || allTransactions).filter(
       (tx) => tx.date.startsWith(monthKey) && tx.status !== 'cancelado' && tx.type !== 'transferencia'
     );
 
@@ -1731,6 +1873,9 @@ export class NexaFinancialEngine {
       thisWeekObligations,
       alerts,
       criticalAlerts,
+      accountBalances,
+      periodLabel,
+      isCurrentMonth,
     };
   }
 

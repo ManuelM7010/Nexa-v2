@@ -32,6 +32,14 @@ import {
   Wallet,
   ArrowRight,
   Layers,
+  ChevronDown,
+  ChevronUp,
+  CreditCard,
+  Building2,
+  Calendar,
+  Clock,
+  Target,
+  Percent,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -47,6 +55,7 @@ import {
   Cell,
   AreaChart,
   Area,
+  ReferenceLine,
 } from 'recharts';
 import { NewCategoryModal } from '../common/NewCategoryModal';
 
@@ -61,6 +70,11 @@ export const BudgetView: React.FC = () => {
     settings,
     allMonthTransactions,
     todayStr,
+    accounts,
+    creditCards,
+    toggleTransactionStatus,
+    setEditingTransaction,
+    setIsNewTxOpen,
   } = useFinance();
 
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -70,11 +84,50 @@ export const BudgetView: React.FC = () => {
 
   // Active chart view tab
   const [activeChartTab, setActiveChartTab] = useState<
-    'comparative' | 'distribution' | 'velocity' | 'variance'
+    'comparative' | 'distribution' | 'velocity' | 'variance' | 'ranking'
   >('comparative');
 
   // Distribution chart toggle (real vs budget)
   const [pieMode, setPieMode] = useState<'real' | 'budget'>('real');
+
+  // Category Selection from Charts & Row Expansion State
+  const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  const handleSelectCategory = (catNameOrId: string) => {
+    const found = categories.find(
+      (c) =>
+        c.name.toLowerCase() === catNameOrId.toLowerCase() ||
+        c.id === catNameOrId
+    );
+    const catName = found?.name || catNameOrId;
+    const catId =
+      found?.id ||
+      budgetAnalysis.find((b) => (b.category?.name || b.categoryName) === catName)?.categoryId;
+
+    if (selectedCategoryName === catName) {
+      // Deselect if already active
+      setSelectedCategoryName(null);
+    } else {
+      setSelectedCategoryName(catName);
+      if (catId) {
+        setExpandedCategories((prev) => ({ ...prev, [catId]: true }));
+      }
+      setTimeout(() => {
+        const el = document.getElementById('budget-categories-table');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  };
+
+  const toggleExpandCategory = (catId: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [catId]: !prev[catId],
+    }));
+  };
 
   // Table filters & sorting
   const [tableSearch, setTableSearch] = useState('');
@@ -294,6 +347,43 @@ export const BudgetView: React.FC = () => {
       .sort((a, b) => a.availableRaw - b.availableRaw);
   }, [budgetAnalysis]);
 
+  // Ranking Data (% execution sorted highest to lowest)
+  const rankingData = useMemo(() => {
+    return budgetAnalysis
+      .filter((b) => b.budgetedAmount > 0 || (b.realSpent || b.realAmount || 0) > 0)
+      .map((b) => {
+        const catName = b.category?.name || b.categoryName || 'General';
+        const pct = b.executionPercentage ?? b.percentUsed ?? 0;
+        return {
+          name: catName.length > 14 ? catName.substring(0, 12) + '...' : catName,
+          fullName: catName,
+          pct,
+          real: centsToDollars(b.realSpent || b.realAmount || 0),
+          budget: centsToDollars(b.budgetedAmount),
+        };
+      })
+      .sort((a, b) => b.pct - a.pct);
+  }, [budgetAnalysis]);
+
+  // Category with highest available cushion
+  const bestMarginCat = useMemo(() => {
+    const list = [...budgetAnalysis].filter(
+      (b) => (b.availableBalance ?? b.availableAmount ?? 0) > 0
+    );
+    if (list.length === 0) return null;
+    list.sort(
+      (a, b) =>
+        (b.availableBalance ?? b.availableAmount ?? 0) - (a.availableBalance ?? a.availableAmount ?? 0)
+    );
+    const top = list[0];
+    return {
+      name: top.category?.name || top.categoryName || 'General',
+      available: top.availableBalance ?? top.availableAmount ?? 0,
+      budget: top.budgetedAmount,
+      real: top.realSpent || top.realAmount || 0,
+    };
+  }, [budgetAnalysis]);
+
   // Handlers for in-line edit
   const handleOpenEdit = (categoryId: string, currentBudget: number) => {
     setEditingCategoryId(categoryId);
@@ -318,11 +408,19 @@ export const BudgetView: React.FC = () => {
     setEditingCategoryId(null);
   };
 
-  // Filtered & sorted table list
+  // Filtered & sorted table list (with drilldown filter from chart)
   const filteredTableList = useMemo(() => {
     return budgetAnalysis
       .filter((item) => {
         const catName = item.category?.name || item.categoryName || '';
+        
+        // Interactive Filter from Charts
+        if (selectedCategoryName) {
+          if (catName.toLowerCase() !== selectedCategoryName.toLowerCase()) {
+            return false;
+          }
+        }
+
         // Text filter
         if (tableSearch.trim()) {
           const q = tableSearch.toLowerCase();
@@ -357,7 +455,7 @@ export const BudgetView: React.FC = () => {
         }
         return tableSortAsc ? diff : -diff;
       });
-  }, [budgetAnalysis, tableSearch, tableStatusFilter, tableSortBy, tableSortAsc]);
+  }, [budgetAnalysis, selectedCategoryName, tableSearch, tableStatusFilter, tableSortBy, tableSortAsc]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -622,6 +720,132 @@ export const BudgetView: React.FC = () => {
         </div>
       </div>
 
+      {/* Row 3: Strategic Depth KPI Cards (4 Additional Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Card 9: Mayor Colchón de Ahorro */}
+        <div
+          onClick={() => {
+            if (bestMarginCat) handleSelectCategory(bestMarginCat.name);
+          }}
+          className="rounded-2xl bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-4 relative overflow-hidden shadow-lg flex flex-col justify-between cursor-pointer transition group"
+        >
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              Mayor Colchón Disponible
+            </span>
+            <span className="text-[10px] text-emerald-400 group-hover:translate-x-0.5 transition font-semibold">
+              Filtrar ↗
+            </span>
+          </div>
+          <div>
+            <div className="text-lg font-black text-white truncate">
+              {bestMarginCat ? bestMarginCat.name : 'Sin margen'}
+            </div>
+            <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">
+              +{formatMoney(bestMarginCat?.available || 0, settings.currencySymbol)}
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-400 truncate">
+            {bestMarginCat
+              ? `Presupuesto: ${formatMoney(bestMarginCat.budget, settings.currencySymbol)} • Gastado: ${formatMoney(bestMarginCat.real, settings.currencySymbol)}`
+              : 'Todas las categorías al tope'}
+          </div>
+        </div>
+
+        {/* Card 10: Salud Presupuestaria Global */}
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 relative overflow-hidden shadow-lg flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5" />
+              Salud de Presupuesto
+            </span>
+            <span className="font-mono text-xs font-bold text-blue-300">
+              {budgetAnalysis.length > 0 ? Math.round((inBudgetCount / budgetAnalysis.length) * 100) : 100}%
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <div className="text-2xl font-black text-white font-mono">
+              {inBudgetCount} <span className="text-sm font-normal text-slate-400">/ {budgetAnalysis.length} en meta</span>
+            </div>
+            <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden flex">
+              <div
+                className="bg-emerald-500 h-full transition-all"
+                style={{ width: `${budgetAnalysis.length > 0 ? (inBudgetCount / budgetAnalysis.length) * 100 : 100}%` }}
+              />
+              <div
+                className="bg-amber-500 h-full transition-all"
+                style={{ width: `${budgetAnalysis.length > 0 ? (warningCount / budgetAnalysis.length) * 100 : 0}%` }}
+              />
+              <div
+                className="bg-rose-500 h-full transition-all"
+                style={{ width: `${budgetAnalysis.length > 0 ? (exceededCount / budgetAnalysis.length) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-400 flex items-center justify-between">
+            <span className="text-emerald-400">{inBudgetCount} En meta</span>
+            <span className="text-amber-400">{warningCount} Alerta</span>
+            <span className="text-rose-400">{exceededCount} Sobregiro</span>
+          </div>
+        </div>
+
+        {/* Card 11: Presupuesto Diario Sugerido */}
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 relative overflow-hidden shadow-lg flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5" />
+              Ritmo Disponible Diario
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {remainingDays} días rest.
+            </span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-sky-300 font-mono">
+              {formatMoney(suggestedDailySpend, settings.currencySymbol)}
+              <span className="text-xs font-normal text-slate-400">/día</span>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">
+              Gasto promedio actual: <strong className="text-slate-300 font-mono">{formatMoney(avgDailySpent, settings.currencySymbol)}/día</strong>
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-400">
+            {suggestedDailySpend >= avgDailySpent ? (
+              <span className="text-emerald-400 font-semibold">✓ Ritmo holgado disponible</span>
+            ) : (
+              <span className="text-amber-400 font-semibold">⚠ Requiere reducir ritmo</span>
+            )}
+          </div>
+        </div>
+
+        {/* Card 12: Total Sobregiro Excedido */}
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 relative overflow-hidden shadow-lg flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5" />
+              Sobregiro Acumulado
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-rose-500/10 text-rose-400">
+              {exceededCount} {exceededCount === 1 ? 'rubro' : 'rubros'}
+            </span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-rose-400 font-mono">
+              {totalOverrunCents > 0 ? `-${formatMoney(totalOverrunCents, settings.currencySymbol)}` : '$0.00'}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">
+              {totalOverrunCents > 0
+                ? 'Exceso de gastos que compromete la meta global'
+                : '¡Excelente! Ninguna categoría sobrepasada'}
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-400">
+            Compensa reasignando margen de categorías holgadas
+          </div>
+        </div>
+      </div>
+
       {/* Top 3 Highest Spending Categories Quick Ranking Bar */}
       {topSpentCategories.length > 0 && (
         <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-2.5 shadow-lg">
@@ -648,14 +872,17 @@ export const BudgetView: React.FC = () => {
             {topSpentCategories.map((top, idx) => (
               <div
                 key={top.id}
-                className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex flex-col justify-between gap-1.5"
+                onClick={() => handleSelectCategory(top.name)}
+                className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 hover:border-blue-500/60 hover:bg-slate-900/90 flex flex-col justify-between gap-1.5 cursor-pointer transition group"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-5 h-5 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-black text-slate-300">
                       #{idx + 1}
                     </span>
-                    <span className="text-xs font-bold text-white truncate">{top.name}</span>
+                    <span className="text-xs font-bold text-white truncate group-hover:text-blue-300 transition">
+                      {top.name}
+                    </span>
                   </div>
                   <span className="text-xs font-mono font-bold text-blue-400 shrink-0">
                     {formatMoney(top.real, settings.currencySymbol)}
@@ -690,6 +917,10 @@ export const BudgetView: React.FC = () => {
                     }`}
                     style={{ width: `${Math.min(100, top.pct)}%` }}
                   />
+                </div>
+                <div className="text-[10px] text-blue-400/80 flex items-center justify-between pt-0.5">
+                  <span>Ver desglose de movimientos</span>
+                  <span className="group-hover:translate-x-0.5 transition">↗</span>
                 </div>
               </div>
             ))}
@@ -760,6 +991,18 @@ export const BudgetView: React.FC = () => {
               <ArrowUpDown className="w-3.5 h-3.5" />
               <span>Desviaciones (Márgenes)</span>
             </button>
+
+            <button
+              onClick={() => setActiveChartTab('ranking')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                activeChartTab === 'ranking'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Percent className="w-3.5 h-3.5" />
+              <span>Ranking de Ejecución (%)</span>
+            </button>
           </div>
         </div>
 
@@ -786,7 +1029,16 @@ export const BudgetView: React.FC = () => {
 
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  onClick={(state: any) => {
+                    if (state && state.activePayload && state.activePayload.length) {
+                      handleSelectCategory(String(state.activePayload[0].payload.fullName));
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} />
                   <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
@@ -808,18 +1060,43 @@ export const BudgetView: React.FC = () => {
                             <div className="text-amber-400">
                               Total Proyectado: ${data.Proyectado.toFixed(2)}
                             </div>
+                            <div className="text-[10px] text-blue-400 pt-1 font-semibold flex items-center gap-1">
+                              <span>Toca para ver desglose de movimientos</span>
+                              <span>↗</span>
+                            </div>
                           </div>
                         );
                       }
                       return null;
                     }}
                   />
-                  <Bar dataKey="Presupuestado" fill="#475569" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Real" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Proyectado" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Bar
+                    dataKey="Presupuestado"
+                    fill="#475569"
+                    radius={[4, 4, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data) => handleSelectCategory(data.fullName)}
+                  />
+                  <Bar
+                    dataKey="Real"
+                    fill="#3b82f6"
+                    radius={[4, 4, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data) => handleSelectCategory(data.fullName)}
+                  />
+                  <Bar
+                    dataKey="Proyectado"
+                    fill="#f59e0b"
+                    radius={[4, 4, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data) => handleSelectCategory(data.fullName)}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <p className="text-[11px] text-slate-400 mt-2">
+              💡 <strong>Interactivo:</strong> Toca cualquier barra de una categoría para filtrar automáticamente la tabla inferior y ver el desglose detallado de todos sus movimientos.
+            </p>
           </div>
         )}
 
@@ -867,9 +1144,16 @@ export const BudgetView: React.FC = () => {
                       paddingAngle={3}
                       stroke="#0f172a"
                       strokeWidth={2}
+                      onClick={(entry: any) => handleSelectCategory(String(entry.name))}
+                      className="cursor-pointer"
                     >
                       {(pieMode === 'real' ? pieDataReal : pieDataBudget).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.color}
+                          stroke={selectedCategoryName === entry.name ? '#ffffff' : '#0f172a'}
+                          strokeWidth={selectedCategoryName === entry.name ? 3 : 2}
+                        />
                       ))}
                     </Pie>
                     <Tooltip
@@ -909,20 +1193,26 @@ export const BudgetView: React.FC = () => {
                   return (
                     <div
                       key={item.name}
-                      className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between text-xs"
+                      onClick={() => handleSelectCategory(item.name)}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between text-xs cursor-pointer transition group ${
+                        selectedCategoryName === item.name
+                          ? 'bg-blue-950/60 border-blue-500 shadow-md shadow-blue-500/10'
+                          : 'bg-slate-950/60 border-slate-800/80 hover:border-blue-500/50 hover:bg-slate-900/60'
+                      }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: item.color }}
                         />
-                        <span className="font-semibold text-white truncate">{item.name}</span>
+                        <span className="font-semibold text-white truncate group-hover:text-blue-300 transition">{item.name}</span>
                       </div>
                       <div className="text-right shrink-0">
                         <span className="font-mono font-bold text-slate-200 mr-2">
                           ${item.value.toFixed(2)}
                         </span>
                         <span className="text-[10px] font-mono text-slate-400">({pct}%)</span>
+                        <span className="ml-1.5 text-[10px] text-blue-400 opacity-0 group-hover:opacity-100 transition">↗</span>
                       </div>
                     </div>
                   );
@@ -1040,7 +1330,16 @@ export const BudgetView: React.FC = () => {
 
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={varianceData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <BarChart
+                  data={varianceData}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  onClick={(state: any) => {
+                    if (state && state.activePayload && state.activePayload.length) {
+                      handleSelectCategory(String(state.activePayload[0].payload.fullName));
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                   <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} />
                   <YAxis stroke="#64748b" tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
@@ -1063,23 +1362,137 @@ export const BudgetView: React.FC = () => {
                                 Margen disponible restante: ${data.Disponible.toFixed(2)}
                               </div>
                             )}
+                            <div className="text-[10px] text-blue-400 pt-1 font-semibold">
+                              Toca para filtrar y ver movimientos ↗
+                            </div>
                           </div>
                         );
                       }
                       return null;
                     }}
                   />
-                  <Bar dataKey="Disponible" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Sobregiro" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Bar
+                    dataKey="Disponible"
+                    fill="#10b981"
+                    radius={[4, 4, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data: any) => handleSelectCategory(String(data.fullName))}
+                  />
+                  <Bar
+                    dataKey="Sobregiro"
+                    fill="#ef4444"
+                    radius={[4, 4, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data: any) => handleSelectCategory(String(data.fullName))}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <p className="text-[11px] text-slate-400 mt-2">
+              💡 Toca cualquier barra para inspeccionar la categoría y abrir su desglose de movimientos.
+            </p>
+          </div>
+        )}
+
+        {/* Chart View 5: Ranking de Ejecución Presupuestaria (%) */}
+        {activeChartTab === 'ranking' && (
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
+              <span>Porcentaje de presupuesto consumido por categoría (Límite = 100%)</span>
+              <div className="flex items-center gap-4 text-[11px]">
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" />
+                  <span>En Meta (&lt;80%)</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-amber-400">
+                  <span className="w-2.5 h-2.5 rounded bg-amber-500 inline-block" />
+                  <span>Alerta (80%-100%)</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-rose-400">
+                  <span className="w-2.5 h-2.5 rounded bg-rose-500 inline-block" />
+                  <span>Sobregiro (&gt;100%)</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={rankingData}
+                  layout="vertical"
+                  margin={{ top: 10, right: 30, left: 40, bottom: 0 }}
+                  onClick={(state: any) => {
+                    if (state && state.activePayload && state.activePayload.length) {
+                      handleSelectCategory(String(state.activePayload[0].payload.fullName));
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+                  <XAxis type="number" domain={[0, 'dataMax + 20']} unit="%" stroke="#64748b" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} width={100} />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="rounded-xl bg-slate-950 border border-slate-800 p-3 shadow-2xl text-xs space-y-1">
+                            <div className="font-bold text-white border-b border-slate-800 pb-1">
+                              {data.fullName}
+                            </div>
+                            <div className="text-slate-300">
+                              Presupuesto: ${data.budget.toFixed(2)}
+                            </div>
+                            <div className="text-blue-400 font-bold">
+                              Gasto Real: ${data.real.toFixed(2)}
+                            </div>
+                            <div
+                              className={`font-mono font-bold ${
+                                data.pct > 100
+                                  ? 'text-rose-400'
+                                  : data.pct >= 80
+                                  ? 'text-amber-400'
+                                  : 'text-emerald-400'
+                              }`}
+                            >
+                              Ejecución: {data.pct}%
+                            </div>
+                            <div className="text-[10px] text-blue-400 pt-1 font-semibold">
+                              Toca para filtrar y ver movimientos ↗
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <ReferenceLine x={100} stroke="#ef4444" strokeDasharray="3 3" label={{ value: '100% Límite', fill: '#ef4444', fontSize: 10 }} />
+                  <ReferenceLine x={80} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: '80% Alerta', fill: '#f59e0b', fontSize: 10 }} />
+                  <Bar
+                    dataKey="pct"
+                    radius={[0, 4, 4, 0]}
+                    cursor="pointer"
+                    onClick={(data: any) => handleSelectCategory(String(data.fullName))}
+                  >
+                    {rankingData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.pct > 100 ? '#ef4444' : entry.pct >= 80 ? '#f59e0b' : '#10b981'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2">
+              💡 Toca cualquier barra para filtrar la tabla y ver el desglose exacto de movimientos en esa categoría.
+            </p>
           </div>
         )}
       </div>
 
       {/* Detailed Categories Table with Search & Smart Filtering */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
+      <div id="budget-categories-table" className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
         <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1087,7 +1500,7 @@ export const BudgetView: React.FC = () => {
               <span>Presupuesto por Categoría & Alertas de Cumplimiento</span>
             </h3>
             <p className="text-xs text-slate-400">
-              Control preventivo al 80% y alerta crítica al superar el 100%
+              Control preventivo al 80% y alerta crítica al superar el 100%. Toca una categoría para ver sus movimientos.
             </p>
           </div>
 
@@ -1133,6 +1546,25 @@ export const BudgetView: React.FC = () => {
           </div>
         </div>
 
+        {/* Active Filter Banner from Interactive Chart Selection */}
+        {selectedCategoryName && (
+          <div className="mx-4 mt-3 p-3 rounded-xl bg-blue-950/40 border border-blue-500/40 flex items-center justify-between text-xs animate-in fade-in duration-150">
+            <div className="flex items-center gap-2 text-blue-300 font-semibold">
+              <Filter className="w-4 h-4 text-blue-400" />
+              <span>
+                Filtrado interactivo por gráfico: <strong className="text-white underline">{selectedCategoryName}</strong>
+              </span>
+            </div>
+            <button
+              onClick={() => setSelectedCategoryName(null)}
+              className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-200 font-semibold transition cursor-pointer flex items-center gap-1 text-[11px]"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Ver todas las categorías</span>
+            </button>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300 border-collapse">
             <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-800">
@@ -1148,7 +1580,7 @@ export const BudgetView: React.FC = () => {
                   className="py-3 px-4 cursor-pointer hover:text-white transition"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Categoría</span>
+                    <span>Categoría & Desglose</span>
                     {tableSortBy === 'name' && (
                       <ArrowUpDown className="w-3 h-3 text-blue-400" />
                     )}
@@ -1232,179 +1664,347 @@ export const BudgetView: React.FC = () => {
                 const catId = item.category?.id || item.categoryId;
                 const catName = item.category?.name || item.categoryName || 'General';
                 const isEditing = editingCategoryId === catId;
+                const isExpanded = !!expandedCategories[catId];
+                const isSelected = selectedCategoryName?.toLowerCase() === catName.toLowerCase();
+                const categoryMovements = allMonthTransactions.filter(
+                  (tx) => tx.categoryId === catId && tx.type !== 'transferencia'
+                );
 
                 return (
-                  <tr key={catId} className="hover:bg-slate-850/60 transition group">
-                    {/* Category Name */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{
-                            backgroundColor:
-                              item.category?.color || item.categoryColor || '#3b82f6',
-                          }}
-                        />
-                        <div className="font-bold text-white truncate max-w-[160px] sm:max-w-none">
-                          {catName}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const foundCat =
-                              categories.find((c) => c.id === catId) || item.category || null;
-                            setCategoryToEditModal(foundCat);
-                            setIsCategoryModalOpen(true);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 hover:opacity-100 text-slate-500 hover:text-blue-400 p-1 rounded transition cursor-pointer"
-                          title={`Editar categoría "${catName}"`}
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </td>
-
-                    {/* Presupuesto */}
-                    <td className="py-3.5 px-3 text-right font-mono font-semibold text-white">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          autoFocus
-                          value={budgetInput}
-                          onChange={(e) => setBudgetInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveBudget(catId);
-                            if (e.key === 'Escape') setEditingCategoryId(null);
-                          }}
-                          className="w-24 bg-slate-950 border border-blue-500 rounded px-2 py-1 text-right text-white focus:outline-none"
-                        />
-                      ) : (
-                        formatMoney(item.budgetedAmount, settings.currencySymbol)
-                      )}
-                    </td>
-
-                    {/* Gasto Real */}
-                    <td className="py-3.5 px-3 text-right font-mono text-blue-400 font-bold">
-                      {formatMoney(item.realSpent || item.realAmount || 0, settings.currencySymbol)}
-                    </td>
-
-                    {/* Pendiente Planificado */}
-                    <td className="py-3.5 px-3 text-right font-mono text-slate-400">
-                      {formatMoney(
-                        item.plannedPendingSpent || item.plannedPendingAmount || 0,
-                        settings.currencySymbol
-                      )}
-                    </td>
-
-                    {/* Total Proyectado */}
-                    <td className="py-3.5 px-3 text-right font-mono font-bold text-slate-200">
-                      {formatMoney(
-                        item.totalProjected || item.projectedTotalAmount || 0,
-                        settings.currencySymbol
-                      )}
-                    </td>
-
-                    {/* Saldo Disponible */}
-                    <td className="py-3.5 px-3 text-right font-mono font-bold">
-                      <span
-                        className={
-                          (item.availableBalance ?? item.availableAmount ?? 0) < 0
-                            ? 'text-rose-400'
-                            : (item.availableBalance ?? item.availableAmount ?? 0) < 2000
-                            ? 'text-amber-400'
-                            : 'text-emerald-400'
-                        }
-                      >
-                        {formatMoney(
-                          item.availableBalance ?? item.availableAmount ?? 0,
-                          settings.currencySymbol
-                        )}
-                      </span>
-                    </td>
-
-                    {/* Progress Bar & Alert */}
-                    <td className="py-3.5 px-4">
-                      <div className="space-y-1.5 min-w-[130px]">
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span
-                            className={`font-bold font-mono ${
-                              item.status === 'exceeded' || item.status === 'sobregiro'
-                                ? 'text-rose-400'
-                                : item.status === 'warning' || item.status === 'alerta'
-                                ? 'text-amber-400'
-                                : 'text-slate-300'
-                            }`}
+                  <React.Fragment key={catId}>
+                    <tr
+                      className={`transition group ${
+                        isSelected
+                          ? 'bg-blue-950/30 border-l-2 border-l-blue-400'
+                          : 'hover:bg-slate-850/60'
+                      }`}
+                    >
+                      {/* Category Name & Expand Toggle */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpandCategory(catId)}
+                            className="p-1 rounded text-slate-500 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                            title={isExpanded ? 'Ocultar desglose de movimientos' : 'Ver desglose de movimientos'}
                           >
-                            {item.executionPercentage ?? item.percentUsed ?? 0}%
-                          </span>
-
-                          {(item.status === 'exceeded' || item.status === 'sobregiro') && (
-                            <span className="flex items-center gap-1 text-rose-400 font-bold">
-                              <AlertCircle className="w-3 h-3" /> Sobrepasado
-                            </span>
-                          )}
-                          {(item.status === 'warning' || item.status === 'alerta') && (
-                            <span className="flex items-center gap-1 text-amber-400 font-semibold">
-                              <AlertTriangle className="w-3 h-3" /> Alerta 80%
-                            </span>
-                          )}
-                          {(item.status === 'normal' || item.status === 'en_presupuesto') &&
-                            item.budgetedAmount > 0 && (
-                              <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-                                <CheckCircle2 className="w-3 h-3" /> En Meta
-                              </span>
-                            )}
-                        </div>
-
-                        <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              item.status === 'exceeded' || item.status === 'sobregiro'
-                                ? 'bg-rose-500'
-                                : item.status === 'warning' || item.status === 'alerta'
-                                ? 'bg-amber-500'
-                                : 'bg-blue-500'
-                            }`}
+                            <ChevronDown
+                              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                isExpanded ? 'rotate-180 text-blue-400' : 'text-slate-400'
+                              }`}
+                            />
+                          </button>
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{
-                              width: `${Math.min(
-                                100,
-                                item.executionPercentage ?? item.percentUsed ?? 0
-                              )}%`,
+                              backgroundColor:
+                                item.category?.color || item.categoryColor || '#3b82f6',
                             }}
                           />
+                          <div
+                            onClick={() => toggleExpandCategory(catId)}
+                            className="font-bold text-white truncate max-w-[160px] sm:max-w-none cursor-pointer hover:text-blue-300 transition flex items-center gap-1.5"
+                          >
+                            <span>{catName}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono font-normal">
+                              {categoryMovements.length}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const foundCat =
+                                categories.find((c) => c.id === catId) || item.category || null;
+                              setCategoryToEditModal(foundCat);
+                              setIsCategoryModalOpen(true);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 hover:opacity-100 text-slate-500 hover:text-blue-400 p-1 rounded transition cursor-pointer"
+                            title={`Editar categoría "${catName}"`}
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Action */}
-                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
-                      {isEditing ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => handleSaveBudget(catId)}
-                            className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold cursor-pointer"
-                          >
-                            OK
-                          </button>
-                          <button
-                            onClick={() => setEditingCategoryId(null)}
-                            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] cursor-pointer"
-                          >
-                            X
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleOpenEdit(catId, item.budgetedAmount)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-                          title="Asignar o modificar presupuesto"
+                      {/* Presupuesto */}
+                      <td className="py-3.5 px-3 text-right font-mono font-semibold text-white">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            autoFocus
+                            value={budgetInput}
+                            onChange={(e) => setBudgetInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveBudget(catId);
+                              if (e.key === 'Escape') setEditingCategoryId(null);
+                            }}
+                            className="w-24 bg-slate-950 border border-blue-500 rounded px-2 py-1 text-right text-white focus:outline-none"
+                          />
+                        ) : (
+                          formatMoney(item.budgetedAmount, settings.currencySymbol)
+                        )}
+                      </td>
+
+                      {/* Gasto Real */}
+                      <td className="py-3.5 px-3 text-right font-mono text-blue-400 font-bold">
+                        {formatMoney(item.realSpent || item.realAmount || 0, settings.currencySymbol)}
+                      </td>
+
+                      {/* Pendiente Planificado */}
+                      <td className="py-3.5 px-3 text-right font-mono text-slate-400">
+                        {formatMoney(
+                          item.plannedPendingSpent || item.plannedPendingAmount || 0,
+                          settings.currencySymbol
+                        )}
+                      </td>
+
+                      {/* Total Proyectado */}
+                      <td className="py-3.5 px-3 text-right font-mono font-bold text-slate-200">
+                        {formatMoney(
+                          item.totalProjected || item.projectedTotalAmount || 0,
+                          settings.currencySymbol
+                        )}
+                      </td>
+
+                      {/* Saldo Disponible */}
+                      <td className="py-3.5 px-3 text-right font-mono font-bold">
+                        <span
+                          className={
+                            (item.availableBalance ?? item.availableAmount ?? 0) < 0
+                              ? 'text-rose-400'
+                              : (item.availableBalance ?? item.availableAmount ?? 0) < 2000
+                              ? 'text-amber-400'
+                              : 'text-emerald-400'
+                          }
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                          {formatMoney(
+                            item.availableBalance ?? item.availableAmount ?? 0,
+                            settings.currencySymbol
+                          )}
+                        </span>
+                      </td>
+
+                      {/* Progress Bar & Alert */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-1.5 min-w-[130px]">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span
+                              className={`font-bold font-mono ${
+                                item.status === 'exceeded' || item.status === 'sobregiro'
+                                  ? 'text-rose-400'
+                                  : item.status === 'warning' || item.status === 'alerta'
+                                  ? 'text-amber-400'
+                                  : 'text-slate-300'
+                              }`}
+                            >
+                              {item.executionPercentage ?? item.percentUsed ?? 0}%
+                            </span>
+
+                            {(item.status === 'exceeded' || item.status === 'sobregiro') && (
+                              <span className="flex items-center gap-1 text-rose-400 font-bold">
+                                <AlertCircle className="w-3 h-3" /> Sobrepasado
+                              </span>
+                            )}
+                            {(item.status === 'warning' || item.status === 'alerta') && (
+                              <span className="flex items-center gap-1 text-amber-400 font-semibold">
+                                <AlertTriangle className="w-3 h-3" /> Alerta 80%
+                              </span>
+                            )}
+                            {(item.status === 'normal' || item.status === 'en_presupuesto') &&
+                              item.budgetedAmount > 0 && (
+                                <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                                  <CheckCircle2 className="w-3 h-3" /> En Meta
+                                </span>
+                              )}
+                          </div>
+
+                          <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                item.status === 'exceeded' || item.status === 'sobregiro'
+                                  ? 'bg-rose-500'
+                                  : item.status === 'warning' || item.status === 'alerta'
+                                  ? 'bg-amber-500'
+                                  : 'bg-blue-500'
+                              }`}
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  item.executionPercentage ?? item.percentUsed ?? 0
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Action */}
+                      <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                        {isEditing ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleSaveBudget(catId)}
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold cursor-pointer"
+                            >
+                              OK
+                            </button>
+                            <button
+                              onClick={() => setEditingCategoryId(null)}
+                              className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] cursor-pointer"
+                            >
+                              X
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => toggleExpandCategory(catId)}
+                              className={`p-1.5 rounded-lg transition cursor-pointer ${
+                                isExpanded
+                                  ? 'bg-blue-600/20 text-blue-300'
+                                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                              }`}
+                              title={isExpanded ? 'Cerrar desglose' : 'Ver desglose'}
+                            >
+                              <Layers className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenEdit(catId, item.budgetedAmount)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                              title="Asignar o modificar presupuesto"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+
+                    {/* Expandable Category Movements Breakdown Sub-Row */}
+                    {isExpanded && (
+                      <tr key={`${catId}-breakdown`} className="bg-slate-950/80 border-b border-slate-800">
+                        <td colSpan={8} className="p-3 sm:p-4 pl-4 sm:pl-10">
+                          <div className="rounded-xl bg-slate-900 border border-slate-800/80 p-3 sm:p-4 space-y-3 shadow-inner">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{
+                                    backgroundColor:
+                                      item.category?.color || item.categoryColor || '#3b82f6',
+                                  }}
+                                />
+                                <span className="font-bold text-white text-xs">
+                                  Desglose de Movimientos — {catName}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                                  {categoryMovements.length} {categoryMovements.length === 1 ? 'movimiento' : 'movimientos'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4 text-xs font-mono">
+                                <span className="text-slate-400">
+                                  Real: <strong className="text-blue-400">{formatMoney(item.realSpent || item.realAmount || 0, settings.currencySymbol)}</strong>
+                                </span>
+                                <span className="text-slate-400">
+                                  Plan: <strong className="text-slate-300">{formatMoney(item.plannedPendingSpent || item.plannedPendingAmount || 0, settings.currencySymbol)}</strong>
+                                </span>
+                              </div>
+                            </div>
+
+                            {categoryMovements.length === 0 ? (
+                              <div className="py-4 text-center text-slate-500 text-xs">
+                                <p>No hay movimientos registrados en {catName} para este mes.</p>
+                              </div>
+                            ) : (
+                              <div className="divide-y divide-slate-800/60 max-h-72 overflow-y-auto pr-1">
+                                {categoryMovements.map((tx) => {
+                                  const card = tx.creditCardId
+                                    ? creditCards.find((c) => c.id === tx.creditCardId)
+                                    : null;
+                                  const acc = tx.accountId
+                                    ? accounts.find((a) => a.id === tx.accountId)
+                                    : null;
+                                  const isReal = tx.status === 'realizado';
+
+                                  return (
+                                    <div
+                                      key={tx.id}
+                                      className="py-2.5 flex items-center justify-between gap-3 text-xs hover:bg-slate-850/40 px-2 rounded-lg transition"
+                                    >
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        <span className="font-mono text-slate-400 text-[11px] shrink-0 flex items-center gap-1">
+                                          <Calendar className="w-3 h-3 text-slate-500" />
+                                          {tx.date}
+                                        </span>
+                                        <div className="min-w-0">
+                                          <span className="font-semibold text-white truncate block">
+                                            {tx.concept}
+                                          </span>
+                                          <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                                            {card ? (
+                                              <span className="flex items-center gap-1 text-amber-400 font-mono">
+                                                <CreditCard className="w-3 h-3" />
+                                                {card.name}
+                                              </span>
+                                            ) : acc ? (
+                                              <span className="flex items-center gap-1 text-sky-400 font-mono">
+                                                <Building2 className="w-3 h-3" />
+                                                {acc.name}
+                                              </span>
+                                            ) : (
+                                              <span className="capitalize">{tx.paymentMethodType.replace('_', ' ')}</span>
+                                            )}
+                                            {tx.notes && <span className="truncate">• {tx.notes}</span>}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-3 shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleTransactionStatus(tx.id)}
+                                          className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition cursor-pointer flex items-center gap-1 ${
+                                            isReal
+                                              ? 'bg-emerald-950/40 border border-emerald-800/50 text-emerald-300 hover:bg-emerald-900/60'
+                                              : 'bg-amber-950/40 border border-amber-800/50 text-amber-300 hover:bg-amber-900/60'
+                                          }`}
+                                          title="Toca para cambiar estado (Realizado / Planificado)"
+                                        >
+                                          {isReal ? (
+                                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                          ) : (
+                                            <Clock className="w-3 h-3 text-amber-400" />
+                                          )}
+                                          <span className="capitalize">{tx.status}</span>
+                                        </button>
+
+                                        <span className={`font-mono font-bold ${isReal ? 'text-blue-400' : 'text-slate-400'}`}>
+                                          {formatMoney(tx.amount, settings.currencySymbol)}
+                                        </span>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingTransaction(tx);
+                                            setIsNewTxOpen(true);
+                                          }}
+                                          className="p-1 rounded text-slate-500 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                                          title="Editar movimiento"
+                                        >
+                                          <Edit2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

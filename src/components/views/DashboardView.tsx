@@ -4,6 +4,8 @@ import {
   formatMoney,
   formatDateEs,
   centsToDollars,
+  MONTH_NAMES_ES,
+  MONTH_NAMES_SHORT_ES,
 } from '../../utils/formatters';
 import {
   Wallet,
@@ -51,7 +53,11 @@ export const DashboardView: React.FC = () => {
     accounts,
     creditCards,
     loans,
+    todayStr,
   } = useFinance();
+
+  const selectedMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+  const todayMonthKey = todayStr ? todayStr.slice(0, 7) : '';
 
   const [selectedCardModal, setSelectedCardModal] = useState<
     'liquidez' | 'cierre' | 'disponible' | 'deuda' | null
@@ -97,11 +103,20 @@ export const DashboardView: React.FC = () => {
             className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
           >
             <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">
-                Liquidez Real Hoy
+              <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                {executiveSummary.isCurrentMonth
+                  ? 'Liquidez Real Hoy'
+                  : selectedMonthKey > todayMonthKey
+                  ? `Liquidez Apertura (${MONTH_NAMES_SHORT_ES[selectedMonth - 1] || 'Mes'})`
+                  : `Liquidez Cierre (${MONTH_NAMES_SHORT_ES[selectedMonth - 1] || 'Mes'})`}
               </span>
-              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20 transition">
-                <Wallet className="w-4 h-4" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {executiveSummary.periodLabel || (executiveSummary.isCurrentMonth ? 'Hoy' : `${MONTH_NAMES_SHORT_ES[selectedMonth - 1]} ${selectedYear}`)}
+                </span>
+                <div className="p-1.5 rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20 transition">
+                  <Wallet className="w-4 h-4" />
+                </div>
               </div>
             </div>
             <div className="text-2xl font-black text-white tracking-tight privacy-blur">
@@ -343,7 +358,7 @@ export const DashboardView: React.FC = () => {
           <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Calendar className="w-4 h-4 text-blue-400" />
-              Curva de Liquidez Diaria — Septiembre {selectedYear}
+              Curva de Liquidez Diaria — {MONTH_NAMES_ES[selectedMonth - 1]} {selectedYear}
             </h3>
             <p className="text-xs text-slate-400">
               Proyección día por día considerando ingresos, gastos y cuotas comprometidas
@@ -620,8 +635,9 @@ export const DashboardView: React.FC = () => {
                       </span>
                       <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
                         {accounts.map((acc) => {
+                          const accBal = executiveSummary.accountBalances?.[acc.id] ?? acc.initialBalance;
                           const percent = executiveSummary.currentRealCashBalance > 0
-                            ? Math.round((acc.initialBalance / executiveSummary.currentRealCashBalance) * 100)
+                            ? Math.round((accBal / executiveSummary.currentRealCashBalance) * 100)
                             : 0;
                           return (
                             <div
@@ -630,11 +646,11 @@ export const DashboardView: React.FC = () => {
                             >
                               <div className="space-y-0.5">
                                 <span className="font-bold text-white block">{acc.name}</span>
-                                <span className="text-[10px] text-slate-500 uppercase">{acc.type} {acc.bank ? `• ${acc.bank}` : ''}</span>
+                                <span className="text-[10px] text-slate-500 uppercase">{acc.type} {acc.bankName ? `• ${acc.bankName}` : ''}</span>
                               </div>
                               <div className="text-right">
                                 <span className="font-mono font-bold text-slate-100 block">
-                                  {formatMoney(acc.initialBalance, settings.currencySymbol)}
+                                  {formatMoney(accBal, settings.currencySymbol)}
                                 </span>
                                 <span className="text-[10px] text-slate-500">{percent}% de liquidez</span>
                               </div>

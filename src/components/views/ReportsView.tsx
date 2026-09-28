@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '../../context/FinanceContext';
-import { formatMoney, MONTH_NAMES_ES } from '../../utils/formatters';
+import { formatMoney, centsToDollars, daysInMonth, MONTH_NAMES_ES } from '../../utils/formatters';
 import {
   BarChart3,
   Lock,
@@ -15,11 +15,25 @@ import {
   Coins,
   ArrowUpRight,
   AlertTriangle,
+  AlertCircle,
   Award,
   Sparkles,
   Printer,
   FileSpreadsheet,
   Download,
+  Filter,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  ArrowUpDown,
+  Layers,
+  Activity,
+  ShieldCheck,
+  ShieldAlert,
+  Building2,
+  Target,
+  Percent,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -34,6 +48,8 @@ import {
   YAxis,
   CartesianGrid,
   ReferenceLine,
+  AreaChart,
+  Area,
 } from 'recharts';
 
 const CHART_COLORS = [
@@ -62,15 +78,62 @@ export const ReportsView: React.FC = () => {
     monthlyCloses,
     closeCurrentMonth,
     reopenMonth,
-    exportTransactionsCSV,
     settings,
+    accounts,
+    creditCards,
   } = useFinance();
 
   const [closeNotes, setCloseNotes] = useState('');
   const [isConfirmingClose, setIsConfirmingClose] = useState(false);
 
+  // Active View Tab in the Visual Analytics Section
+  const [activeTab, setActiveTab] = useState<'concentration' | 'daily_flow' | 'payment_methods'>('concentration');
+
+  // Interactive Category & Payment Method Filters
+  const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
+  const [selectedPaymentFilter, setSelectedPaymentFilter] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  // Table search & status filters
+  const [tableSearch, setTableSearch] = useState('');
+  const [tableStatusFilter, setTableStatusFilter] = useState<'all' | 'realizado' | 'planificado'>('all');
+
   const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const currentMonthClose = monthlyCloses.find((c) => c.id === monthKey && c.isClosed);
+
+  const handleSelectCategory = (catName: string) => {
+    if (selectedCategoryName?.toLowerCase() === catName.toLowerCase()) {
+      // Toggle off
+      setSelectedCategoryName(null);
+    } else {
+      setSelectedCategoryName(catName);
+      // Auto-expand that category
+      const found = categories.find((c) => c.name.toLowerCase() === catName.toLowerCase());
+      if (found) {
+        setExpandedCategories((prev) => ({ ...prev, [found.id]: true }));
+      } else {
+        const bgt = budgetAnalysis.find((b) => (b.category?.name || b.categoryName)?.toLowerCase() === catName.toLowerCase());
+        if (bgt) {
+          const id = bgt.category?.id || bgt.categoryId;
+          setExpandedCategories((prev) => ({ ...prev, [id]: true }));
+        }
+      }
+      // Scroll to table smoothly
+      setTimeout(() => {
+        const el = document.getElementById('audit-category-table');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  };
+
+  const toggleExpandCategory = (catId: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [catId]: !prev[catId],
+    }));
+  };
 
   const handleExecuteClose = async () => {
     await closeCurrentMonth(closeNotes.trim() || undefined);
@@ -149,32 +212,38 @@ export const ReportsView: React.FC = () => {
     if (totalSpent === 0) return [];
 
     return budgetAnalysis
-      .filter((item) => item.actualSpent > 0)
-      .map((item, idx) => ({
-        name: item.categoryName,
-        value: item.actualSpent / 100, // in dollars for chart display
-        cents: item.actualSpent,
-        percentage: ((item.actualSpent / totalSpent) * 100).toFixed(1),
-        color: CHART_COLORS[idx % CHART_COLORS.length],
-      }))
+      .filter((item) => (item.realSpent || item.actualSpent || 0) > 0)
+      .map((item, idx) => {
+        const spent = item.realSpent || item.actualSpent || 0;
+        const name = item.category?.name || item.categoryName || 'General';
+        return {
+          name,
+          value: spent / 100, // dollars for recharts
+          cents: spent,
+          percentage: ((spent / totalSpent) * 100).toFixed(1),
+          color: item.category?.color || CHART_COLORS[idx % CHART_COLORS.length],
+        };
+      })
       .sort((a, b) => b.value - a.value);
   }, [budgetAnalysis, executiveSummary.totalRealizedExpense]);
 
   // 2. Análisis de Presupuesto vs Real ("¿Dónde se ahorró vs dónde hubo sobrecosto?")
   const budgetComparisonData = useMemo(() => {
     return budgetAnalysis
-      .filter((item) => item.budgetedAmount > 0 || item.actualSpent > 0)
+      .filter((item) => item.budgetedAmount > 0 || (item.realSpent || item.actualSpent || 0) > 0)
       .map((item) => {
-        const ahorro = item.budgetedAmount - item.actualSpent;
+        const spent = item.realSpent || item.actualSpent || 0;
+        const ahorro = item.budgetedAmount - spent;
+        const name = item.category?.name || item.categoryName || 'General';
         return {
-          name: item.categoryName.length > 14 ? `${item.categoryName.substring(0, 12)}...` : item.categoryName,
-          fullName: item.categoryName,
+          name: name.length > 14 ? `${name.substring(0, 12)}...` : name,
+          fullName: name,
           presupuestado: item.budgetedAmount / 100,
-          real: item.actualSpent / 100,
+          real: spent / 100,
           ahorro: ahorro / 100,
           ahorroCents: ahorro,
           presupuestadoCents: item.budgetedAmount,
-          realCents: item.actualSpent,
+          realCents: spent,
         };
       })
       .sort((a, b) => b.presupuestado - a.presupuestado);
@@ -200,7 +269,7 @@ export const ReportsView: React.FC = () => {
   const topIndividualExpenses = useMemo(() => {
     const catMap = new Map(categories.map((c) => [c.id, c.name]));
     return allMonthTransactions
-      .filter((tx) => tx.type === 'gasto')
+      .filter((tx) => tx.type === 'gasto' || tx.type === 'cuota_tarjeta' || tx.type === 'servicio')
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5)
       .map((tx) => ({
@@ -209,14 +278,14 @@ export const ReportsView: React.FC = () => {
       }));
   }, [allMonthTransactions, categories]);
 
-  // 4. Distribución por Medio de Pago (Efectivo vs Bancos/Débito vs Tarjetas de Crédito)
+  // 4. Distribución por Medio de Pago
   const paymentMethodData = useMemo(() => {
     let cash = 0;
     let bank = 0;
     let credit = 0;
 
     allMonthTransactions
-      .filter((tx) => tx.type === 'gasto')
+      .filter((tx) => tx.type === 'gasto' || tx.type === 'cuota_tarjeta' || tx.type === 'servicio' || tx.type === 'suscripcion')
       .forEach((tx) => {
         if (tx.paymentMethodType === 'efectivo') cash += tx.amount;
         else if (tx.paymentMethodType === 'tarjeta_credito') credit += tx.amount;
@@ -227,17 +296,117 @@ export const ReportsView: React.FC = () => {
     if (total === 0) return [];
 
     return [
-      { name: 'Tarjetas de Crédito', value: credit / 100, cents: credit, color: '#f59e0b', icon: CreditCard },
-      { name: 'Cuentas & Débito', value: bank / 100, cents: bank, color: '#3b82f6', icon: Wallet },
-      { name: 'Efectivo', value: cash / 100, cents: cash, color: '#10b981', icon: Coins },
+      { key: 'tarjeta_credito', name: 'Tarjetas de Crédito', value: credit / 100, cents: credit, color: '#f59e0b', icon: CreditCard },
+      { key: 'cuenta_bancaria', name: 'Cuentas & Débito', value: bank / 100, cents: bank, color: '#3b82f6', icon: Wallet },
+      { key: 'efectivo', name: 'Efectivo', value: cash / 100, cents: cash, color: '#10b981', icon: Coins },
     ].filter((m) => m.cents > 0);
   }, [allMonthTransactions]);
+
+  // 5. Daily Inflows vs Outflows Flow Data for Tab 2
+  const dailyFlowData = useMemo(() => {
+    const totalDays = daysInMonth(selectedYear, selectedMonth);
+    const dayMap = new Map<number, { day: number; income: number; expense: number }>();
+
+    for (let d = 1; d <= totalDays; d++) {
+      dayMap.set(d, { day: d, income: 0, expense: 0 });
+    }
+
+    allMonthTransactions.forEach((tx) => {
+      if (tx.status === 'cancelado' || tx.type === 'transferencia') return;
+      if (!tx.date) return;
+      const dayNum = parseInt(tx.date.split('-')[2], 10);
+      if (dayMap.has(dayNum)) {
+        const item = dayMap.get(dayNum)!;
+        if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
+          item.income += tx.amount;
+        } else {
+          item.expense += tx.amount;
+        }
+      }
+    });
+
+    return Array.from(dayMap.values()).map((d) => ({
+      dayLabel: `Día ${d.day}`,
+      dayNum: d.day,
+      Ingresos: centsToDollars(d.income),
+      Gastos: centsToDollars(d.expense),
+      incomeCents: d.income,
+      expenseCents: d.expense,
+    }));
+  }, [allMonthTransactions, selectedYear, selectedMonth]);
+
+  // Financial Health Score Calculation (0 to 100)
+  const healthScore = useMemo(() => {
+    let score = 50; // base
+
+    // Savings rate impact (+-25)
+    if (executiveSummary.totalRealizedIncome > 0) {
+      const savingsRate = executiveSummary.netRealSavings / executiveSummary.totalRealizedIncome;
+      if (savingsRate >= 0.2) score += 25;
+      else if (savingsRate >= 0.1) score += 15;
+      else if (savingsRate >= 0) score += 5;
+      else score -= 20; // Deficit
+    }
+
+    // Budget overruns impact (+-25)
+    const overruns = budgetAnalysis.filter((b) => (b.availableBalance ?? b.availableAmount ?? 0) < 0).length;
+    if (overruns === 0) score += 25;
+    else if (overruns <= 2) score += 10;
+    else score -= 15;
+
+    return Math.max(10, Math.min(100, Math.round(score)));
+  }, [executiveSummary, budgetAnalysis]);
+
+  const scoreLabel =
+    healthScore >= 80 ? 'Excelente Salud' : healthScore >= 60 ? 'Manejo Saludable' : 'Atención Requerida';
+  const scoreColor =
+    healthScore >= 80 ? 'text-emerald-400' : healthScore >= 60 ? 'text-amber-400' : 'text-rose-400';
+  const scoreBadgeBg =
+    healthScore >= 80
+      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+      : healthScore >= 60
+      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+      : 'bg-rose-500/10 border-rose-500/30 text-rose-400';
+
+  // Filtered Categories for the Audit Table
+  const filteredCategoryList = useMemo(() => {
+    return budgetAnalysis
+      .filter((b) => {
+        const catName = b.category?.name || b.categoryName || '';
+
+        // If interactive filter from chart is active
+        if (selectedCategoryName) {
+          if (catName.toLowerCase() !== selectedCategoryName.toLowerCase()) {
+            return false;
+          }
+        }
+
+        // Text search
+        if (tableSearch.trim()) {
+          const q = tableSearch.toLowerCase();
+          const matchesCat = catName.toLowerCase().includes(q);
+          const hasMatchingTx = allMonthTransactions.some(
+            (tx) =>
+              (tx.categoryId === (b.category?.id || b.categoryId)) &&
+              (tx.concept?.toLowerCase().includes(q) || tx.notes?.toLowerCase().includes(q))
+          );
+          if (!matchesCat && !hasMatchingTx) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        const spentA = a.realSpent || a.actualSpent || 0;
+        const spentB = b.realSpent || b.actualSpent || 0;
+        return spentB - spentA;
+      });
+  }, [budgetAnalysis, selectedCategoryName, tableSearch, allMonthTransactions]);
 
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs space-y-1">
+        <div className="bg-slate-950 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs space-y-1">
           <div className="font-bold text-white flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.color }} />
             <span>{data.name}</span>
@@ -248,18 +417,21 @@ export const ReportsView: React.FC = () => {
           <div className="text-[11px] text-slate-400 font-medium">
             Representa el {data.percentage}% del total gastado
           </div>
+          <div className="text-[10px] text-blue-400 pt-1 font-semibold">
+            Toca para filtrar y ver movimientos ↗
+          </div>
         </div>
       );
     }
     return null;
   };
 
-  const CustomBarTooltip = ({ active, payload, label }: any) => {
+  const CustomBarTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const pData = payload[0]?.payload;
       if (!pData) return null;
       return (
-        <div className="bg-slate-900 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs space-y-1">
+        <div className="bg-slate-950 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs space-y-1">
           <div className="font-bold text-white mb-1">{pData.fullName}</div>
           <div className="flex justify-between gap-4 text-slate-300">
             <span>Presupuestado:</span>
@@ -286,6 +458,9 @@ export const ReportsView: React.FC = () => {
               {formatMoney(pData.ahorroCents, settings.currencySymbol)}
             </span>
           </div>
+          <div className="text-[10px] text-blue-400 pt-1 font-semibold">
+            Toca para filtrar y ver movimientos ↗
+          </div>
         </div>
       );
     }
@@ -302,9 +477,12 @@ export const ReportsView: React.FC = () => {
             <h2 className="text-base font-bold text-white">
               Cierre Contable & Análisis Visual del Mes — {MONTH_NAMES_ES[selectedMonth - 1]} {selectedYear}
             </h2>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30">
+              Auditoría
+            </span>
           </div>
           <p className="text-xs text-slate-400">
-            Auditoría de variaciones, gráficos de concentración de gastos, ahorro por categoría y cierre formal de período.
+            Auditoría de variaciones, gráficos interactivos con desglose de movimientos y cierre formal de período
           </p>
         </div>
 
@@ -333,7 +511,7 @@ export const ReportsView: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Mes Auditado</span>
+                <span>Mes Auditado & Cerrado</span>
               </span>
               <button
                 onClick={() => handleReopen(selectedYear, selectedMonth)}
@@ -355,10 +533,47 @@ export const ReportsView: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Cards: Resumen Ejecutivo del Cierre */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Ingresos Plan vs Real */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-2.5">
+      {/* KPI Cards: Resumen Ejecutivo del Cierre & Score Financiero */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Score Financiero del Cierre */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-2 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+              Índice de Cierre
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${scoreBadgeBg}`}>
+              {scoreLabel}
+            </span>
+          </div>
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className={`text-3xl font-black font-mono tracking-tight ${scoreColor}`}>
+                {healthScore}
+              </span>
+              <span className="text-xs text-slate-500 font-mono">/ 100 pts</span>
+            </div>
+            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-2">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  healthScore >= 80 ? 'bg-emerald-400' : healthScore >= 60 ? 'bg-amber-400' : 'bg-rose-400'
+                }`}
+                style={{ width: `${healthScore}%` }}
+              />
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-400 flex justify-between">
+            <span>Cumplimiento presupuestario</span>
+            <span className="text-slate-300 font-semibold">
+              {executiveSummary.totalRealizedIncome > 0
+                ? `${Math.max(0, Math.round((executiveSummary.netRealSavings / executiveSummary.totalRealizedIncome) * 100))}% ahorro`
+                : 'Sin ingresos'}
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Ingresos Plan vs Real */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">
               Ingresos del Período
@@ -367,20 +582,17 @@ export const ReportsView: React.FC = () => {
               Entradas
             </span>
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Planificado:</span>
-            <span className="font-mono text-slate-300 font-medium">
+          <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">
+            {formatMoney(executiveSummary.totalRealizedIncome, settings.currencySymbol)}
+          </div>
+          <div className="text-xs text-slate-400 flex justify-between">
+            <span>Meta planificada:</span>
+            <span className="font-mono text-slate-300">
               {formatMoney(executiveSummary.totalPlannedIncome, settings.currencySymbol)}
             </span>
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Realizado:</span>
-            <span className="font-mono font-bold text-emerald-400">
-              {formatMoney(executiveSummary.totalRealizedIncome, settings.currencySymbol)}
-            </span>
-          </div>
-          <div className="pt-2 border-t border-slate-800 text-xs flex justify-between font-semibold">
-            <span className="text-slate-400">Diferencia:</span>
+          <div className="pt-1.5 border-t border-slate-800 text-[11px] flex justify-between font-semibold">
+            <span className="text-slate-400">Variación:</span>
             <span
               className={
                 executiveSummary.totalRealizedIncome >= executiveSummary.totalPlannedIncome
@@ -396,8 +608,8 @@ export const ReportsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Gastos Plan vs Real */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-2.5">
+        {/* Card 3: Gastos Plan vs Real */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">
               Gastos del Período
@@ -406,19 +618,16 @@ export const ReportsView: React.FC = () => {
               Salidas
             </span>
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Planificado:</span>
-            <span className="font-mono text-slate-300 font-medium">
+          <div className="text-2xl font-black text-rose-400 font-mono tracking-tight">
+            {formatMoney(executiveSummary.totalRealizedExpense, settings.currencySymbol)}
+          </div>
+          <div className="text-xs text-slate-400 flex justify-between">
+            <span>Límite planificado:</span>
+            <span className="font-mono text-slate-300">
               {formatMoney(executiveSummary.totalPlannedExpense, settings.currencySymbol)}
             </span>
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Realizado:</span>
-            <span className="font-mono font-bold text-rose-400">
-              {formatMoney(executiveSummary.totalRealizedExpense, settings.currencySymbol)}
-            </span>
-          </div>
-          <div className="pt-2 border-t border-slate-800 text-xs flex justify-between font-semibold">
+          <div className="pt-1.5 border-t border-slate-800 text-[11px] flex justify-between font-semibold">
             <span className="text-slate-400">Ahorro en gasto:</span>
             <span
               className={
@@ -435,30 +644,31 @@ export const ReportsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Ahorro Neto & Saldo */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-2.5">
+        {/* Card 4: Ahorro Neto & Liquidez */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">
-              Resultado Neto & Liquidez
+              Ahorro Neto & Cierre
             </span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-sky-950/40 text-sky-400 font-semibold border border-sky-900/40">
               Balance
             </span>
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Ahorro Neto Real:</span>
-            <span className="font-mono font-bold text-sky-400">
-              {formatMoney(executiveSummary.netRealSavings, settings.currencySymbol)}
-            </span>
+          <div
+            className={`text-2xl font-black font-mono tracking-tight ${
+              executiveSummary.netRealSavings >= 0 ? 'text-sky-300' : 'text-rose-400'
+            }`}
+          >
+            {formatMoney(executiveSummary.netRealSavings, settings.currencySymbol)}
           </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-400">Deuda Total Activa:</span>
+          <div className="text-xs text-slate-400 flex justify-between">
+            <span>Deuda Activa en Tarjetas/Préstamos:</span>
             <span className="font-mono text-amber-300 font-medium">
               {formatMoney(executiveSummary.totalDebt, settings.currencySymbol)}
             </span>
           </div>
-          <div className="pt-2 border-t border-slate-800 text-xs flex justify-between font-bold">
-            <span className="text-slate-300">Saldo Disponible Final:</span>
+          <div className="pt-1.5 border-t border-slate-800 text-[11px] flex justify-between font-bold">
+            <span className="text-slate-300">Tesorería al cierre:</span>
             <span className="text-white font-mono">
               {formatMoney(executiveSummary.currentRealCashBalance, settings.currencySymbol)}
             </span>
@@ -466,268 +676,797 @@ export const ReportsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Visual Analytics Section: Pie Chart & Bar Chart (User Request) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico 1: Pastel de Gastos por Categoría ("¿En qué se gastó más?") */}
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl flex flex-col justify-between">
-          <div className="border-b border-slate-800 pb-3 mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <PieIcon className="w-4 h-4 text-pink-400" />
-              <h3 className="text-sm font-bold text-white">
-                ¿En qué se gastó más? — Concentración por Categoría
-              </h3>
-            </div>
-            <span className="text-[11px] text-slate-400 font-medium">Gráfico de Pastel</span>
+      {/* Visual Analytics Hub with Interactive Mode Tabs */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 text-sky-400" />
+              <span>Análisis Gráfico Interactivo de Cierre</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              Toca cualquier segmento o barra para filtrar la tabla de auditoría y desglosar sus movimientos
+            </p>
           </div>
 
-          {expensesByCategoryData.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-500 text-xs text-center">
-              <PieIcon className="w-10 h-10 mb-2 opacity-30" />
-              <span>No hay gastos registrados en este mes para graficar.</span>
+          {/* Perspective Selector Tabs */}
+          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveTab('concentration')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'concentration'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <PieIcon className="w-3.5 h-3.5" />
+              <span>Concentración & Presupuesto</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('daily_flow')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'daily_flow'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Flujo Diario del Período</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('payment_methods')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                activeTab === 'payment_methods'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              <span>Medios de Pago & Top Gastos</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tab 1: Concentration & Budget Comparison */}
+        {activeTab === 'concentration' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Gráfico 1: Pastel de Gastos por Categoría */}
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800/80 p-4 flex flex-col justify-between">
+              <div className="border-b border-slate-800 pb-2.5 mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <PieIcon className="w-4 h-4 text-pink-400" />
+                  <h4 className="text-xs font-bold text-white">
+                    Concentración de Gasto por Categoría
+                  </h4>
+                </div>
+                <span className="text-[10px] text-blue-400 font-medium">Toca para filtrar ↗</span>
+              </div>
+
+              {expensesByCategoryData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 text-slate-500 text-xs text-center">
+                  <PieIcon className="w-10 h-10 mb-2 opacity-30" />
+                  <span>No hay gastos registrados en este mes para graficar.</span>
+                </div>
+              ) : (
+                <div>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={expensesByCategoryData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={85}
+                          innerRadius={50}
+                          paddingAngle={2}
+                          cursor="pointer"
+                          onClick={(entry: any) => handleSelectCategory(String(entry.name))}
+                        >
+                          {expensesByCategoryData.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={entry.color}
+                              stroke={selectedCategoryName === entry.name ? '#ffffff' : '#0f172a'}
+                              strokeWidth={selectedCategoryName === entry.name ? 3 : 1}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomPieTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Interactive Legend List */}
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {expensesByCategoryData.map((item) => (
+                      <div
+                        key={item.name}
+                        onClick={() => handleSelectCategory(item.name)}
+                        className={`flex items-center justify-between text-xs p-2 rounded-lg cursor-pointer transition ${
+                          selectedCategoryName?.toLowerCase() === item.name.toLowerCase()
+                            ? 'bg-blue-950/80 border border-blue-500 text-white font-semibold'
+                            : 'hover:bg-slate-900 border border-transparent text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="truncate">{item.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 shrink-0 font-mono">
+                          <span className="text-slate-400 text-[11px]">{item.percentage}%</span>
+                          <span className="font-bold text-white">
+                            {formatMoney(item.cents, settings.currencySymbol)}
+                          </span>
+                          <span className="text-[10px] text-blue-400">↗</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
-            <div>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={expensesByCategoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={85}
-                      innerRadius={50}
-                      paddingAngle={2}
+
+            {/* Gráfico 2: Presupuesto vs Real */}
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800/80 p-4 flex flex-col justify-between">
+              <div className="border-b border-slate-800 pb-2.5 mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-emerald-400" />
+                  <h4 className="text-xs font-bold text-white">
+                    Presupuestado vs. Real por Rubro
+                  </h4>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] font-semibold">
+                  <span className="flex items-center gap-1 text-blue-400">
+                    <span className="w-2 h-2 rounded bg-blue-500 inline-block" /> Meta
+                  </span>
+                  <span className="flex items-center gap-1 text-rose-400">
+                    <span className="w-2 h-2 rounded bg-rose-500 inline-block" /> Real
+                  </span>
+                </div>
+              </div>
+
+              {budgetComparisonData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 text-slate-500 text-xs text-center">
+                  <BarChart3 className="w-10 h-10 mb-2 opacity-30" />
+                  <span>No hay presupuestos ni gastos asignados.</span>
+                </div>
+              ) : (
+                <div>
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={budgetComparisonData.slice(0, 7)}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fill: '#94a3b8', fontSize: 10 }}
+                          interval={0}
+                          angle={-25}
+                          textAnchor="end"
+                        />
+                        <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                        <Tooltip content={<CustomBarTooltip />} />
+                        <Bar
+                          dataKey="presupuestado"
+                          fill="#3b82f6"
+                          radius={[4, 4, 0, 0]}
+                          cursor="pointer"
+                          onClick={(data: any) => handleSelectCategory(String(data.fullName))}
+                        />
+                        <Bar
+                          dataKey="real"
+                          fill="#f43f5e"
+                          radius={[4, 4, 0, 0]}
+                          cursor="pointer"
+                          onClick={(data: any) => handleSelectCategory(String(data.fullName))}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Highlights: Top Ahorros y Top Desviaciones */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-800 text-xs">
+                    {/* Top Ahorros */}
+                    <div className="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-900/30 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px]">
+                        <Award className="w-3.5 h-3.5" />
+                        <span>Mayores Ahorros</span>
+                      </div>
+                      {topSavingsCategories.length === 0 ? (
+                        <span className="text-slate-400 text-[11px] block">No hubo ahorro este mes.</span>
+                      ) : (
+                        topSavingsCategories.map((c) => (
+                          <div
+                            key={c.fullName}
+                            onClick={() => handleSelectCategory(c.fullName)}
+                            className="flex justify-between text-[11px] cursor-pointer hover:text-white transition"
+                          >
+                            <span className="text-slate-300 truncate pr-2 hover:text-emerald-300">{c.fullName}</span>
+                            <span className="font-mono font-bold text-emerald-400 shrink-0">
+                              +{formatMoney(c.ahorroCents, settings.currencySymbol)} ↗
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Top Sobregiros */}
+                    <div className="p-2.5 rounded-xl bg-rose-950/20 border border-rose-900/30 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-rose-400 font-bold text-[11px]">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>Mayores Sobregiros</span>
+                      </div>
+                      {topOverspentCategories.length === 0 ? (
+                        <span className="text-slate-400 text-[11px] block">
+                          ¡Excelente! Ninguna categoría sobrepasada.
+                        </span>
+                      ) : (
+                        topOverspentCategories.map((c) => (
+                          <div
+                            key={c.fullName}
+                            onClick={() => handleSelectCategory(c.fullName)}
+                            className="flex justify-between text-[11px] cursor-pointer hover:text-white transition"
+                          >
+                            <span className="text-slate-300 truncate pr-2 hover:text-rose-300">{c.fullName}</span>
+                            <span className="font-mono font-bold text-rose-400 shrink-0">
+                              {formatMoney(c.ahorroCents, settings.currencySymbol)} ↗
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Daily Income vs Expenses Flow */}
+        {activeTab === 'daily_flow' && (
+          <div className="rounded-xl bg-slate-950/60 border border-slate-800/80 p-4 space-y-3">
+            <div className="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800">
+              <span className="font-semibold text-white">
+                Distribución de Entradas vs Salidas a lo largo de los días de {MONTH_NAMES_ES[selectedMonth - 1]}
+              </span>
+              <div className="flex items-center gap-4 text-[11px]">
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" /> Ingresos
+                </span>
+                <span className="flex items-center gap-1.5 text-rose-400">
+                  <span className="w-2.5 h-2.5 rounded bg-rose-500 inline-block" /> Gastos
+                </span>
+              </div>
+            </div>
+
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dailyFlowData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <XAxis
+                    dataKey="dayNum"
+                    stroke="#64748b"
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(v) => `D${v}`}
+                  />
+                  <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickFormatter={(v) => `$${v}`} />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const item = payload[0].payload;
+                        return (
+                          <div className="rounded-xl bg-slate-950 border border-slate-800 p-2.5 shadow-2xl text-xs space-y-1">
+                            <div className="font-bold text-white border-b border-slate-800 pb-1">
+                              {item.dayLabel} de {MONTH_NAMES_ES[selectedMonth - 1]}
+                            </div>
+                            <div className="text-emerald-400 font-mono font-bold">
+                              Ingresos: {formatMoney(item.incomeCents, settings.currencySymbol)}
+                            </div>
+                            <div className="text-rose-400 font-mono font-bold">
+                              Gastos: {formatMoney(item.expenseCents, settings.currencySymbol)}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="Ingresos" fill="#10b981" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Gastos" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-[11px] text-slate-400 italic">
+              💡 Este gráfico identifica las fechas del mes donde ocurrieron las mayores salidas y entradas monetarias.
+            </p>
+          </div>
+        )}
+
+        {/* Tab 3: Payment Methods & Top Expenses */}
+        {activeTab === 'payment_methods' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Top 5 Gastos Individuales del Mes */}
+            <div className="lg:col-span-2 rounded-xl bg-slate-950/60 border border-slate-800/80 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                  <ArrowUpRight className="w-4 h-4 text-amber-400" />
+                  <span>Top 5 Mayores Salidas Individuales del Mes</span>
+                </h4>
+                <span className="text-[11px] text-slate-400">Impacto puntual en liquidez</span>
+              </div>
+
+              {topIndividualExpenses.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500">
+                  No hay movimientos de gasto registrados en este período.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-800 text-xs">
+                  {topIndividualExpenses.map((tx, idx) => (
+                    <div
+                      key={tx.id}
+                      onClick={() => handleSelectCategory(tx.categoryName)}
+                      className="py-2.5 flex items-center justify-between gap-4 cursor-pointer hover:bg-slate-900/60 p-2 rounded-lg transition"
                     >
-                      {expensesByCategoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomPieTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
+                      <div className="flex items-center gap-3">
+                        <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-400 font-bold text-[10px] flex items-center justify-center shrink-0">
+                          #{idx + 1}
+                        </span>
+                        <div>
+                          <div className="font-semibold text-white hover:text-blue-300 transition">
+                            {tx.concept}
+                          </div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                            <span className="text-blue-400">{tx.categoryName}</span>
+                            <span>•</span>
+                            <span>{tx.date}</span>
+                            <span>•</span>
+                            <span className="capitalize">{tx.paymentMethodType.replace('_', ' ')}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="font-mono font-bold text-rose-400 text-sm shrink-0 flex items-center gap-1.5">
+                        <span>{formatMoney(tx.amount, settings.currencySymbol)}</span>
+                        <span className="text-[10px] text-blue-400">↗</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Medios de Pago */}
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800/80 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-sky-400" />
+                  <span>Medios de Pago Utilizados</span>
+                </h4>
               </div>
 
-              {/* Legend and top breakdown table */}
-              <div className="mt-4 pt-4 border-t border-slate-800 space-y-2 max-h-48 overflow-y-auto pr-1">
-                {expensesByCategoryData.map((item) => (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between text-xs hover:bg-slate-800/40 p-1.5 rounded-lg transition"
-                  >
-                    <div className="flex items-center gap-2 truncate pr-2">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="text-slate-300 truncate">{item.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 font-mono">
-                      <span className="text-slate-400 text-[11px]">{item.percentage}%</span>
-                      <span className="font-bold text-white">
-                        {formatMoney(item.cents, settings.currencySymbol)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+              {paymentMethodData.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500">
+                  Sin datos de medios de pago en este mes.
+                </div>
+              ) : (
+                <div className="space-y-3 pt-1">
+                  {paymentMethodData.map((m) => {
+                    const Icon = m.icon;
+                    const totalSpent = executiveSummary.totalRealizedExpense;
+                    const pct = totalSpent > 0 ? Math.round((m.cents / totalSpent) * 100) : 0;
 
-        {/* Gráfico 2: Presupuesto vs Gasto Real ("¿Dónde se ahorró vs dónde hubo sobrecosto?") */}
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl flex flex-col justify-between">
-          <div className="border-b border-slate-800 pb-3 mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-bold text-white">
-                ¿Dónde se ahorró? — Presupuestado vs. Real
-              </h3>
-            </div>
-            <div className="flex items-center gap-3 text-[10px] font-semibold">
-              <span className="flex items-center gap-1 text-blue-400">
-                <span className="w-2 h-2 rounded bg-blue-500 inline-block" /> Presupuesto
-              </span>
-              <span className="flex items-center gap-1 text-rose-400">
-                <span className="w-2 h-2 rounded bg-rose-500 inline-block" /> Gasto Real
-              </span>
+                    return (
+                      <div
+                        key={m.name}
+                        onClick={() => setSelectedPaymentFilter(selectedPaymentFilter === m.key ? null : m.key)}
+                        className={`p-2.5 rounded-xl border transition cursor-pointer ${
+                          selectedPaymentFilter === m.key
+                            ? 'bg-blue-950/60 border-blue-500 shadow-md shadow-blue-500/20'
+                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <div className="flex items-center gap-2 text-slate-300 font-medium">
+                            <Icon className="w-4 h-4" style={{ color: m.color }} />
+                            <span>{m.name}</span>
+                          </div>
+                          <div className="font-mono text-white font-bold">
+                            {formatMoney(m.cents, settings.currencySymbol)} ({pct}%)
+                          </div>
+                        </div>
+                        <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="h-1.5 rounded-full transition-all duration-300"
+                            style={{ width: `${pct}%`, backgroundColor: m.color }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-800 leading-relaxed">
+                    Permite vigilar qué proporción de tus consumos dependió de crédito diferido frente a liquidez inmediata en cuentas y efectivo.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-
-          {budgetComparisonData.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-500 text-xs text-center">
-              <BarChart3 className="w-10 h-10 mb-2 opacity-30" />
-              <span>No hay presupuestos ni gastos asignados a categorías.</span>
-            </div>
-          ) : (
-            <div>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={budgetComparisonData.slice(0, 7)}
-                    margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fill: '#94a3b8', fontSize: 10 }}
-                      interval={0}
-                      angle={-25}
-                      textAnchor="end"
-                    />
-                    <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                    <Tooltip content={<CustomBarTooltip />} />
-                    <Bar dataKey="presupuestado" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="real" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Highlights: Top Ahorros y Top Desviaciones */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-800 text-xs">
-                {/* Categorías con mayor ahorro */}
-                <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-900/30 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px]">
-                    <Award className="w-3.5 h-3.5" />
-                    <span>Mayores Ahorros Logrados</span>
-                  </div>
-                  {topSavingsCategories.length === 0 ? (
-                    <span className="text-slate-400 text-[11px] block">No hubo ahorro este mes.</span>
-                  ) : (
-                    topSavingsCategories.map((c) => (
-                      <div key={c.fullName} className="flex justify-between text-[11px]">
-                        <span className="text-slate-300 truncate pr-2">{c.fullName}</span>
-                        <span className="font-mono font-bold text-emerald-400 shrink-0">
-                          +{formatMoney(c.ahorroCents, settings.currencySymbol)}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Categorías con sobrecosto */}
-                <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-900/30 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-rose-400 font-bold text-[11px]">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    <span>Mayores Sobregiros</span>
-                  </div>
-                  {topOverspentCategories.length === 0 ? (
-                    <span className="text-slate-400 text-[11px] block">
-                      ¡Excelente! Ninguna categoría sobrepasó el límite.
-                    </span>
-                  ) : (
-                    topOverspentCategories.map((c) => (
-                      <div key={c.fullName} className="flex justify-between text-[11px]">
-                        <span className="text-slate-300 truncate pr-2">{c.fullName}</span>
-                        <span className="font-mono font-bold text-rose-400 shrink-0">
-                          {formatMoney(c.ahorroCents, settings.currencySymbol)}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Additional Analysis: Top Individual Expenses & Payment Method Flow */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Top 5 Gastos Individuales del Mes */}
-        <div className="lg:col-span-2 rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      {/* Interactive Category Audit Table with Full Movement Breakdown */}
+      <div id="audit-category-table" className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
+        <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <ArrowUpRight className="w-4 h-4 text-amber-400" />
-              <span>Top 5 Mayores Salidas Individuales del Mes</span>
+              <Layers className="w-4 h-4 text-blue-400" />
+              <span>Auditoría de Rubros & Desglose de Movimientos</span>
             </h3>
-            <span className="text-[11px] text-slate-400">Impacto puntual en liquidez</span>
+            <p className="text-xs text-slate-400">
+              Despliega cada categoría para auditar cada transacción realizada o planificada con su cuenta o tarjeta
+            </p>
           </div>
 
-          {topIndividualExpenses.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-500">
-              No hay movimientos de gasto registrados en este período.
+          {/* Search & Status Filters */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={tableSearch}
+                onChange={(e) => setTableSearch(e.target.value)}
+                placeholder="Buscar rubro o movimiento..."
+                className="bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 w-44"
+              />
+              {tableSearch && (
+                <button
+                  onClick={() => setTableSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
-          ) : (
-            <div className="divide-y divide-slate-800 text-xs">
-              {topIndividualExpenses.map((tx, idx) => (
-                <div key={tx.id} className="py-3 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-400 font-bold text-[10px] flex items-center justify-center shrink-0">
-                      #{idx + 1}
-                    </span>
-                    <div>
-                      <div className="font-semibold text-white">{tx.concept}</div>
-                      <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
-                        <span>{tx.categoryName}</span>
-                        <span>•</span>
-                        <span>{tx.date}</span>
-                        <span>•</span>
-                        <span className="capitalize">{tx.paymentMethodType.replace('_', ' ')}</span>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="font-mono font-bold text-rose-400 text-sm shrink-0">
-                    {formatMoney(tx.amount, settings.currencySymbol)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            <select
+              value={tableStatusFilter}
+              onChange={(e) => setTableStatusFilter(e.target.value as any)}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none cursor-pointer"
+            >
+              <option value="all">Todos los estados</option>
+              <option value="realizado">Solo Realizados</option>
+              <option value="planificado">Solo Planificados</option>
+            </select>
+          </div>
         </div>
 
-        {/* Distribución por Medio de Pago */}
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-sky-400" />
-              <span>Medios de Pago Utilizados</span>
-            </h3>
-          </div>
-
-          {paymentMethodData.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-500">
-              Sin datos de medios de pago en este mes.
+        {/* Active Filter Banner from Interactive Chart Selection */}
+        {(selectedCategoryName || selectedPaymentFilter) && (
+          <div className="mx-4 mt-3 p-3 rounded-xl bg-blue-950/40 border border-blue-500/40 flex items-center justify-between text-xs animate-in fade-in duration-150">
+            <div className="flex items-center gap-2 text-blue-300 font-semibold flex-wrap">
+              <Filter className="w-4 h-4 text-blue-400 shrink-0" />
+              <span>
+                Filtro interactivo:{' '}
+                {selectedCategoryName && (
+                  <strong className="text-white underline mr-2">Categoría: {selectedCategoryName}</strong>
+                )}
+                {selectedPaymentFilter && (
+                  <strong className="text-white underline">Medio de Pago: {selectedPaymentFilter.replace('_', ' ')}</strong>
+                )}
+              </span>
             </div>
-          ) : (
-            <div className="space-y-4 pt-1">
-              {paymentMethodData.map((m) => {
-                const Icon = m.icon;
-                const totalSpent = executiveSummary.totalRealizedExpense;
-                const pct = totalSpent > 0 ? Math.round((m.cents / totalSpent) * 100) : 0;
+            <button
+              onClick={() => {
+                setSelectedCategoryName(null);
+                setSelectedPaymentFilter(null);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-200 font-semibold transition cursor-pointer flex items-center gap-1 text-[11px] shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Ver todas las categorías</span>
+            </button>
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-300 border-collapse">
+            <thead className="bg-slate-950/80 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-800">
+              <tr>
+                <th className="py-3 px-4">Categoría & Desglose</th>
+                <th className="py-3 px-3 text-right">Presupuesto</th>
+                <th className="py-3 px-3 text-right">Gasto Real</th>
+                <th className="py-3 px-3 text-right">Pendiente Plan.</th>
+                <th className="py-3 px-3 text-right">Variación / Ahorro</th>
+                <th className="py-3 px-4">Cumplimiento</th>
+                <th className="py-3 px-3 text-center">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 font-medium">
+              {filteredCategoryList.map((item) => {
+                const catId = item.category?.id || item.categoryId;
+                const catName = item.category?.name || item.categoryName || 'General';
+                const isExpanded = !!expandedCategories[catId];
+                const isSelected = selectedCategoryName?.toLowerCase() === catName.toLowerCase();
+                const realSpent = item.realSpent || item.actualSpent || 0;
+                const plannedSpent = item.plannedPendingSpent || item.plannedPendingAmount || 0;
+                const variance = item.budgetedAmount - realSpent;
+
+                // Movements in this category matching tableStatusFilter and selectedPaymentFilter
+                const categoryMovements = allMonthTransactions.filter((tx) => {
+                  if (tx.categoryId !== catId) return false;
+                  if (tx.type === 'transferencia') return false;
+                  if (tableStatusFilter === 'realizado' && tx.status !== 'realizado') return false;
+                  if (tableStatusFilter === 'planificado' && tx.status !== 'planificado') return false;
+                  if (selectedPaymentFilter && tx.paymentMethodType !== selectedPaymentFilter) return false;
+                  return true;
+                });
 
                 return (
-                  <div key={m.name} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 text-slate-300 font-medium">
-                        <Icon className="w-4 h-4" style={{ color: m.color }} />
-                        <span>{m.name}</span>
-                      </div>
-                      <div className="font-mono text-white font-bold">
-                        {formatMoney(m.cents, settings.currencySymbol)} ({pct}%)
-                      </div>
-                    </div>
-                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${pct}%`, backgroundColor: m.color }}
-                      />
-                    </div>
-                  </div>
+                  <React.Fragment key={catId}>
+                    <tr
+                      className={`transition group ${
+                        isSelected
+                          ? 'bg-blue-950/40 border-l-2 border-l-blue-400'
+                          : 'hover:bg-slate-850/60'
+                      }`}
+                    >
+                      {/* Name & Toggle */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpandCategory(catId)}
+                            className="p-1 rounded text-slate-500 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                            title={isExpanded ? 'Ocultar desglose' : 'Ver desglose de movimientos'}
+                          >
+                            <ChevronDown
+                              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                isExpanded ? 'rotate-180 text-blue-400' : 'text-slate-400'
+                              }`}
+                            />
+                          </button>
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{
+                              backgroundColor:
+                                item.category?.color || item.categoryColor || '#3b82f6',
+                            }}
+                          />
+                          <div
+                            onClick={() => toggleExpandCategory(catId)}
+                            className="font-bold text-white truncate max-w-[160px] sm:max-w-none cursor-pointer hover:text-blue-300 transition flex items-center gap-1.5"
+                          >
+                            <span>{catName}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono font-normal">
+                              {categoryMovements.length}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Presupuesto */}
+                      <td className="py-3.5 px-3 text-right font-mono font-semibold text-white">
+                        {formatMoney(item.budgetedAmount, settings.currencySymbol)}
+                      </td>
+
+                      {/* Real Spent */}
+                      <td className="py-3.5 px-3 text-right font-mono text-rose-400 font-bold">
+                        {formatMoney(realSpent, settings.currencySymbol)}
+                      </td>
+
+                      {/* Pending Planned */}
+                      <td className="py-3.5 px-3 text-right font-mono text-slate-400">
+                        {formatMoney(plannedSpent, settings.currencySymbol)}
+                      </td>
+
+                      {/* Variance */}
+                      <td className="py-3.5 px-3 text-right font-mono font-bold">
+                        <span className={variance >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                          {variance >= 0 ? '+' : ''}
+                          {formatMoney(variance, settings.currencySymbol)}
+                        </span>
+                      </td>
+
+                      {/* Progress / Status */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-1.5 min-w-[120px]">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span
+                              className={`font-bold font-mono ${
+                                item.status === 'exceeded' || item.status === 'sobregiro'
+                                  ? 'text-rose-400'
+                                  : item.status === 'warning' || item.status === 'alerta'
+                                  ? 'text-amber-400'
+                                  : 'text-slate-300'
+                              }`}
+                            >
+                              {item.executionPercentage ?? item.percentUsed ?? 0}%
+                            </span>
+                            {item.status === 'exceeded' || item.status === 'sobregiro' ? (
+                              <span className="text-rose-400 font-bold flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" /> Excedido
+                              </span>
+                            ) : item.status === 'warning' || item.status === 'alerta' ? (
+                              <span className="text-amber-400 font-semibold flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" /> 80%
+                              </span>
+                            ) : (
+                              <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> En meta
+                              </span>
+                            )}
+                          </div>
+                          <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                item.status === 'exceeded' || item.status === 'sobregiro'
+                                  ? 'bg-rose-500'
+                                  : item.status === 'warning' || item.status === 'alerta'
+                                  ? 'bg-amber-500'
+                                  : 'bg-emerald-500'
+                              }`}
+                              style={{
+                                width: `${Math.min(100, item.executionPercentage ?? item.percentUsed ?? 0)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Action */}
+                      <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                        <button
+                          onClick={() => toggleExpandCategory(catId)}
+                          className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 mx-auto text-[11px] font-semibold ${
+                            isExpanded
+                              ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}
+                        >
+                          <Layers className="w-3.5 h-3.5" />
+                          <span>{isExpanded ? 'Ocultar' : 'Desglosar'}</span>
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* Expandable Category Movements Sub-Row */}
+                    {isExpanded && (
+                      <tr key={`${catId}-movements`} className="bg-slate-950/80 border-b border-slate-800">
+                        <td colSpan={7} className="p-3 sm:p-4 pl-4 sm:pl-10">
+                          <div className="rounded-xl bg-slate-900 border border-slate-800/80 p-3 sm:p-4 space-y-3 shadow-inner">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{
+                                    backgroundColor:
+                                      item.category?.color || item.categoryColor || '#3b82f6',
+                                  }}
+                                />
+                                <span className="font-bold text-white text-xs">
+                                  Desglose Auditor — {catName}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                                  {categoryMovements.length} {categoryMovements.length === 1 ? 'movimiento' : 'movimientos'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4 text-xs font-mono">
+                                <span className="text-slate-400">
+                                  Real:{' '}
+                                  <strong className="text-rose-400">
+                                    {formatMoney(realSpent, settings.currencySymbol)}
+                                  </strong>
+                                </span>
+                                <span className="text-slate-400">
+                                  Plan:{' '}
+                                  <strong className="text-slate-300">
+                                    {formatMoney(plannedSpent, settings.currencySymbol)}
+                                  </strong>
+                                </span>
+                              </div>
+                            </div>
+
+                            {categoryMovements.length === 0 ? (
+                              <div className="py-4 text-center text-slate-500 text-xs">
+                                <p>No hay movimientos registrados en {catName} para este período.</p>
+                              </div>
+                            ) : (
+                              <div className="divide-y divide-slate-800/60 max-h-72 overflow-y-auto pr-1">
+                                {categoryMovements.map((tx) => {
+                                  const card = tx.creditCardId
+                                    ? creditCards.find((c) => c.id === tx.creditCardId)
+                                    : null;
+                                  const acc = tx.accountId
+                                    ? accounts.find((a) => a.id === tx.accountId)
+                                    : null;
+                                  const isReal = tx.status === 'realizado';
+
+                                  return (
+                                    <div
+                                      key={tx.id}
+                                      className="py-2.5 flex items-center justify-between gap-3 text-xs hover:bg-slate-850/40 px-2 rounded-lg transition"
+                                    >
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        <span className="font-mono text-slate-400 text-[11px] shrink-0 flex items-center gap-1">
+                                          <Calendar className="w-3 h-3 text-slate-500" />
+                                          {tx.date}
+                                        </span>
+                                        <div className="min-w-0">
+                                          <span className="font-semibold text-white truncate block">
+                                            {tx.concept}
+                                          </span>
+                                          <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 flex-wrap">
+                                            {card ? (
+                                              <span className="flex items-center gap-1 text-amber-400 font-mono">
+                                                <CreditCard className="w-3 h-3" />
+                                                {card.name}
+                                              </span>
+                                            ) : acc ? (
+                                              <span className="flex items-center gap-1 text-blue-400">
+                                                <Building2 className="w-3 h-3" />
+                                                {acc.name}
+                                              </span>
+                                            ) : (
+                                              <span className="flex items-center gap-1 text-emerald-400">
+                                                <Coins className="w-3 h-3" />
+                                                Efectivo
+                                              </span>
+                                            )}
+                                            {tx.notes && (
+                                              <span className="text-slate-500 truncate max-w-xs italic">
+                                                "{tx.notes}"
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-3 shrink-0">
+                                        <span
+                                          className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                                            isReal
+                                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                          }`}
+                                        >
+                                          {isReal ? 'Realizado' : 'Planificado'}
+                                        </span>
+                                        <span
+                                          className={`font-mono font-bold text-sm ${
+                                            tx.type === 'ingreso' ? 'text-emerald-400' : 'text-rose-400'
+                                          }`}
+                                        >
+                                          {tx.type === 'ingreso' ? '+' : '-'}
+                                          {formatMoney(tx.amount, settings.currencySymbol)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
-
-              <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-800 leading-relaxed">
-                Permite vigilar qué proporción de tus consumos dependió de crédito diferido frente a liquidez inmediata en cuentas y efectivo.
-              </p>
-            </div>
-          )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Histórico de Cierres Anteriores */}
+      {/* Histórico de Cierres Anteriores Inmutables */}
       <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">

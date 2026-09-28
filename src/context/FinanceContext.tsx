@@ -573,10 +573,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       creditCards,
       loans,
       dailyCashFlow,
-      allMonthTransactions,
+      transactions,
       budgetAnalysis,
       settings.liquidityStartDate || '2026-09-15',
-      savingsAccounts
+      savingsAccounts,
+      allMonthTransactions
     );
   }, [
     selectedYear,
@@ -586,6 +587,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     creditCards,
     loans,
     dailyCashFlow,
+    transactions,
     allMonthTransactions,
     budgetAnalysis,
     settings.liquidityStartDate,
