@@ -47,6 +47,7 @@ export const CreditCardStatementsView: React.FC = () => {
     creditCards,
     transactions,
     installmentPurchases,
+    loans,
     categories,
     accounts,
     saveTransaction,
@@ -107,9 +108,10 @@ export const CreditCardStatementsView: React.FC = () => {
       selectedMonth,
       transactions,
       installmentPurchases,
-      todayStr
+      todayStr,
+      loans
     );
-  }, [currentCard, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr]);
+  }, [currentCard, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans]);
 
   // Statements for all cards for global summary
   const allStatements: CreditCardStatement[] = useMemo(() => {
@@ -119,9 +121,10 @@ export const CreditCardStatementsView: React.FC = () => {
       selectedMonth,
       transactions,
       installmentPurchases,
-      todayStr
+      todayStr,
+      loans
     );
-  }, [activeCards, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr]);
+  }, [activeCards, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans]);
 
   // Aggregate totals
   const totalGlobalTDDC = useMemo(() => {

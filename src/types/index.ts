@@ -189,7 +189,10 @@ export interface Loan {
   nextPaymentDate: string; // YYYY-MM-DD
   startDate?: string; // YYYY-MM-DD
   totalInstallments?: number;
+  paymentMethodType?: PaymentMethodType;
   preferredAccountId?: string;
+  creditCardId?: string;
+  isExtrafinanciamiento?: boolean;
   notes?: string;
   createdAt: string;
   updatedAt: string;

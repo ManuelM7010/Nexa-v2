@@ -442,6 +442,9 @@ export class NexaFinancialEngine {
       );
 
       if (!hasDuplicate) {
+        const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
+        const methodType = isTdc ? 'tarjeta_credito' : (loan.paymentMethodType || 'banco');
+
         const label = monthInst
           ? `Cuota Préstamo ${monthInst.installmentNumber}/${monthInst.totalInstallments}: ${loan.name} (${loan.lender})`
           : `Cuota Préstamo: ${loan.name} (${loan.lender})`;
@@ -453,8 +456,9 @@ export class NexaFinancialEngine {
           concept: label,
           type: 'cuota_prestamo',
           amount: loan.installmentAmount,
-          paymentMethodType: 'banco',
-          accountId: loan.preferredAccountId || data.accounts[0]?.id,
+          paymentMethodType: methodType,
+          creditCardId: isTdc ? loan.creditCardId : undefined,
+          accountId: !isTdc ? (loan.preferredAccountId || data.accounts[0]?.id) : undefined,
           status: 'planificado',
           loanId: loan.id,
           origin: `prestamo:${loan.id}`,
@@ -521,6 +525,32 @@ export class NexaFinancialEngine {
                     tx.origin === `cuota:${ip.id}` ||
                     tx.origin === `cuota:${ip.id}:${inst.installmentNumber}` ||
                     tx.installmentPurchaseId === ip.id
+                );
+                if (!alreadyIncluded) {
+                  chargesAmount += inst.amount;
+                }
+              });
+            }
+          });
+        }
+
+        // Add loan installments (extrafinanciamiento) charged to this card within this billing cycle
+        if (data.loans) {
+          data.loans.forEach((loan) => {
+            const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
+            if (isTdc && loan.creditCardId === card.id) {
+              if (loan.remainingBalance <= 0 || loan.remainingInstallmentsCount <= 0) return;
+              const schedule = NexaFinancialEngine.getLoanSchedule(loan);
+              const matchingInCycle = schedule.filter(
+                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
+              );
+
+              matchingInCycle.forEach((inst) => {
+                const alreadyIncluded = cycleExpenses.some(
+                  (tx) =>
+                    tx.origin === `prestamo:${loan.id}` ||
+                    tx.origin === `prestamo:${loan.id}:${inst.installmentNumber}` ||
+                    tx.loanId === loan.id
                 );
                 if (!alreadyIncluded) {
                   chargesAmount += inst.amount;
@@ -2249,6 +2279,11 @@ export class NexaFinancialEngine {
       if (tx.creditCardId !== card.id) return;
       if (asOfDate && tx.date > asOfDate) return;
 
+      // Extrafinanciamiento cuota: does NOT affect credit card purchase limit (Requirement: no afecta el límite de compras de la TDC)
+      if (tx.type === 'cuota_prestamo' || tx.origin?.startsWith('prestamo:')) {
+        return;
+      }
+
       if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') {
         balance += tx.amount;
       } else if (tx.type === 'pago_tarjeta') {
@@ -2469,7 +2504,8 @@ export class NexaFinancialEngine {
     month: number,
     allTransactions: Transaction[],
     installmentPurchases: InstallmentPurchase[] = [],
-    todayStr: string = new Date().toISOString().split('T')[0]
+    todayStr: string = new Date().toISOString().split('T')[0],
+    loans: Loan[] = []
   ): CreditCardStatement {
     const { cycleStartDate, cycleEndDate, cutOffDayActual } = NexaFinancialEngine.getBillingCycleDates(card, year, month);
 
@@ -2538,6 +2574,45 @@ export class NexaFinancialEngine {
       }
     });
 
+    // Active Loans with Extrafinanciamiento (charged to this credit card)
+    (loans || []).forEach((loan) => {
+      const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
+      if (isTdc && loan.creditCardId === card.id) {
+        if (loan.remainingBalance <= 0 || loan.remainingInstallmentsCount <= 0) return;
+        const schedule = NexaFinancialEngine.getLoanSchedule(loan);
+        const matchingInCycle = schedule.filter(
+          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
+        );
+
+        matchingInCycle.forEach((inst) => {
+          const alreadyInCycle = purchaseTxs.some(
+            (tx) =>
+              tx.origin === `prestamo:${loan.id}` ||
+              tx.origin === `prestamo:${loan.id}:${inst.installmentNumber}` ||
+              tx.loanId === loan.id
+          );
+          if (!alreadyInCycle) {
+            purchasesSum += inst.amount;
+            cycleTxs.push({
+              id: `gen_loan_${loan.id}_${inst.installmentNumber}`,
+              date: inst.date,
+              expectedDate: inst.date,
+              concept: `Cuota Préstamo ${inst.installmentNumber}/${inst.totalInstallments}: ${loan.name} (${loan.lender})`,
+              type: 'cuota_prestamo',
+              amount: inst.amount,
+              paymentMethodType: 'tarjeta_credito',
+              creditCardId: card.id,
+              loanId: loan.id,
+              status: inst.date <= todayStr ? 'realizado' : 'planificado',
+              origin: `prestamo:${loan.id}:${inst.installmentNumber}`,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        });
+      }
+    });
+
     // Prior cycle balance (for initial month, include initialUsedBalance if any)
     let previousCycleBalance = 0;
     if (cycleMonthKey === '2026-09') {
@@ -2567,7 +2642,15 @@ export class NexaFinancialEngine {
 
     const totalPayments = appliedPayments.reduce((sum, tx) => sum + tx.amount, 0);
     const remainingDue = Math.max(0, totalDueAtCutOff - totalPayments);
-    const availableCredit = Math.max(0, card.limit - remainingDue);
+
+    // Extrafinanciamientos are billed on the TDC statement but do not consume the regular purchase credit limit
+    const extrafinancingInCycle = cycleTxs
+      .filter((t) => t.type === 'cuota_prestamo' || t.origin?.startsWith('prestamo:'))
+      .reduce((s, t) => s + t.amount, 0);
+    const regularPurchasesTotal = Math.max(0, totalDueAtCutOff - extrafinancingInCycle);
+    const regularRemainingDue = Math.max(0, regularPurchasesTotal - totalPayments);
+    const availableCredit = Math.max(0, card.limit - regularRemainingDue);
+
     const minimumPayment = remainingDue > 0 ? Math.min(remainingDue, Math.max(2500, Math.round(remainingDue * 0.05))) : 0;
     const cashPaymentNoInterest = remainingDue;
 
@@ -2629,7 +2712,8 @@ export class NexaFinancialEngine {
     month: number,
     allTransactions: Transaction[],
     installmentPurchases: InstallmentPurchase[] = [],
-    todayStr: string = new Date().toISOString().split('T')[0]
+    todayStr: string = new Date().toISOString().split('T')[0],
+    loans: Loan[] = []
   ): CreditCardStatement[] {
     return creditCards
       .filter((c) => c.isActive)
@@ -2640,7 +2724,8 @@ export class NexaFinancialEngine {
           month,
           allTransactions,
           installmentPurchases,
-          todayStr
+          todayStr,
+          loans
         )
       );
   }

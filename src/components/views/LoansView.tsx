@@ -16,12 +16,15 @@ import {
   CheckCircle2,
   Clock,
   Check,
+  CreditCard as CreditCardIcon,
+  Sparkles,
 } from 'lucide-react';
 
 export const LoansView: React.FC = () => {
   const {
     loans,
     accounts,
+    creditCards,
     saveLoan,
     deleteLoan,
     registerLoanExtraPayment,
@@ -42,7 +45,10 @@ export const LoansView: React.FC = () => {
   const [paymentDay, setPaymentDay] = useState(28);
   const [startDate, setStartDate] = useState('');
   const [totalInstallments, setTotalInstallments] = useState(24);
+  const [paymentMethodType, setPaymentMethodType] = useState<'banco' | 'tarjeta_credito'>('banco');
+  const [creditCardId, setCreditCardId] = useState(creditCards[0]?.id || '');
   const [preferredAccountId, setPreferredAccountId] = useState(accounts[0]?.id || '');
+  const [isExtrafinanciamiento, setIsExtrafinanciamiento] = useState(false);
   const [notes, setNotes] = useState('');
 
   // Extra Payment modal state
@@ -61,7 +67,10 @@ export const LoansView: React.FC = () => {
     setPaymentDay(28);
     setStartDate(todayStr);
     setTotalInstallments(24);
-    setPreferredAccountId(accounts[0]?.id || '');
+    setPaymentMethodType('banco');
+    setCreditCardId(creditCards[0]?.id || '');
+    setPreferredAccountId(accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || '');
+    setIsExtrafinanciamiento(false);
     setNotes('');
     setIsModalOpen(true);
   };
@@ -78,7 +87,13 @@ export const LoansView: React.FC = () => {
     setTotalInstallments(
       loan.totalInstallments || (loan.paymentsMadeCount || 0) + (loan.remainingInstallmentsCount || 24)
     );
-    setPreferredAccountId(loan.preferredAccountId || accounts[0]?.id || '');
+    const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
+    setPaymentMethodType(isTdc ? 'tarjeta_credito' : 'banco');
+    setCreditCardId(loan.creditCardId || creditCards[0]?.id || '');
+    setPreferredAccountId(
+      loan.preferredAccountId || accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || ''
+    );
+    setIsExtrafinanciamiento(loan.isExtrafinanciamiento ?? isTdc);
     setNotes(loan.notes || '');
     setIsModalOpen(true);
   };
@@ -87,17 +102,24 @@ export const LoansView: React.FC = () => {
     e.preventDefault();
     if (!name.trim() || !originalAmountStr) return;
 
+    const isTdc = paymentMethodType === 'tarjeta_credito';
+    const selectedCard = isTdc ? creditCards.find((c) => c.id === creditCardId) : null;
+    const finalLender = lender.trim() || (selectedCard ? selectedCard.bank : 'Entidad Bancaria');
+
     await saveLoan({
       id: editingLoan?.id,
       name: name.trim(),
-      lender: lender.trim() || 'Entidad Bancaria',
+      lender: finalLender,
       originalAmount: dollarsToCents(originalAmountStr),
       remainingBalance: dollarsToCents(remainingBalanceStr || originalAmountStr),
       installmentAmount: dollarsToCents(installmentStr || 100),
       paymentDay,
       startDate: startDate.trim() || undefined,
       totalInstallments: Number(totalInstallments) || 24,
-      preferredAccountId,
+      paymentMethodType,
+      creditCardId: isTdc ? creditCardId : undefined,
+      preferredAccountId: !isTdc ? preferredAccountId : undefined,
+      isExtrafinanciamiento: isTdc ? true : isExtrafinanciamiento,
       notes: notes.trim() || undefined,
     });
 
@@ -133,6 +155,18 @@ export const LoansView: React.FC = () => {
     return acc + (!s.isCompleted ? l.installmentAmount : 0);
   }, 0);
 
+  const extrafinancingLoans = loans.filter(
+    (l) => l.paymentMethodType === 'tarjeta_credito' || !!l.creditCardId
+  );
+  const extrafinancingRemaining = extrafinancingLoans.reduce((acc, l) => {
+    const s = NexaFinancialEngine.getLoanStatus(l, todayStr);
+    return acc + s.remainingBalance;
+  }, 0);
+  const extrafinancingMonthly = extrafinancingLoans.reduce((acc, l) => {
+    const s = NexaFinancialEngine.getLoanStatus(l, todayStr);
+    return acc + (!s.isCompleted ? l.installmentAmount : 0);
+  }, 0);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Header */}
@@ -143,7 +177,7 @@ export const LoansView: React.FC = () => {
             <h2 className="text-base font-bold text-white">Préstamos & Pasivos Financieros</h2>
           </div>
           <p className="text-xs text-slate-400">
-            Control exacto por fecha y amortización. Al cumplirse el plazo total de cuotas, el cobro finaliza automáticamente.
+            Control de préstamos bancarios y extrafinanciamientos en tarjeta de crédito. Amortización exacta sin afectar el límite de compras en TDC.
           </p>
         </div>
 
@@ -157,7 +191,7 @@ export const LoansView: React.FC = () => {
       </div>
 
       {/* Aggregate Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
           <span className="text-xs font-semibold uppercase text-slate-400 block mb-1">
             Deuda Pendiente Total
@@ -166,7 +200,7 @@ export const LoansView: React.FC = () => {
             {formatMoney(totalRemainingLoan, settings.currencySymbol)}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            Saldo pendiente en préstamos activos
+            Saldo acumulado en {loans.length} pasivo(s)
           </p>
         </div>
 
@@ -178,7 +212,25 @@ export const LoansView: React.FC = () => {
             {formatMoney(totalInstallmentMonthly, settings.currencySymbol)}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            Total debitado este mes (excluye préstamos liquidados)
+            Total debitado o cargado a TDC este mes
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-slate-900 border border-amber-500/20 bg-amber-950/10 p-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold uppercase text-amber-400 block">
+              Extrafinanciamientos TDC
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              {extrafinancingLoans.length}
+            </span>
+          </div>
+          <div className="text-2xl font-black text-amber-300 font-mono">
+            {formatMoney(extrafinancingMonthly, settings.currencySymbol)}
+            <span className="text-xs text-amber-400/80 font-normal ml-1">/mes</span>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Saldo: {formatMoney(extrafinancingRemaining, settings.currencySymbol)} (no bloquea cupo TDC)
           </p>
         </div>
 
@@ -204,6 +256,8 @@ export const LoansView: React.FC = () => {
           const amortized = Math.max(0, loan.originalAmount - status.remainingBalance);
           const progressPct =
             loan.originalAmount > 0 ? Math.round((amortized / loan.originalAmount) * 100) : 0;
+          const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
+          const card = isTdc ? creditCards.find((c) => c.id === loan.creditCardId) : null;
           const account = accounts.find((a) => a.id === loan.preferredAccountId);
           const isExpanded = expandedScheduleId === loan.id;
 
@@ -216,25 +270,44 @@ export const LoansView: React.FC = () => {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-base font-bold text-white">{loan.name}</h3>
+                    {isTdc && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                        <CreditCardIcon className="w-3 h-3" />
+                        Extrafinanciamiento TDC
+                      </span>
+                    )}
                     {status.isCompleted ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                         <CheckCircle2 className="w-3 h-3" />
                         Liquidado ({status.totalInstallments}/{status.totalInstallments})
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                         <Clock className="w-3 h-3" />
                         En Curso ({status.paidCount}/{status.totalInstallments})
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                    <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                  <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 flex-wrap">
+                    <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                     <span>{loan.lender}</span>
-                    {account && <span>• Débito en {account.name}</span>}
+                    {isTdc ? (
+                      <span className="flex items-center gap-1 text-amber-300 font-medium">
+                        • <CreditCardIcon className="w-3 h-3 text-amber-400" />
+                        Cobro mensual en {card ? card.name : 'Tarjeta de Crédito'} (no afecta límite de compras)
+                      </span>
+                    ) : account ? (
+                      <span>• Débito en {account.name}</span>
+                    ) : null}
                   </div>
+                  {loan.notes && (
+                    <div className="text-[11px] text-slate-400 bg-slate-950/60 border border-slate-800/80 rounded-lg px-2.5 py-1 mt-1.5 flex items-center gap-1.5">
+                      <span className="text-amber-400/80 font-semibold text-[10px] uppercase tracking-wider">Nota:</span>
+                      <span>{loan.notes}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -432,13 +505,13 @@ export const LoansView: React.FC = () => {
 
       {/* Modal Add/Edit Loan */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100 my-8 max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-bold text-white mb-4">
               {editingLoan ? 'Editar Préstamo' : 'Registrar Nuevo Préstamo'}
             </h3>
 
-            <form onSubmit={handleSaveLoan} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveLoan} className="space-y-4 text-xs">
               <div>
                 <label className="block text-slate-300 mb-1 font-semibold">Nombre del Préstamo</label>
                 <input
@@ -446,18 +519,153 @@ export const LoansView: React.FC = () => {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ej. Préstamo Personal, Crédito Vehículo..."
+                  placeholder="Ej. Extrafinanciamiento Línea Blanca, Préstamo Personal..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                 />
               </div>
 
+              {/* Selector de Método de Pago / Modalidad */}
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Entidad Prestamista</label>
+                <label className="block text-slate-300 mb-1.5 font-semibold">
+                  Método de Pago / Modalidad de Cobro
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMethodType('banco');
+                      setIsExtrafinanciamiento(false);
+                    }}
+                    className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 cursor-pointer ${
+                      paymentMethodType === 'banco'
+                        ? 'bg-blue-600/15 border-blue-500 text-white shadow-sm'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <Building2
+                      className={`w-4 h-4 shrink-0 mt-0.5 ${
+                        paymentMethodType === 'banco' ? 'text-blue-400' : 'text-slate-500'
+                      }`}
+                    />
+                    <div>
+                      <div className="font-bold text-xs text-white">Cuenta Bancaria</div>
+                      <div className="text-[11px] text-slate-400 leading-tight mt-0.5">
+                        Débito directo en cuenta corriente o ahorros
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMethodType('tarjeta_credito');
+                      setIsExtrafinanciamiento(true);
+                      if (creditCards.length > 0 && !creditCardId) {
+                        setCreditCardId(creditCards[0].id);
+                      }
+                      if ((!lender || lender === 'Entidad Bancaria') && creditCards.length > 0) {
+                        const targetCard = creditCards.find((c) => c.id === creditCardId) || creditCards[0];
+                        if (targetCard) setLender(targetCard.bank);
+                      }
+                    }}
+                    className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 cursor-pointer ${
+                      paymentMethodType === 'tarjeta_credito'
+                        ? 'bg-amber-500/15 border-amber-500 text-white shadow-sm'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <CreditCardIcon
+                      className={`w-4 h-4 shrink-0 mt-0.5 ${
+                        paymentMethodType === 'tarjeta_credito' ? 'text-amber-400' : 'text-slate-500'
+                      }`}
+                    />
+                    <div>
+                      <div className="font-bold text-xs text-amber-300">Tarjeta de Crédito</div>
+                      <div className="text-[11px] text-slate-400 leading-tight mt-0.5">
+                        Extrafinanciamiento (no afecta cupo de compras)
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Conditional Account vs Credit Card Selector */}
+              {paymentMethodType === 'tarjeta_credito' ? (
+                <div className="space-y-2 p-3 rounded-xl bg-amber-950/20 border border-amber-500/30">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-amber-300 font-semibold">
+                      Tarjeta de Crédito de Cobro
+                    </label>
+                    <span className="text-[10px] text-amber-400 font-mono">Carga mensual a TDC</span>
+                  </div>
+
+                  {creditCards.length === 0 ? (
+                    <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs">
+                      No tienes tarjetas de crédito registradas. Ve al módulo de <strong>Tarjetas</strong> para agregar una tarjeta primero.
+                    </div>
+                  ) : (
+                    <select
+                      value={creditCardId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setCreditCardId(id);
+                        const c = creditCards.find((card) => card.id === id);
+                        if (c && (!lender || lender === 'Entidad Bancaria' || creditCards.some((other) => other.bank === lender))) {
+                          setLender(c.bank);
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium"
+                    >
+                      {creditCards.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} — {c.bank} (Límite: {formatMoney(c.limit, settings.currencySymbol)})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {/* Extrafinanciamiento Explanation Box */}
+                  <div className="flex items-start gap-2 pt-1 text-[11px] text-amber-200/90 leading-relaxed">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Extrafinanciamiento Bancario:</strong> La cuota mensual se incluirá en el estado de cuenta mensual de la tarjeta de crédito para ser pagada con la tarjeta, pero el monto total del préstamo <strong>no reduce ni bloquea tu límite disponible para compras</strong>.
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 pt-1 text-[11px] text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isExtrafinanciamiento}
+                      onChange={(e) => setIsExtrafinanciamiento(e.target.checked)}
+                      className="rounded bg-slate-950 border-slate-700 text-amber-500 focus:ring-amber-400"
+                    />
+                    <span>Extrafinanciamiento activo (no afecta límite de compra de la TDC)</span>
+                  </label>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold">Cuenta Bancaria de Débito</label>
+                  <select
+                    value={preferredAccountId}
+                    onChange={(e) => setPreferredAccountId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  >
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.bankName || a.type}) — Saldo: {formatMoney(a.initialBalance, settings.currencySymbol)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-300 mb-1 font-semibold">Entidad Prestamista / Banco</label>
                 <input
                   type="text"
                   value={lender}
                   onChange={(e) => setLender(e.target.value)}
-                  placeholder="Ej. BAC Credomatic, Banco Cuscatlán..."
+                  placeholder="Ej. BAC Credomatic, Banco Cuscatlán, Banco Promerica..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                 />
               </div>
@@ -502,7 +710,7 @@ export const LoansView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 mb-1 font-semibold">Día de Pago en el Mes</label>
+                  <label className="block text-slate-300 mb-1 font-semibold">Día de Pago / Cobro en el Mes</label>
                   <input
                     type="number"
                     min="1"
@@ -539,33 +747,29 @@ export const LoansView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Cuenta Bancaria de Débito</label>
-                <select
-                  value={preferredAccountId}
-                  onChange={(e) => setPreferredAccountId(e.target.value)}
+                <label className="block text-slate-300 mb-1 font-semibold">Notas u Observaciones (Opcional)</label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ej. Extrafinanciamiento tasa cero a 24 meses..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                >
-                  {accounts.filter((a) => a.type === 'banco').map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold cursor-pointer hover:bg-slate-700"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white shadow-md"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-white shadow-md cursor-pointer"
                 >
-                  Guardar
+                  {editingLoan ? 'Actualizar Préstamo' : 'Guardar Préstamo'}
                 </button>
               </div>
             </form>
