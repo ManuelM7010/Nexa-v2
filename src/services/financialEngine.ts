@@ -3,6 +3,8 @@ import {
   CreditCard,
   CreditCardStatement,
   Transaction,
+  TransactionType,
+  TransactionStatus,
   Category,
   Budget,
   ItemBudget,
@@ -73,6 +75,30 @@ export interface ExecutiveSummary {
   accountBalances: Record<string, number>;
   periodLabel: string;
   isCurrentMonth: boolean;
+}
+
+export interface AccountMovementItem {
+  id: string;
+  date: string;
+  concept: string;
+  type: TransactionType;
+  flowAmount: number; // positive for inflow (+), negative for outflow (-)
+  isTransfer: boolean;
+  transferDirection?: 'in' | 'out';
+  counterpartName?: string;
+  status: TransactionStatus;
+  notes?: string;
+}
+
+export interface AccountMonthlySummary {
+  currentBalance: number;
+  openingBalance: number;
+  monthInflow: number;
+  monthOutflow: number;
+  netMonthlyChange: number;
+  transfersReceived: number;
+  transfersSent: number;
+  movements: AccountMovementItem[];
 }
 
 export interface MonthProjection {
@@ -1500,22 +1526,22 @@ export class NexaFinancialEngine {
             if (tx.type === 'gasto_desde_ahorro') return;
             if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
 
-            const targetAccount = accounts.find((a) => a.id === tx.accountId);
+            const targetAccount = accounts.find((a) => a.id === tx.accountId) || accounts.find((a) => a.isActive);
             const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
 
             if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
               currentRealCashBalance += tx.amount;
               if (isCash) cashBalance += tx.amount;
               else bankBalance += tx.amount;
-              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
-                accountBalances[tx.accountId] += tx.amount;
+              if (targetAccount && accountBalances[targetAccount.id] !== undefined) {
+                accountBalances[targetAccount.id] += tx.amount;
               }
             } else {
               currentRealCashBalance -= tx.amount;
               if (isCash) cashBalance -= tx.amount;
               else bankBalance -= tx.amount;
-              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
-                accountBalances[tx.accountId] -= tx.amount;
+              if (targetAccount && accountBalances[targetAccount.id] !== undefined) {
+                accountBalances[targetAccount.id] -= tx.amount;
               }
             }
           }
@@ -1543,13 +1569,15 @@ export class NexaFinancialEngine {
             if (tx.type === 'gasto_desde_ahorro') return;
             if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
 
+            const targetAccount = accounts.find((a) => a.id === tx.accountId) || accounts.find((a) => a.isActive);
+
             if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
-              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
-                accountBalances[tx.accountId] += tx.amount;
+              if (targetAccount && accountBalances[targetAccount.id] !== undefined) {
+                accountBalances[targetAccount.id] += tx.amount;
               }
             } else {
-              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
-                accountBalances[tx.accountId] -= tx.amount;
+              if (targetAccount && accountBalances[targetAccount.id] !== undefined) {
+                accountBalances[targetAccount.id] -= tx.amount;
               }
             }
           }
@@ -1580,9 +1608,26 @@ export class NexaFinancialEngine {
         if (rawTotal > 0 && currentRealCashBalance > 0) {
           bankBalance = Math.round((rawBank / rawTotal) * currentRealCashBalance);
           cashBalance = currentRealCashBalance - bankBalance;
+
+          // Scale individual accountBalances proportionally so their sum strictly matches currentRealCashBalance
+          const activeAccounts = accounts.filter((a) => a.isActive);
+          let allocated = 0;
+          activeAccounts.forEach((a, i) => {
+            if (i === activeAccounts.length - 1) {
+              accountBalances[a.id] = Math.max(0, currentRealCashBalance - allocated);
+            } else {
+              const val = Math.round(((Math.max(0, accountBalances[a.id] || 0)) / rawTotal) * currentRealCashBalance);
+              accountBalances[a.id] = val;
+              allocated += val;
+            }
+          });
         } else {
           bankBalance = currentRealCashBalance;
           cashBalance = 0;
+          const activeAccounts = accounts.filter((a) => a.isActive);
+          activeAccounts.forEach((a, i) => {
+            accountBalances[a.id] = i === 0 ? currentRealCashBalance : 0;
+          });
         }
       } else {
         // Past month: compute up to monthEndStr
@@ -1609,22 +1654,22 @@ export class NexaFinancialEngine {
             if (tx.type === 'gasto_desde_ahorro') return;
             if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
 
-            const targetAccount = accounts.find((a) => a.id === tx.accountId);
+            const targetAccount = accounts.find((a) => a.id === tx.accountId) || accounts.find((a) => a.isActive);
             const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
 
             if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
               currentRealCashBalance += tx.amount;
               if (isCash) cashBalance += tx.amount;
               else bankBalance += tx.amount;
-              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
-                accountBalances[tx.accountId] += tx.amount;
+              if (targetAccount && accountBalances[targetAccount.id] !== undefined) {
+                accountBalances[targetAccount.id] += tx.amount;
               }
             } else {
               currentRealCashBalance -= tx.amount;
               if (isCash) cashBalance -= tx.amount;
               else bankBalance -= tx.amount;
-              if (tx.accountId && accountBalances[tx.accountId] !== undefined) {
-                accountBalances[tx.accountId] -= tx.amount;
+              if (targetAccount && accountBalances[targetAccount.id] !== undefined) {
+                accountBalances[targetAccount.id] -= tx.amount;
               }
             }
           }
@@ -2728,5 +2773,125 @@ export class NexaFinancialEngine {
           loans
         )
       );
+  }
+
+  /**
+   * Calculates comprehensive monthly account metrics, including opening balance,
+   * realized inflows/outflows, internal transfers sent & received, and itemized movements.
+   */
+  static getAccountMonthlyBreakdown(
+    account: Account,
+    year: number,
+    month: number,
+    allTransactions: Transaction[],
+    currentCalculatedBalance: number,
+    accounts: Account[]
+  ): AccountMonthlySummary {
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+    const movements: AccountMovementItem[] = [];
+    let monthInflow = 0;
+    let monthOutflow = 0;
+    let transfersReceived = 0;
+    let transfersSent = 0;
+
+    const monthTxs = allTransactions.filter(
+      (tx) => tx.date.startsWith(monthKey) && tx.status !== 'cancelado'
+    );
+
+    monthTxs.forEach((tx) => {
+      // 1. Direct transfer between accounts
+      if (tx.type === 'transferencia') {
+        if (tx.accountId === account.id) {
+          // Transfer OUT (sent)
+          transfersSent += tx.amount;
+          monthOutflow += tx.amount;
+          const counterpart = accounts.find((a) => a.id === tx.transferToAccountId);
+          movements.push({
+            id: tx.id,
+            date: tx.date,
+            concept: tx.concept || `Transferencia a ${counterpart?.name || 'otra cuenta'}`,
+            type: tx.type,
+            flowAmount: -tx.amount,
+            isTransfer: true,
+            transferDirection: 'out',
+            counterpartName: counterpart?.name || 'Otra Cuenta',
+            status: tx.status,
+            notes: tx.notes,
+          });
+        } else if (tx.transferToAccountId === account.id) {
+          // Transfer IN (received)
+          transfersReceived += tx.amount;
+          monthInflow += tx.amount;
+          const counterpart = accounts.find((a) => a.id === tx.accountId);
+          movements.push({
+            id: tx.id,
+            date: tx.date,
+            concept: tx.concept || `Transferencia recibida de ${counterpart?.name || 'otra cuenta'}`,
+            type: tx.type,
+            flowAmount: tx.amount,
+            isTransfer: true,
+            transferDirection: 'in',
+            counterpartName: counterpart?.name || 'Otra Cuenta',
+            status: tx.status,
+            notes: tx.notes,
+          });
+        }
+        return;
+      }
+
+      // Ignore credit card purchases (which do not debit cash/bank directly)
+      if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+      // Ignore direct expenses from savings fund
+      if (tx.type === 'gasto_desde_ahorro') return;
+
+      const isForThisAccount =
+        tx.accountId === account.id ||
+        (!tx.accountId && account.id === (accounts.find((a) => a.isActive)?.id || accounts[0]?.id));
+
+      if (!isForThisAccount) return;
+
+      if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
+        monthInflow += tx.amount;
+        movements.push({
+          id: tx.id,
+          date: tx.date,
+          concept: tx.concept,
+          type: tx.type,
+          flowAmount: tx.amount,
+          isTransfer: false,
+          status: tx.status,
+          notes: tx.notes,
+        });
+      } else {
+        // Outflow (expense, CC payment, loan cuota, savings deposit)
+        monthOutflow += tx.amount;
+        movements.push({
+          id: tx.id,
+          date: tx.date,
+          concept: tx.concept,
+          type: tx.type,
+          flowAmount: -tx.amount,
+          isTransfer: false,
+          status: tx.status,
+          notes: tx.notes,
+        });
+      }
+    });
+
+    movements.sort((a, b) => b.date.localeCompare(a.date));
+
+    const netMonthlyChange = monthInflow - monthOutflow;
+    const openingBalance = Math.max(0, currentCalculatedBalance - netMonthlyChange);
+
+    return {
+      currentBalance: currentCalculatedBalance,
+      openingBalance,
+      monthInflow,
+      monthOutflow,
+      netMonthlyChange,
+      transfersReceived,
+      transfersSent,
+      movements,
+    };
   }
 }
