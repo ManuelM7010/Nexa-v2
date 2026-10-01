@@ -362,12 +362,21 @@ export class NexaFinancialEngine {
       accounts: Account[];
       existingTransactions: Transaction[];
       todayStr?: string;
+      liquidityStartDate?: string;
     }
   ): Transaction[] {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     const generated: Transaction[] = [];
     const daysCount = daysInMonth(year, month);
     const referenceToday = data.todayStr || new Date().toISOString().split('T')[0];
+    const liquidityStartDate = data.liquidityStartDate || '2026-09-15';
+    const monthEndStr = `${monthKey}-${String(daysCount).padStart(2, '0')}`;
+
+    // If the entire month is strictly prior to liquidityStartDate, do NOT generate any projected fixed obligations/cuotas
+    // (Requirement: cuotas, suscripciones o gastos fijos de meses anteriores no se muestren ni afecten estados de cuenta o pagos)
+    if (monthEndStr < liquidityStartDate) {
+      return [];
+    }
 
     // 1. Subscriptions
     for (const sub of data.subscriptions) {
@@ -381,6 +390,7 @@ export class NexaFinancialEngine {
 
       const billingDay = Math.min(sub.billingDay, daysCount);
       const dateStr = `${monthKey}-${String(billingDay).padStart(2, '0')}`;
+      if (dateStr < liquidityStartDate) continue;
 
       // Check if user already registered an explicit/realized transaction for this
       const hasDuplicate = data.existingTransactions.some(
@@ -416,6 +426,7 @@ export class NexaFinancialEngine {
 
       const estimatedDay = Math.min(srv.estimatedDay, daysCount);
       const dateStr = record?.paidDate || `${monthKey}-${String(estimatedDay).padStart(2, '0')}`;
+      if (dateStr < liquidityStartDate) continue;
 
       const hasDuplicate = data.existingTransactions.some(
         (t) => t.date.startsWith(monthKey) && t.origin === `servicio:${srv.id}`
@@ -462,6 +473,7 @@ export class NexaFinancialEngine {
 
       const paymentDay = Math.min(loan.paymentDay, daysCount);
       const dateStr = monthInst ? monthInst.date : `${monthKey}-${String(paymentDay).padStart(2, '0')}`;
+      if (dateStr < liquidityStartDate) continue;
 
       const hasDuplicate = data.existingTransactions.some(
         (t) => t.date.startsWith(monthKey) && t.origin === `prestamo:${loan.id}`
@@ -495,14 +507,14 @@ export class NexaFinancialEngine {
     }
 
     // 4. Credit Card Payment Obligations (from card cut-off/payment dates)
-    // Date guard: If monthKey < '2026-09', all credit card payments are 0.00 as requested by the user
-    // ("todos lo pagos de tarjteas de agosto hacia a tras será 0.00, porque comenzaré a meter data a partir de mi situacion en Septiembre.")
-    if (monthKey >= '2026-09') {
+    // Date guard: If monthKey < liquidityStartDate.slice(0, 7), credit card payments are not generated
+    if (monthKey >= liquidityStartDate.slice(0, 7)) {
       for (const card of data.creditCards) {
         if (!card.isActive) continue;
 
         const payDay = Math.min(card.usualPaymentDay || card.paymentDueDay, daysCount);
         const dateStr = `${monthKey}-${String(payDay).padStart(2, '0')}`;
+        if (dateStr < liquidityStartDate) continue;
 
         // Determine cycle closing month & year for payments due in this month (year, month)
         let closingYear = year;
@@ -517,32 +529,35 @@ export class NexaFinancialEngine {
         }
         const { cycleStartDate, cycleEndDate } = NexaFinancialEngine.getBillingCycleDates(card, closingYear, closingMonth);
 
+        // If closing cycle ends before liquidityStartDate, no obligation to pay
+        if (cycleEndDate < liquidityStartDate) continue;
+
         let chargesAmount = 0;
 
-        // In the starting month (September 2026), include the initial balance configured by the user
-        if (monthKey === '2026-09' && card.initialUsedBalance > 0) {
+        // In the starting month, include the initial balance configured by the user
+        if (monthKey === liquidityStartDate.slice(0, 7) && card.initialUsedBalance > 0) {
           chargesAmount += card.initialUsedBalance;
         }
 
-        // Add expenses made on this card within this billing cycle (from day after previous cut-off to current cut-off day)
+        // Add expenses made on this card within this billing cycle (only >= liquidityStartDate)
         const cycleExpenses = data.existingTransactions.filter((tx) => {
           if (tx.status === 'cancelado') return false;
           if (tx.creditCardId !== card.id) return false;
           if (tx.paymentMethodType !== 'tarjeta_credito') return false;
           if (tx.type === 'pago_tarjeta') return false;
-          return tx.date >= cycleStartDate && tx.date <= cycleEndDate;
+          return tx.date >= cycleStartDate && tx.date <= cycleEndDate && tx.date >= liquidityStartDate;
         });
 
         const cycleExpensesSum = cycleExpenses.reduce((sum, tx) => sum + tx.amount, 0);
         chargesAmount += cycleExpensesSum;
 
-        // Add installment purchase quotas that fall specifically within this card billing cycle [cycleStartDate, cycleEndDate]
+        // Add installment purchase quotas that fall specifically within this card billing cycle [cycleStartDate, cycleEndDate] >= liquidityStartDate
         if (data.installmentPurchases) {
           data.installmentPurchases.forEach((ip) => {
             if (ip.creditCardId === card.id) {
               const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
               const matchingInCycle = schedule.filter(
-                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
+                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && inst.date >= liquidityStartDate
               );
 
               matchingInCycle.forEach((inst) => {
@@ -560,7 +575,7 @@ export class NexaFinancialEngine {
           });
         }
 
-        // Add loan installments (extrafinanciamiento) charged to this card within this billing cycle
+        // Add loan installments (extrafinanciamiento) charged to this card within this billing cycle >= liquidityStartDate
         if (data.loans) {
           data.loans.forEach((loan) => {
             const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
@@ -568,7 +583,7 @@ export class NexaFinancialEngine {
               if (loan.remainingBalance <= 0 || loan.remainingInstallmentsCount <= 0) return;
               const schedule = NexaFinancialEngine.getLoanSchedule(loan);
               const matchingInCycle = schedule.filter(
-                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
+                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && inst.date >= liquidityStartDate
               );
 
               matchingInCycle.forEach((inst) => {
@@ -586,9 +601,7 @@ export class NexaFinancialEngine {
           });
         }
 
-        // Deduct payments and abonos made to this card for this billing cycle:
-        // Includes explicit abonos tied to this cycleKey, abonos made during the cycle,
-        // and payments made up to the payment month
+        // Deduct payments and abonos made to this card for this billing cycle >= liquidityStartDate
         const monthEndStr = `${monthKey}-${String(daysCount).padStart(2, '0')}`;
         const closingCycleKey = `${closingYear}-${String(closingMonth).padStart(2, '0')}`;
         const cyclePayments = data.existingTransactions.filter((tx) => {
@@ -596,6 +609,7 @@ export class NexaFinancialEngine {
           if (tx.creditCardId !== card.id) return false;
           if (tx.type !== 'pago_tarjeta') return false;
           if (tx.id.startsWith('gen_')) return false; // Only count explicit user payments
+          if (tx.date < liquidityStartDate) return false;
           // If transaction has an explicit target creditCardCycleKey
           if (tx.creditCardCycleKey) {
             return tx.creditCardCycleKey === closingCycleKey;
@@ -628,12 +642,13 @@ export class NexaFinancialEngine {
       }
     }
 
-    // 5. Active Installment Purchases on Credit Cards (charged to credit card on their scheduled date)
+    // 5. Active Installment Purchases on Credit Cards (charged to credit card on their scheduled date >= liquidityStartDate)
     if (data.installmentPurchases) {
       for (const ip of data.installmentPurchases) {
         const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
         const monthInst = schedule.find((s) => s.date.startsWith(monthKey));
         if (!monthInst) continue;
+        if (monthInst.date < liquidityStartDate) continue; // Do not generate cuotas before liquidity start date!
 
         const hasDuplicate = data.existingTransactions.some(
           (t) =>
@@ -785,7 +800,24 @@ export class NexaFinancialEngine {
         const dateObj = new Date(y, m - 1, dayNum);
         const dayOfWeek = dayNames[dateObj.getDay()];
 
-        const dayTxs = allTransactions.filter((tx) => tx.date === dateStr && tx.status !== 'cancelado');
+        const dayTxs = allTransactions.filter((tx) => {
+          if (tx.date !== dateStr || tx.status === 'cancelado') return false;
+          // Filter out cuotas, subscriptions, services, or obligations from prior months
+          if (
+            tx.type === 'cuota_prestamo' ||
+            tx.type === 'cuota_tarjeta' ||
+            tx.type === 'suscripcion' ||
+            tx.type === 'servicio' ||
+            tx.type === 'pago_tarjeta' ||
+            tx.origin?.startsWith('prestamo:') ||
+            tx.origin?.startsWith('suscripcion:') ||
+            tx.origin?.startsWith('servicio:') ||
+            tx.origin?.startsWith('cuota:')
+          ) {
+            return false;
+          }
+          return true;
+        });
         let obligations = 0;
         dayTxs.forEach((tx) => {
           if (
@@ -960,7 +992,24 @@ export class NexaFinancialEngine {
       // If the day is strictly before liquidityStartDate (e.g. Sept 1 to Sept 14 when start is Sept 15):
       // Cash liquidity balance remains 0.00 until official start date.
       if (dateStr < liquidityStartDate) {
-        const dayTxs = targetMonthAllTxs.filter((tx) => tx.date === dateStr && tx.status !== 'cancelado');
+        const dayTxs = targetMonthAllTxs.filter((tx) => {
+          if (tx.date !== dateStr || tx.status === 'cancelado') return false;
+          // Filter out cuotas, subscriptions, services, or obligations from prior days
+          if (
+            tx.type === 'cuota_prestamo' ||
+            tx.type === 'cuota_tarjeta' ||
+            tx.type === 'suscripcion' ||
+            tx.type === 'servicio' ||
+            tx.type === 'pago_tarjeta' ||
+            tx.origin?.startsWith('prestamo:') ||
+            tx.origin?.startsWith('suscripcion:') ||
+            tx.origin?.startsWith('servicio:') ||
+            tx.origin?.startsWith('cuota:')
+          ) {
+            return false;
+          }
+          return true;
+        });
         let realizedIncome = 0;
         let projectedIncome = 0;
         let realizedExpense = 0;
@@ -1493,7 +1542,7 @@ export class NexaFinancialEngine {
 
     accounts.forEach((acc) => {
       if (acc.isActive) {
-        accountBalances[acc.id] = acc.initialBalance;
+        accountBalances[acc.id] = monthEndStr < liquidityStartDate ? 0 : acc.initialBalance;
       }
     });
 
@@ -2315,7 +2364,8 @@ export class NexaFinancialEngine {
   static calculateCardCurrentBalance(
     card: CreditCard,
     allTransactions: Transaction[],
-    asOfDate?: string
+    asOfDate?: string,
+    liquidityStartDate: string = '2026-09-15'
   ): { balance: number; available: number; usagePercentage: number } {
     let balance = card.initialUsedBalance || 0;
 
@@ -2323,6 +2373,7 @@ export class NexaFinancialEngine {
       if (tx.status === 'cancelado') return;
       if (tx.creditCardId !== card.id) return;
       if (asOfDate && tx.date > asOfDate) return;
+      if (tx.date < liquidityStartDate) return;
 
       // Extrafinanciamiento cuota: does NOT affect credit card purchase limit (Requirement: no afecta el límite de compras de la TDC)
       if (tx.type === 'cuota_prestamo' || tx.origin?.startsWith('prestamo:')) {
@@ -2550,7 +2601,8 @@ export class NexaFinancialEngine {
     allTransactions: Transaction[],
     installmentPurchases: InstallmentPurchase[] = [],
     todayStr: string = new Date().toISOString().split('T')[0],
-    loans: Loan[] = []
+    loans: Loan[] = [],
+    liquidityStartDate: string = '2026-09-15'
   ): CreditCardStatement {
     const { cycleStartDate, cycleEndDate, cutOffDayActual } = NexaFinancialEngine.getBillingCycleDates(card, year, month);
 
@@ -2569,11 +2621,11 @@ export class NexaFinancialEngine {
     const paymentDueDate = `${payYear}-${String(payMonth).padStart(2, '0')}-${String(payDayActual).padStart(2, '0')}`;
     const cycleMonthKey = `${year}-${String(month).padStart(2, '0')}`;
 
-    // Charges and purchases inside this billing cycle period [cycleStartDate, cycleEndDate]
+    // Charges and purchases inside this billing cycle period [cycleStartDate, cycleEndDate] >= liquidityStartDate
     const cycleTxs = allTransactions.filter((tx) => {
       if (tx.creditCardId !== card.id) return false;
       if (tx.status === 'cancelado') return false;
-      return tx.date >= cycleStartDate && tx.date <= cycleEndDate;
+      return tx.date >= cycleStartDate && tx.date <= cycleEndDate && tx.date >= liquidityStartDate;
     });
 
     // Expenses / Purchases
@@ -2582,12 +2634,12 @@ export class NexaFinancialEngine {
     );
     let purchasesSum = purchaseTxs.reduce((sum, tx) => sum + tx.amount, 0);
 
-    // Active Installment Purchases for this card that apply to this cycle
+    // Active Installment Purchases for this card that apply to this cycle >= liquidityStartDate
     installmentPurchases.forEach((ip) => {
       if (ip.creditCardId === card.id) {
         const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
         const matchingInCycle = schedule.filter(
-          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
+          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && inst.date >= liquidityStartDate
         );
 
         matchingInCycle.forEach((inst) => {
@@ -2619,14 +2671,14 @@ export class NexaFinancialEngine {
       }
     });
 
-    // Active Loans with Extrafinanciamiento (charged to this credit card)
+    // Active Loans with Extrafinanciamiento (charged to this credit card) >= liquidityStartDate
     (loans || []).forEach((loan) => {
       const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
       if (isTdc && loan.creditCardId === card.id) {
         if (loan.remainingBalance <= 0 || loan.remainingInstallmentsCount <= 0) return;
         const schedule = NexaFinancialEngine.getLoanSchedule(loan);
         const matchingInCycle = schedule.filter(
-          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
+          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && inst.date >= liquidityStartDate
         );
 
         matchingInCycle.forEach((inst) => {
@@ -2660,7 +2712,7 @@ export class NexaFinancialEngine {
 
     // Prior cycle balance (for initial month, include initialUsedBalance if any)
     let previousCycleBalance = 0;
-    if (cycleMonthKey === '2026-09') {
+    if (cycleMonthKey === liquidityStartDate.slice(0, 7) && cycleEndDate >= liquidityStartDate) {
       previousCycleBalance = card.initialUsedBalance || 0;
     }
 
@@ -2670,12 +2722,13 @@ export class NexaFinancialEngine {
     // Payments and abonos applied to this statement
     // Includes:
     // 1) Explicitly assigned via creditCardCycleKey === cycleMonthKey
-    // 2) Default window: payments made between cycleStartDate and paymentDueDate that are not assigned to another cycle
+    // 2) Default window: payments made between cycleStartDate and paymentDueDate that are not assigned to another cycle >= liquidityStartDate
     const effectivePayDeadline = paymentDueDate > cycleEndDate ? paymentDueDate : cycleEndDate;
     const appliedPayments = allTransactions.filter((tx) => {
       if (tx.creditCardId !== card.id) return false;
       if (tx.status === 'cancelado') return false;
       if (tx.type !== 'pago_tarjeta') return false;
+      if (tx.date < liquidityStartDate) return false;
 
       if (tx.creditCardCycleKey) {
         return tx.creditCardCycleKey === cycleMonthKey;
@@ -2758,7 +2811,8 @@ export class NexaFinancialEngine {
     allTransactions: Transaction[],
     installmentPurchases: InstallmentPurchase[] = [],
     todayStr: string = new Date().toISOString().split('T')[0],
-    loans: Loan[] = []
+    loans: Loan[] = [],
+    liquidityStartDate: string = '2026-09-15'
   ): CreditCardStatement[] {
     return creditCards
       .filter((c) => c.isActive)
@@ -2770,7 +2824,8 @@ export class NexaFinancialEngine {
           allTransactions,
           installmentPurchases,
           todayStr,
-          loans
+          loans,
+          liquidityStartDate
         )
       );
   }
@@ -2785,9 +2840,27 @@ export class NexaFinancialEngine {
     month: number,
     allTransactions: Transaction[],
     currentCalculatedBalance: number,
-    accounts: Account[]
+    accounts: Account[],
+    liquidityStartDate: string = '2026-09-15'
   ): AccountMonthlySummary {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+    const daysInCurrentMonth = daysInMonth(year, month);
+    const monthEndStr = `${monthKey}-${String(daysInCurrentMonth).padStart(2, '0')}`;
+
+    // If month is strictly prior to liquidityStartDate, accounts have 0 balance and 0 movements
+    if (monthEndStr < liquidityStartDate) {
+      return {
+        currentBalance: 0,
+        openingBalance: 0,
+        monthInflow: 0,
+        monthOutflow: 0,
+        netMonthlyChange: 0,
+        transfersReceived: 0,
+        transfersSent: 0,
+        movements: [],
+      };
+    }
+
     const movements: AccountMovementItem[] = [];
     let monthInflow = 0;
     let monthOutflow = 0;
@@ -2795,7 +2868,7 @@ export class NexaFinancialEngine {
     let transfersSent = 0;
 
     const monthTxs = allTransactions.filter(
-      (tx) => tx.date.startsWith(monthKey) && tx.status !== 'cancelado'
+      (tx) => tx.date.startsWith(monthKey) && tx.status !== 'cancelado' && tx.date >= liquidityStartDate
     );
 
     monthTxs.forEach((tx) => {
@@ -2881,10 +2954,20 @@ export class NexaFinancialEngine {
     movements.sort((a, b) => b.date.localeCompare(a.date));
 
     const netMonthlyChange = monthInflow - monthOutflow;
-    const openingBalance = Math.max(0, currentCalculatedBalance - netMonthlyChange);
+    let openingBalance: number;
+    let finalBalance: number;
+
+    if (monthKey === liquidityStartDate.slice(0, 7)) {
+      // In the start month, the funds activate on liquidityStartDate with account.initialBalance
+      openingBalance = account.initialBalance;
+      finalBalance = Math.max(0, openingBalance + netMonthlyChange);
+    } else {
+      finalBalance = currentCalculatedBalance;
+      openingBalance = Math.max(0, finalBalance - netMonthlyChange);
+    }
 
     return {
-      currentBalance: currentCalculatedBalance,
+      currentBalance: finalBalance,
       openingBalance,
       monthInflow,
       monthOutflow,

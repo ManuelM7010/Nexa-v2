@@ -474,6 +474,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       accounts,
       existingTransactions: transactions,
       todayStr,
+      liquidityStartDate: settings.liquidityStartDate || '2026-09-15',
     });
   }, [
     selectedYear,
@@ -486,15 +487,36 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     accounts,
     transactions,
     todayStr,
+    settings.liquidityStartDate,
   ]);
 
   // Merge explicit transactions with generated projections
   const allMonthTransactions = useMemo(() => {
     const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-    const explicitMonthTxs = transactions.filter((t) => t.date.startsWith(monthKey));
+    const liquidityStart = settings.liquidityStartDate || '2026-09-15';
+    const explicitMonthTxs = transactions.filter((t) => {
+      if (!t.date.startsWith(monthKey)) return false;
+      // Do not include prior cuotas, subs, or fixed obligations before liquidityStartDate
+      if (t.date < liquidityStart) {
+        if (
+          t.type === 'cuota_prestamo' ||
+          t.type === 'cuota_tarjeta' ||
+          t.type === 'suscripcion' ||
+          t.type === 'servicio' ||
+          t.type === 'pago_tarjeta' ||
+          t.origin?.startsWith('prestamo:') ||
+          t.origin?.startsWith('suscripcion:') ||
+          t.origin?.startsWith('servicio:') ||
+          t.origin?.startsWith('cuota:')
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
     const combined = [...explicitMonthTxs, ...projectedEvents];
     return combined.sort((a, b) => a.date.localeCompare(b.date));
-  }, [selectedYear, selectedMonth, transactions, projectedEvents]);
+  }, [selectedYear, selectedMonth, transactions, projectedEvents, settings.liquidityStartDate]);
 
   // Daily Cash Flow calculation with strict month-to-month balance continuity
   const dailyCashFlow = useMemo(() => {

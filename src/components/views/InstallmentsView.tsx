@@ -29,6 +29,8 @@ export const InstallmentsView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InstallmentPurchase | null>(null);
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
+  const [hidePriorInstallments, setHidePriorInstallments] = useState(true);
+  const liquidityStart = settings.liquidityStartDate || '2026-09-15';
 
   const [concept, setConcept] = useState('');
   const [totalAmountStr, setTotalAmountStr] = useState('');
@@ -284,35 +286,60 @@ export const InstallmentsView: React.FC = () => {
                   </button>
 
                   {isExpanded && (
-                    <div className="mt-2.5 max-h-40 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-slate-950/80 border border-slate-800">
-                      {schedule.map((inst) => {
-                        const isPaid = inst.date <= todayStr;
-                        return (
-                          <div
-                            key={inst.installmentNumber}
-                            className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg ${
-                              isPaid ? 'bg-slate-900/60 text-slate-300' : 'bg-slate-900 text-slate-100 font-medium'
-                            }`}
-                          >
-                            <span className="flex items-center gap-1.5">
-                              {isPaid ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              ) : (
-                                <span className="w-3.5 h-3.5 rounded-full border border-slate-600 inline-block" />
-                              )}
-                              <span>
-                                Cuota {inst.installmentNumber}/{inst.totalInstallments}
-                              </span>
-                            </span>
-                            <span className="text-slate-400 font-mono text-[11px]">
-                              {formatDateEs(inst.date, { withDayName: false })}
-                            </span>
-                            <span className="font-mono font-bold text-indigo-300">
-                              {formatMoney(inst.amount, settings.currencySymbol)}
-                            </span>
-                          </div>
-                        );
-                      })}
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                        <span>Inicio de liquidez: <strong className="text-slate-300 font-mono">{formatDateEs(liquidityStart, { withDayName: false })}</strong></span>
+                        <button
+                          type="button"
+                          onClick={() => setHidePriorInstallments(!hidePriorInstallments)}
+                          className="text-indigo-400 hover:underline cursor-pointer"
+                        >
+                          {hidePriorInstallments ? 'Ver cuotas anteriores' : 'Ocultar cuotas anteriores'}
+                        </button>
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-slate-950/80 border border-slate-800">
+                        {schedule
+                          .filter((inst) => !hidePriorInstallments || inst.date >= liquidityStart)
+                          .map((inst) => {
+                            const isPriorToLiquidity = inst.date < liquidityStart;
+                            const isPaid = inst.date <= todayStr;
+                            return (
+                              <div
+                                key={inst.installmentNumber}
+                                className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg ${
+                                  isPriorToLiquidity
+                                    ? 'bg-slate-900/30 text-slate-500 border border-dashed border-slate-800'
+                                    : isPaid
+                                    ? 'bg-slate-900/60 text-slate-300'
+                                    : 'bg-slate-900 text-slate-100 font-medium'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  {isPaid ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                  ) : (
+                                    <span className="w-3.5 h-3.5 rounded-full border border-slate-600 inline-block" />
+                                  )}
+                                  <span>
+                                    Cuota {inst.installmentNumber}/{inst.totalInstallments}
+                                    {isPriorToLiquidity && (
+                                      <span className="ml-1 text-[10px] text-indigo-400/80 font-normal">
+                                        (Previa a inicio liquidez)
+                                      </span>
+                                    )}
+                                  </span>
+                                </span>
+                                <span className="text-slate-400 font-mono text-[11px]">
+                                  {formatDateEs(inst.date, { withDayName: false })}
+                                </span>
+                                <span className="font-mono font-bold text-indigo-300">
+                                  {formatMoney(inst.amount, settings.currencySymbol)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                      </div>
                     </div>
                   )}
                 </div>

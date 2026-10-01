@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { Subscription } from '../../types';
-import { formatMoney, dollarsToCents, centsToDollars } from '../../utils/formatters';
+import { formatMoney, dollarsToCents, centsToDollars, formatDateEs } from '../../utils/formatters';
 import {
   Tv,
   Plus,
@@ -13,6 +13,7 @@ import {
   CreditCard,
   Building2,
   CheckCircle2,
+  Clock,
 } from 'lucide-react';
 
 export const SubscriptionsView: React.FC = () => {
@@ -30,6 +31,8 @@ export const SubscriptionsView: React.FC = () => {
   } = useFinance();
 
   const currentMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+  const liquidityStart = settings.liquidityStartDate || '2026-09-15';
+  const isPriorToStartMonth = currentMonthKey < liquidityStart.slice(0, 7);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
@@ -90,12 +93,16 @@ export const SubscriptionsView: React.FC = () => {
   };
 
   // Calculate monthly total and annual projected
-  const activeMonthlyTotal = subscriptions.reduce((acc, s) => {
-    const isPaused = s.monthlyExceptions?.[currentMonthKey]?.paused || s.status !== 'activa';
-    return isPaused ? acc : acc + s.amount;
-  }, 0);
+  const activeMonthlyTotal = isPriorToStartMonth
+    ? 0
+    : subscriptions.reduce((acc, s) => {
+        const isPaused = s.monthlyExceptions?.[currentMonthKey]?.paused || s.status !== 'activa';
+        return isPaused ? acc : acc + s.amount;
+      }, 0);
 
-  const annualProjected = activeMonthlyTotal * 12;
+  const annualProjected = (isPriorToStartMonth
+    ? subscriptions.reduce((acc, s) => (s.status === 'activa' ? acc + s.amount : acc), 0)
+    : activeMonthlyTotal) * 12;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -119,6 +126,21 @@ export const SubscriptionsView: React.FC = () => {
           <span>Nueva Suscripción</span>
         </button>
       </div>
+
+      {/* Notice if prior to start */}
+      {isPriorToStartMonth && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+          <Clock className="w-5 h-5 flex-shrink-0 text-amber-400" />
+          <div>
+            <p className="font-bold text-amber-200">
+              Mes anterior a la fecha oficial de inicio de liquidez ({formatDateEs(liquidityStart, { withYear: true })})
+            </p>
+            <p className="text-amber-300/80 mt-0.5">
+              Las suscripciones no generan cobros en cuenta ni afectan los estados de cuenta en meses anteriores al inicio oficial de tu sistema.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

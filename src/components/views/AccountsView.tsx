@@ -62,23 +62,27 @@ export const AccountsView: React.FC = () => {
   const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const monthName = MONTH_NAMES_ES[selectedMonth - 1] || 'Mes';
 
+  const liquidityStart = settings.liquidityStartDate || '2026-09-15';
+  const isPriorToStartMonth = monthKey < liquidityStart.slice(0, 7);
+
   // Calculate detailed monthly breakdown for each account based on selected month
   const accountSummaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof NexaFinancialEngine.getAccountMonthlyBreakdown>>();
     accounts.forEach((acc) => {
-      const currentBal = executiveSummary.accountBalances?.[acc.id] ?? acc.initialBalance;
+      const currentBal = executiveSummary.accountBalances?.[acc.id] ?? (isPriorToStartMonth ? 0 : acc.initialBalance);
       const breakdown = NexaFinancialEngine.getAccountMonthlyBreakdown(
         acc,
         selectedYear,
         selectedMonth,
         transactions,
         currentBal,
-        accounts
+        accounts,
+        liquidityStart
       );
       map.set(acc.id, breakdown);
     });
     return map;
-  }, [accounts, executiveSummary.accountBalances, selectedYear, selectedMonth, transactions]);
+  }, [accounts, executiveSummary.accountBalances, selectedYear, selectedMonth, transactions, liquidityStart, isPriorToStartMonth]);
 
   // Aggregate monthly flows
   const totalMonthInflows = useMemo(() => {
@@ -172,7 +176,9 @@ export const AccountsView: React.FC = () => {
   const isFuture = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}` > todayStr.slice(0, 7);
   const isPast = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}` < todayStr.slice(0, 7);
 
-  const periodBadgeText = isCurrentMonth
+  const periodBadgeText = isPriorToStartMonth
+    ? `Período Previo — Inicio: ${formatDateEs(liquidityStart, { withDayName: false })}`
+    : isCurrentMonth
     ? `Período Actual — Saldo Real Hoy (${formatDateEs(todayStr, { withDayName: false })})`
     : isFuture
     ? `Período Futuro — Apertura ${monthName} ${selectedYear}`
@@ -194,7 +200,9 @@ export const AccountsView: React.FC = () => {
             </span>
             <span
               className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                isCurrentMonth
+                isPriorToStartMonth
+                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  : isCurrentMonth
                   ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                   : 'bg-slate-800 text-slate-300 border-slate-700'
               }`}
@@ -230,6 +238,21 @@ export const AccountsView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Prior to Liquidity Start Notice */}
+      {isPriorToStartMonth && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+          <Clock className="w-5 h-5 flex-shrink-0 text-amber-400" />
+          <div>
+            <p className="font-bold text-amber-200">
+              Mes anterior a la fecha oficial de inicio de liquidez ({formatDateEs(liquidityStart, { withYear: true })})
+            </p>
+            <p className="text-amber-300/80 mt-0.5">
+              Por configuración del sistema, las cuotas, suscripciones y gastos fijos de meses previos no se muestran ni afectan la liquidez bancaria ni los estados de cuenta. Los saldos de tus cuentas y movimientos computan a partir del día de inicio de liquidez.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Aggregate KPI Cards - Synchronized with Real Liquidity */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

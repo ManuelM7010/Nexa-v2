@@ -99,6 +99,8 @@ export const CreditCardStatementsView: React.FC = () => {
     [activeCards, selectedCardId]
   );
 
+  const liquidityStartDate = settings.liquidityStartDate || '2026-09-15';
+
   // Generate statement for selected card and month
   const statement: CreditCardStatement | null = useMemo(() => {
     if (!currentCard) return null;
@@ -109,9 +111,10 @@ export const CreditCardStatementsView: React.FC = () => {
       transactions,
       installmentPurchases,
       todayStr,
-      loans
+      loans,
+      liquidityStartDate
     );
-  }, [currentCard, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans]);
+  }, [currentCard, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate]);
 
   // Statements for all cards for global summary
   const allStatements: CreditCardStatement[] = useMemo(() => {
@@ -122,9 +125,10 @@ export const CreditCardStatementsView: React.FC = () => {
       transactions,
       installmentPurchases,
       todayStr,
-      loans
+      loans,
+      liquidityStartDate
     );
-  }, [activeCards, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans]);
+  }, [activeCards, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate]);
 
   // Aggregate totals
   const totalGlobalTDDC = useMemo(() => {
