@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { ServiceItem } from '../../types';
-import { formatMoney, dollarsToCents, centsToDollars } from '../../utils/formatters';
+import { formatMoney, dollarsToCents, centsToDollars, formatDateEs } from '../../utils/formatters';
 import {
   Zap,
   Plus,
@@ -28,6 +28,8 @@ export const ServicesView: React.FC = () => {
   } = useFinance();
 
   const currentMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+  const liquidityStart = settings.liquidityStartDate || '2026-09-15';
+  const isPriorToStartMonth = currentMonthKey < liquidityStart.slice(0, 7);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
@@ -113,15 +115,19 @@ export const ServicesView: React.FC = () => {
     });
   };
 
-  const totalBudgeted = services.reduce((acc, s) => {
-    const rec = s.monthlyRecords?.[currentMonthKey];
-    return acc + (rec?.budgetedAmount || s.budgetedAmount);
-  }, 0);
+  const totalBudgeted = isPriorToStartMonth
+    ? 0
+    : services.reduce((acc, s) => {
+        const rec = s.monthlyRecords?.[currentMonthKey];
+        return acc + (rec?.budgetedAmount || s.budgetedAmount);
+      }, 0);
 
-  const totalReal = services.reduce((acc, s) => {
-    const rec = s.monthlyRecords?.[currentMonthKey];
-    return acc + (rec?.actualAmount !== undefined ? rec.actualAmount : s.budgetedAmount);
-  }, 0);
+  const totalReal = isPriorToStartMonth
+    ? 0
+    : services.reduce((acc, s) => {
+        const rec = s.monthlyRecords?.[currentMonthKey];
+        return acc + (rec?.actualAmount !== undefined ? rec.actualAmount : s.budgetedAmount);
+      }, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -145,6 +151,21 @@ export const ServicesView: React.FC = () => {
           <span>Nuevo Servicio</span>
         </button>
       </div>
+
+      {/* Prior to start notice banner */}
+      {isPriorToStartMonth && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+          <Clock className="w-5 h-5 flex-shrink-0 text-amber-400" />
+          <div>
+            <p className="font-bold text-amber-200">
+              Mes anterior a la fecha oficial de inicio de liquidez ({formatDateEs(liquidityStart, { withYear: true })})
+            </p>
+            <p className="text-amber-300/80 mt-0.5">
+              Los gastos fijos y servicios no generan pagos ni afectan cuentas en meses previos al inicio oficial de tu sistema financiero.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

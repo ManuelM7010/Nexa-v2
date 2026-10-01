@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { PlanNote, PlanNoteCategory, PlanNotePriority } from '../../types';
 import { formatMoney, centsToDollars, dollarsToCents } from '../../utils/formatters';
+import { WhiteboardCanvas } from './WhiteboardCanvas';
 import {
   StickyNote,
   Plus,
@@ -23,6 +24,7 @@ import {
   Compass,
   ShoppingBag,
   ListTodo,
+  Pencil,
 } from 'lucide-react';
 
 const CATEGORY_CONFIG: Record<
@@ -114,6 +116,9 @@ const SAMPLE_NOTES = [
 
 export const NotesView: React.FC = () => {
   const { planNotes, savePlanNote, deletePlanNote, togglePlanNoteCompleted, settings } = useFinance();
+
+  // Top Section Switcher: 'notes' vs 'whiteboard'
+  const [activeSection, setActiveSection] = useState<'notes' | 'whiteboard'>('notes');
 
   // Search and filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -260,51 +265,99 @@ export const NotesView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
-              <StickyNote className="w-5 h-5" />
+            <div
+              className={`w-9 h-9 rounded-xl border flex items-center justify-center ${
+                activeSection === 'whiteboard'
+                  ? 'bg-purple-500/15 border-purple-500/30 text-purple-400'
+                  : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
+              }`}
+            >
+              {activeSection === 'whiteboard' ? <Pencil className="w-5 h-5" /> : <StickyNote className="w-5 h-5" />}
             </div>
             <div>
               <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Listas & Notas de Planes</span>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                  {planNotes.length} {planNotes.length === 1 ? 'nota' : 'notas'}
-                </span>
+                <span>{activeSection === 'whiteboard' ? 'Pizarra Libre & Dibujo' : 'Listas & Notas de Planes'}</span>
+                {activeSection === 'notes' && (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {planNotes.length} {planNotes.length === 1 ? 'nota' : 'notas'}
+                  </span>
+                )}
               </h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                Espacio libre para anotar futuros gastos, planes, compras deseadas e ideas sin alterar tus balances, flujo diario ni presupuestos.
+                {activeSection === 'whiteboard'
+                  ? 'Lienzo interactivo para escribir, dibujar diagramas, usar lápices de colores, borrador, notas adhesivas y tablas de cotización.'
+                  : 'Espacio libre para anotar futuros gastos, planes, compras deseadas e ideas sin alterar tus balances, flujo diario ni presupuestos.'}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          {planNotes.length === 0 && (
+        {/* Section Tabs Switcher */}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-2xl">
             <button
-              onClick={handleLoadSampleNotes}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+              type="button"
+              onClick={() => setActiveSection('notes')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                activeSection === 'notes'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Cargar Ejemplos</span>
+              <StickyNote className="w-3.5 h-3.5" />
+              <span>Notas ({planNotes.length})</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSection('whiteboard')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                activeSection === 'whiteboard'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Pencil className="w-3.5 h-3.5 text-purple-300" />
+              <span>Pizarra & Dibujo</span>
+            </button>
+          </div>
+
+          {activeSection === 'notes' && (
+            <>
+              {planNotes.length === 0 && (
+                <button
+                  onClick={handleLoadSampleNotes}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Cargar Ejemplos</span>
+                </button>
+              )}
+
+              <button
+                onClick={openNewModal}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/30 transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Nueva Nota o Plan</span>
+              </button>
+            </>
           )}
-
-          <button
-            onClick={openNewModal}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-600/30 transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nueva Nota o Plan</span>
-          </button>
         </div>
       </div>
 
-      {/* Disclaimer Banner: 100% Non-Impact Isolation Guarantee */}
-      <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-3.5 flex items-start gap-3 text-xs text-slate-300">
-        <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-        <div className="leading-relaxed">
-          <strong className="text-white">Aislamiento Contable Total:</strong> Los montos estimados y fechas registradas en esta sección son <em>estrictamente informativos</em>. No descuentan saldo de tus cuentas ni se suman como egresos en tu flujo de caja hasta que decidas registrarlos como transacciones reales.
-        </div>
-      </div>
+      {/* Render Active Section */}
+      {activeSection === 'whiteboard' ? (
+        <WhiteboardCanvas />
+      ) : (
+        <>
+          {/* Disclaimer Banner: 100% Non-Impact Isolation Guarantee */}
+          <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-3.5 flex items-start gap-3 text-xs text-slate-300">
+            <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="leading-relaxed">
+              <strong className="text-white">Aislamiento Contable Total:</strong> Los montos estimados y fechas registradas en esta sección son <em>estrictamente informativos</em>. No descuentan saldo de tus cuentas ni se suman como egresos en tu flujo de caja hasta que decidas registrarlos como transacciones reales.
+            </div>
+          </div>
 
       {/* Metric Cards (Informative summary) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -597,6 +650,8 @@ export const NotesView: React.FC = () => {
             );
           })}
         </div>
+      )}
+        </>
       )}
 
       {/* Create / Edit Note Modal */}

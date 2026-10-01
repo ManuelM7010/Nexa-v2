@@ -8,6 +8,7 @@ import {
   dollarsToCents,
   MONTH_NAMES_ES,
   formatPeriodEs,
+  formatDateEs,
 } from '../../utils/formatters';
 import {
   FileSpreadsheet,
@@ -561,6 +562,21 @@ export const CreditCardStatementsView: React.FC = () => {
               </button>
             </div>
           </div>
+
+      {/* Prior to Liquidity Start Notification */}
+      {`${selectedYear}-${String(selectedMonth).padStart(2, '0')}` < liquidityStartDate.slice(0, 7) && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+          <Clock className="w-5 h-5 flex-shrink-0 text-amber-400" />
+          <div>
+            <p className="font-bold text-amber-200">
+              Corte anterior a la fecha oficial de inicio de liquidez ({formatDateEs(liquidityStartDate, { withYear: true })})
+            </p>
+            <p className="text-amber-300/80 mt-0.5">
+              Por configuración del sistema, las cuotas, suscripciones y gastos de meses anteriores no se cobran ni generan deudas en estados de cuenta previos al inicio de liquidez. Solo computan consumos y pagos a partir de dicha fecha.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Global TDDC Summary Header */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
