@@ -730,23 +730,6 @@ export function generateDemoSeedData(): {
       updatedAt: '2026-09-12T00:00:00.000Z',
     },
     {
-      id: 'tx_demo_sep15_obligacion',
-      date: '2026-09-15',
-      expectedDate: '2026-09-15',
-      realDate: '2026-09-15',
-      concept: 'Liquidación Pago Obligación Financiera',
-      notes: 'Pago programado de compromiso quincenal',
-      type: 'pago_tarjeta',
-      categoryId: 'cat_deuda_tarjetas',
-      amount: 35000, // $350.00
-      paymentMethodType: 'banco',
-      accountId: 'acc_bac',
-      creditCardId: 'card_bac',
-      status: 'planificado',
-      createdAt: '2026-09-12T00:00:00.000Z',
-      updatedAt: '2026-09-12T00:00:00.000Z',
-    },
-    {
       id: 'tx_demo_sep18_almuerzo',
       date: '2026-09-18',
       expectedDate: '2026-09-18',

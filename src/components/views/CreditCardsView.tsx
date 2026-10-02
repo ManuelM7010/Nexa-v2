@@ -95,6 +95,7 @@ export const CreditCardsView: React.FC = () => {
     if (payCents <= 0) return;
 
     // Create payment transaction
+    const targetCycle = NexaFinancialEngine.determinePaymentCycleKey(card, todayStr);
     await saveTransaction({
       concept: `Pago Tarjeta ${card.name}`,
       amount: payCents,
@@ -103,9 +104,10 @@ export const CreditCardsView: React.FC = () => {
       paymentMethodType: 'banco',
       accountId: paymentAccountId,
       creditCardId: card.id,
+      creditCardCycleKey: targetCycle,
       status: 'realizado',
       origin: `pago_tarjeta:${card.id}`,
-      notes: `Liquidación de deuda de tarjeta. Descontado de cuenta bancaria.`,
+      notes: `Liquidación de deuda de tarjeta (${targetCycle}). Descontado de cuenta bancaria.`,
     });
 
     setPaymentCardId(null);

@@ -473,9 +473,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setSettings(loadedStg);
         }
 
-        // Migrate any previous demo transactions from Sept 13/14 to Sept 15
-        let currentTxs = txList;
+        // Migrate any previous demo transactions from Sept 13/14 to Sept 15, and remove mock tx_demo_sep15_obligacion
         let didMigrateTx = false;
+        let currentTxs = txList.filter((t) => t.id !== 'tx_demo_sep15_obligacion');
+        if (currentTxs.length !== txList.length) {
+          didMigrateTx = true;
+          await storage.delete('transactions', 'tx_demo_sep15_obligacion');
+        }
         currentTxs = currentTxs.map((t) => {
           if (t.id === 'tx_demo_sep14_quincena' || (t.concept === 'Pago 1ra Quincena Septiembre' && t.date === '2026-09-14')) {
             didMigrateTx = true;
@@ -784,8 +788,26 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const toggleTransactionStatus = async (id: string) => {
-    const found = transactions.find((t) => t.id === id);
-    if (!found) return;
+    let found = transactions.find((t) => t.id === id);
+    if (!found) {
+      // Check if it's a projected event
+      found = projectedEvents.find((p) => p.id === id);
+      if (found) {
+        // Materialize projected event as a persistent transaction with realized status
+        const materialized: Transaction = {
+          ...found,
+          id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          status: 'realizado',
+          realDate: todayStr,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await storage.put('transactions', materialized);
+        setTransactions((prev) => [materialized, ...prev]);
+        return;
+      }
+      return;
+    }
     const nextStatus = found.status === 'realizado' ? 'planificado' : 'realizado';
     const updated: Transaction = {
       ...found,

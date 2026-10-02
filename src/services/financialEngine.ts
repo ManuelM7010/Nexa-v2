@@ -508,138 +508,65 @@ export class NexaFinancialEngine {
       }
     }
 
-    // 4. Credit Card Payment Obligations (from card cut-off/payment dates)
+    // 4. Credit Card Payment Obligations (from card cut-off/payment dates strictly according to the statement)
     // Date guard: If monthKey < liquidityStartDate.slice(0, 7), credit card payments are not generated
     if (monthKey >= liquidityStartDate.slice(0, 7)) {
       for (const card of data.creditCards) {
         if (!card.isActive) continue;
 
-        const payDay = Math.min(card.usualPaymentDay || card.paymentDueDay, daysCount);
-        const dateStr = `${monthKey}-${String(payDay).padStart(2, '0')}`;
-        if (dateStr < liquidityStartDate) continue;
-
-        // Determine cycle closing month & year for payments due in this month (year, month)
-        let closingYear = year;
-        let closingMonth = month;
+        // Determine cycle closing month & year for the statement whose paymentDueDate falls in this month (year, month)
+        let stmtMonth = month;
+        let stmtYear = year;
         if (card.paymentDueDay <= card.cutOffDay) {
-          // Billing cycle ended in the previous month
-          closingMonth = month - 1;
-          if (closingMonth < 1) {
-            closingMonth = 12;
-            closingYear = year - 1;
+          // Billing cycle ended in the previous month (e.g. cutOff 20th, payDay 5th)
+          stmtMonth = month - 1;
+          if (stmtMonth < 1) {
+            stmtMonth = 12;
+            stmtYear = year - 1;
           }
-        }
-        const { cycleStartDate, cycleEndDate } = NexaFinancialEngine.getBillingCycleDates(card, closingYear, closingMonth);
-
-        let chargesAmount = 0;
-
-        // In the starting month of liquidity, include the initial balance configured by the user
-        const isStartMonth = monthKey === liquidityStartDate.slice(0, 7);
-        if (isStartMonth && (card.initialUsedBalance || 0) > 0) {
-          chargesAmount += card.initialUsedBalance;
+        } else {
+          // Billing cycle ends in the current month (e.g. cutOff 15th, payDay 30th)
+          stmtMonth = month;
+          stmtYear = year;
         }
 
-        // Add expenses (cargos a TDC) made on this card within this billing cycle
-        const cycleExpenses = data.existingTransactions.filter((tx) => {
-          if (tx.status === 'cancelado') return false;
-          const isThisCard = tx.creditCardId === card.id || (tx.paymentMethodType === 'tarjeta_credito' && !tx.creditCardId);
-          if (!isThisCard) return false;
-          if (tx.type === 'pago_tarjeta') return false;
-          if (tx.date < cycleStartDate || tx.date > cycleEndDate) return false;
-          // If initial balance was already added in the start month, do not double-count transactions prior to liquidity start date
-          if (isStartMonth && (card.initialUsedBalance || 0) > 0 && tx.date < liquidityStartDate) {
-            return false;
-          }
-          return true;
-        });
+        // Generate the EXACT credit card statement for this cycle
+        const statement = NexaFinancialEngine.generateCreditCardStatement(
+          card,
+          stmtYear,
+          stmtMonth,
+          data.existingTransactions,
+          data.installmentPurchases || [],
+          referenceToday,
+          data.loans || [],
+          liquidityStartDate
+        );
 
-        const cycleExpensesSum = cycleExpenses.reduce((sum, tx) => sum + tx.amount, 0);
-        chargesAmount += cycleExpensesSum;
+        // Date of payment: Exactly in the card's payment date as defined by the statement (paymentDueDate)
+        const paymentDate = statement.paymentDueDate;
 
-        // Add installment purchase quotas that fall specifically within this card billing cycle [cycleStartDate, cycleEndDate]
-        if (data.installmentPurchases) {
-          data.installmentPurchases.forEach((ip) => {
-            if (ip.creditCardId === card.id) {
-              const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
-              const matchingInCycle = schedule.filter(
-                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && (!isStartMonth || (card.initialUsedBalance || 0) === 0 || inst.date >= liquidityStartDate)
-              );
+        // Only include if paymentDate falls in this month and is on or after liquidityStartDate
+        if (!paymentDate.startsWith(monthKey)) continue;
+        if (paymentDate < liquidityStartDate) continue;
 
-              matchingInCycle.forEach((inst) => {
-                const alreadyIncluded = cycleExpenses.some(
-                  (tx) =>
-                    tx.origin === `cuota:${ip.id}` ||
-                    tx.origin === `cuota:${ip.id}:${inst.installmentNumber}` ||
-                    tx.installmentPurchaseId === ip.id
-                );
-                if (!alreadyIncluded) {
-                  chargesAmount += inst.amount;
-                }
-              });
-            }
-          });
-        }
+        // Amount of payment: Exactly according to the credit card statement (saldo pendiente por pagar)
+        const amountToPay = statement.remainingDue;
 
-        // Add loan installments (extrafinanciamiento) charged to this card within this billing cycle
-        if (data.loans) {
-          data.loans.forEach((loan) => {
-            const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
-            if (isTdc && loan.creditCardId === card.id) {
-              if (loan.remainingBalance <= 0 || loan.remainingInstallmentsCount <= 0) return;
-              const schedule = NexaFinancialEngine.getLoanSchedule(loan);
-              const matchingInCycle = schedule.filter(
-                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && (!isStartMonth || (card.initialUsedBalance || 0) === 0 || inst.date >= liquidityStartDate)
-              );
-
-              matchingInCycle.forEach((inst) => {
-                const alreadyIncluded = cycleExpenses.some(
-                  (tx) =>
-                    tx.origin === `prestamo:${loan.id}` ||
-                    tx.origin === `prestamo:${loan.id}:${inst.installmentNumber}` ||
-                    tx.loanId === loan.id
-                );
-                if (!alreadyIncluded) {
-                  chargesAmount += inst.amount;
-                }
-              });
-            }
-          });
-        }
-
-        // Deduct payments and abonos made to this card for this billing cycle >= liquidityStartDate
-        const monthEndStr = `${monthKey}-${String(daysCount).padStart(2, '0')}`;
-        const closingCycleKey = `${closingYear}-${String(closingMonth).padStart(2, '0')}`;
-        const cyclePayments = data.existingTransactions.filter((tx) => {
-          if (tx.status === 'cancelado') return false;
-          if (tx.creditCardId !== card.id) return false;
-          if (tx.type !== 'pago_tarjeta') return false;
-          if (tx.id.startsWith('gen_')) return false; // Only count explicit user payments
-          if (tx.date < liquidityStartDate) return false;
-          // If transaction has an explicit target creditCardCycleKey
-          if (tx.creditCardCycleKey) {
-            return tx.creditCardCycleKey === closingCycleKey;
-          }
-          return tx.date >= cycleStartDate && tx.date <= monthEndStr;
-        });
-
-        const cyclePaymentsSum = cyclePayments.reduce((sum, tx) => sum + tx.amount, 0);
-
-        // Net remaining payment after taking into account all abonos
-        const remainingPayment = Math.max(0, chargesAmount - cyclePaymentsSum);
-
-        if (remainingPayment > 0) {
+        if (amountToPay > 0) {
           generated.push({
-            id: `gen_card_pay_${card.id}_${monthKey}`,
-            date: dateStr,
-            expectedDate: dateStr,
+            id: `gen_card_pay_${card.id}_${statement.cycleKey}`,
+            date: paymentDate,
+            expectedDate: paymentDate,
             concept: `Pago Tarjeta: ${card.name} (${card.bank})`,
             type: 'pago_tarjeta',
-            amount: remainingPayment,
+            amount: amountToPay,
             paymentMethodType: 'banco',
             accountId: data.accounts.find((a) => a.type === 'banco')?.id || data.accounts[0]?.id,
             creditCardId: card.id,
+            creditCardCycleKey: statement.cycleKey,
             status: 'planificado',
             origin: `pago_tarjeta:${card.id}`,
+            notes: `Pago según estado de cuenta (${statement.cycleLabel}). Saldo al corte: $${(statement.totalDueAtCutOff / 100).toFixed(2)}.`,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           });
@@ -908,6 +835,7 @@ export class NexaFinancialEngine {
               accounts,
               existingTransactions: allTransactions,
               todayStr,
+              liquidityStartDate,
             })
           : [];
         const startMonthAllTxs = [...startExplicit, ...startProjected];
@@ -950,6 +878,7 @@ export class NexaFinancialEngine {
                 accounts,
                 existingTransactions: allTransactions,
                 todayStr,
+                liquidityStartDate,
               })
             : [];
           const simAllMonthTxs = [...simExplicit, ...simProjected];
@@ -984,6 +913,7 @@ export class NexaFinancialEngine {
           accounts,
           existingTransactions: allTransactions,
           todayStr,
+          liquidityStartDate,
         })
       : [];
     const targetMonthAllTxs = [...targetMonthExplicit, ...targetMonthProjected];
@@ -2985,7 +2915,8 @@ export class NexaFinancialEngine {
 
     // Prior cycle balance (for initial setup, include initialUsedBalance if any)
     let previousCycleBalance = 0;
-    if (cycleMonthKey <= '2026-09') {
+    const startMonthKey = (liquidityStartDate || '2026-09-15').slice(0, 7);
+    if (cycleMonthKey <= startMonthKey) {
       previousCycleBalance = card.initialUsedBalance || 0;
     }
 
@@ -3001,6 +2932,7 @@ export class NexaFinancialEngine {
       if (tx.creditCardId !== card.id) return false;
       if (tx.status === 'cancelado') return false;
       if (tx.type !== 'pago_tarjeta') return false;
+      if (tx.id?.startsWith('gen_')) return false;
 
       if (tx.creditCardCycleKey) {
         return tx.creditCardCycleKey === cycleMonthKey;
