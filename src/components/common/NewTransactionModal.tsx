@@ -16,6 +16,7 @@ export const NewTransactionModal: React.FC = () => {
     setNewTxInitialDate,
     newTxInitialType,
     newTxInitialCategoryId,
+    newTxInitialAmount,
     accounts,
     creditCards,
     savingsAccounts,
@@ -62,7 +63,7 @@ export const NewTransactionModal: React.FC = () => {
       setNotes(editingTransaction.notes || '');
     } else {
       setConcept('');
-      setAmountStr('');
+      setAmountStr(newTxInitialAmount !== undefined && newTxInitialAmount > 0 ? newTxInitialAmount.toFixed(2) : '');
       const targetDate = newTxInitialDate || getTodayDateStr();
       setDate(targetDate);
       const initialType = newTxInitialType || 'gasto';
@@ -92,6 +93,7 @@ export const NewTransactionModal: React.FC = () => {
     newTxInitialDate,
     newTxInitialType,
     newTxInitialCategoryId,
+    newTxInitialAmount,
     categories,
     accounts,
     creditCards,

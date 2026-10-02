@@ -62,7 +62,8 @@ interface FinanceContextType {
   setNewTxInitialDate: (date: string | null) => void;
   newTxInitialType?: TransactionType;
   newTxInitialCategoryId?: string;
-  openNewTransactionModal: (opts?: { date?: string; type?: TransactionType; categoryId?: string }) => void;
+  newTxInitialAmount?: number;
+  openNewTransactionModal: (opts?: { date?: string; type?: TransactionType; categoryId?: string; amount?: number }) => void;
   isAffordabilityOpen: boolean;
   setIsAffordabilityOpen: (open: boolean) => void;
   isRenderGuideOpen: boolean;
@@ -235,12 +236,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [newTxInitialDate, setNewTxInitialDate] = useState<string | null>(null);
   const [newTxInitialType, setNewTxInitialType] = useState<TransactionType | undefined>(undefined);
   const [newTxInitialCategoryId, setNewTxInitialCategoryId] = useState<string | undefined>(undefined);
+  const [newTxInitialAmount, setNewTxInitialAmount] = useState<number | undefined>(undefined);
 
-  const openNewTransactionModal = useCallback((opts?: { date?: string; type?: TransactionType; categoryId?: string }) => {
+  const openNewTransactionModal = useCallback((opts?: { date?: string; type?: TransactionType; categoryId?: string; amount?: number }) => {
     setEditingTransaction(null);
     setNewTxInitialDate(opts?.date || null);
     setNewTxInitialType(opts?.type);
     setNewTxInitialCategoryId(opts?.categoryId);
+    setNewTxInitialAmount(opts?.amount);
     setIsNewTxOpen(true);
   }, []);
 
@@ -690,6 +693,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         installmentPurchases,
         loans,
         transactions,
+        liquidityStartDate: settings.liquidityStartDate,
       }
     );
   }, [
@@ -706,6 +710,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     installmentPurchases,
     loans,
     transactions,
+    settings.liquidityStartDate,
   ]);
 
   // --- Actions ---
@@ -1882,6 +1887,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setNewTxInitialDate,
         newTxInitialType,
         newTxInitialCategoryId,
+        newTxInitialAmount,
         openNewTransactionModal,
         isAffordabilityOpen,
         setIsAffordabilityOpen,

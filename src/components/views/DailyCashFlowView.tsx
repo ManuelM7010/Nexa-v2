@@ -175,7 +175,7 @@ export const DailyCashFlowView: React.FC = () => {
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
             <span className="font-semibold uppercase tracking-wider text-[10px]">
               {isStartMonth
-                ? `Saldo Inicial (${liquidityStartDate.slice(8)} ${MONTH_NAMES_SHORT_ES[selectedMonth - 1] || 'Sep'})`
+                ? `Saldo Inicial (${liquidityStartDate.slice(8)} ${MONTH_NAMES_SHORT_ES[Number(liquidityStartDate.slice(5, 7)) - 1] || 'Inicio'})`
                 : 'Saldo Inicial (Día 1)'}
             </span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">
@@ -187,7 +187,7 @@ export const DailyCashFlowView: React.FC = () => {
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
             <span className="truncate">
-              {isStartMonth ? 'Inicio oficial 15 Sep' : 'Heredado del mes previo'}
+              {isStartMonth ? `Inicio: ${formatDateEs(liquidityStartDate, { withDayName: false, withYear: false })}` : 'Heredado del mes previo'}
             </span>
             <span className="text-[10px] text-blue-400 group-hover:underline">Detalle</span>
           </div>

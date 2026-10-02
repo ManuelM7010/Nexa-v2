@@ -1105,32 +1105,36 @@ export const CreditCardStatementsView: React.FC = () => {
                 </span>
                 <button
                   onClick={() => {
-                    setRangeStartDate('2026-08-01');
-                    setRangeEndDate('2026-09-15');
+                    const [ly, lm] = liquidityStartDate.split('-').map(Number);
+                    const prevM = lm === 1 ? 12 : lm - 1;
+                    const prevY = lm === 1 ? ly - 1 : ly;
+                    const prevMonthStart = `${prevY}-${String(prevM).padStart(2, '0')}-01`;
+                    setRangeStartDate(prevMonthStart);
+                    setRangeEndDate(liquidityStartDate);
                   }}
                   className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeStartDate === '2026-08-01' && rangeEndDate === '2026-09-15'
+                    rangeEndDate === liquidityStartDate
                       ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
                       : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
                   }`}
-                  title="Ejemplo explícito: 01 de Agosto al 15 de Septiembre"
+                  title={`Período previo hasta inicio de liquidez (${liquidityStartDate})`}
                 >
-                  📌 01 Ago - 15 Sep
+                  📌 Hasta Inicio Liquidez ({formatDateEs(liquidityStartDate, { withDayName: false, withYear: false })})
                 </button>
 
                 <button
                   onClick={() => {
-                    setRangeStartDate('2026-08-01');
-                    setRangeEndDate(todayStr || '2026-09-27');
+                    setRangeStartDate(liquidityStartDate);
+                    setRangeEndDate(todayStr);
                   }}
                   className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeStartDate === '2026-08-01' && rangeEndDate === (todayStr || '2026-09-27')
+                    rangeStartDate === liquidityStartDate && rangeEndDate === todayStr
                       ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
                       : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
                   }`}
-                  title="Ejemplo explícito: 01 de Agosto hasta hoy (27 de Septiembre)"
+                  title="Desde inicio de liquidez hasta la fecha de hoy"
                 >
-                  ⚡ 01 Ago - 27 Sep (Hoy)
+                  ⚡ Inicio Liquidez a Hoy
                 </button>
 
                 <button

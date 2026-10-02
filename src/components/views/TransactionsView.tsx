@@ -20,7 +20,9 @@ import {
   Pin,
   Maximize2,
   Minimize2,
+  Calculator,
 } from 'lucide-react';
+import { DropdownCalculator } from '../common/DropdownCalculator';
 
 export const TransactionsView: React.FC = () => {
   const {
@@ -31,6 +33,7 @@ export const TransactionsView: React.FC = () => {
     settings,
     setIsNewTxOpen,
     setEditingTransaction,
+    openNewTransactionModal,
     deleteTransaction,
     duplicateTransaction,
     toggleTransactionStatus,
@@ -42,6 +45,7 @@ export const TransactionsView: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<string>('all');
   const [isTableScrollFixed, setIsTableScrollFixed] = useState(true);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
   const filteredTransactions = useMemo(() => {
     return allMonthTransactions.filter((tx) => {
@@ -168,7 +172,22 @@ export const TransactionsView: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative">
+              {/* Dropdown Calculator Button */}
+              <button
+                type="button"
+                onClick={() => setIsCalculatorOpen(!isCalculatorOpen)}
+                title="Abrir calculadora rápida de movimientos"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+                  isCalculatorOpen
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-md shadow-amber-500/10'
+                    : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-amber-300 hover:border-amber-500/40 hover:bg-slate-900'
+                }`}
+              >
+                <Calculator className={`w-3.5 h-3.5 ${isCalculatorOpen ? 'text-amber-400' : 'text-amber-400/80'}`} />
+                <span className="hidden sm:inline">Calculadora</span>
+              </button>
+
               {/* Toggle Freeze / Sticky Mode */}
               <button
                 type="button"
@@ -196,6 +215,16 @@ export const TransactionsView: React.FC = () => {
                 <Plus className="w-4 h-4" />
                 <span>Nuevo Movimiento</span>
               </button>
+
+              {/* Dropdown Calculator Popover */}
+              <DropdownCalculator
+                isOpen={isCalculatorOpen}
+                onClose={() => setIsCalculatorOpen(false)}
+                currencySymbol={settings.currencySymbol}
+                onUseInTransaction={(amount) => {
+                  openNewTransactionModal({ amount });
+                }}
+              />
             </div>
           </div>
 

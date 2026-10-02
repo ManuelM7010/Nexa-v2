@@ -531,35 +531,38 @@ export class NexaFinancialEngine {
         }
         const { cycleStartDate, cycleEndDate } = NexaFinancialEngine.getBillingCycleDates(card, closingYear, closingMonth);
 
-        // If closing cycle ends before liquidityStartDate, no obligation to pay
-        if (cycleEndDate < liquidityStartDate) continue;
-
         let chargesAmount = 0;
 
-        // In the starting month, include the initial balance configured by the user
-        if (monthKey === liquidityStartDate.slice(0, 7) && card.initialUsedBalance > 0) {
+        // In the starting month of liquidity, include the initial balance configured by the user
+        const isStartMonth = monthKey === liquidityStartDate.slice(0, 7);
+        if (isStartMonth && (card.initialUsedBalance || 0) > 0) {
           chargesAmount += card.initialUsedBalance;
         }
 
-        // Add expenses made on this card within this billing cycle (only >= liquidityStartDate)
+        // Add expenses (cargos a TDC) made on this card within this billing cycle
         const cycleExpenses = data.existingTransactions.filter((tx) => {
           if (tx.status === 'cancelado') return false;
-          if (tx.creditCardId !== card.id) return false;
-          if (tx.paymentMethodType !== 'tarjeta_credito') return false;
+          const isThisCard = tx.creditCardId === card.id || (tx.paymentMethodType === 'tarjeta_credito' && !tx.creditCardId);
+          if (!isThisCard) return false;
           if (tx.type === 'pago_tarjeta') return false;
-          return tx.date >= cycleStartDate && tx.date <= cycleEndDate && tx.date >= liquidityStartDate;
+          if (tx.date < cycleStartDate || tx.date > cycleEndDate) return false;
+          // If initial balance was already added in the start month, do not double-count transactions prior to liquidity start date
+          if (isStartMonth && (card.initialUsedBalance || 0) > 0 && tx.date < liquidityStartDate) {
+            return false;
+          }
+          return true;
         });
 
         const cycleExpensesSum = cycleExpenses.reduce((sum, tx) => sum + tx.amount, 0);
         chargesAmount += cycleExpensesSum;
 
-        // Add installment purchase quotas that fall specifically within this card billing cycle [cycleStartDate, cycleEndDate] >= liquidityStartDate
+        // Add installment purchase quotas that fall specifically within this card billing cycle [cycleStartDate, cycleEndDate]
         if (data.installmentPurchases) {
           data.installmentPurchases.forEach((ip) => {
             if (ip.creditCardId === card.id) {
               const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
               const matchingInCycle = schedule.filter(
-                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && inst.date >= liquidityStartDate
+                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && (!isStartMonth || (card.initialUsedBalance || 0) === 0 || inst.date >= liquidityStartDate)
               );
 
               matchingInCycle.forEach((inst) => {
@@ -577,7 +580,7 @@ export class NexaFinancialEngine {
           });
         }
 
-        // Add loan installments (extrafinanciamiento) charged to this card within this billing cycle >= liquidityStartDate
+        // Add loan installments (extrafinanciamiento) charged to this card within this billing cycle
         if (data.loans) {
           data.loans.forEach((loan) => {
             const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
@@ -585,7 +588,7 @@ export class NexaFinancialEngine {
               if (loan.remainingBalance <= 0 || loan.remainingInstallmentsCount <= 0) return;
               const schedule = NexaFinancialEngine.getLoanSchedule(loan);
               const matchingInCycle = schedule.filter(
-                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && inst.date >= liquidityStartDate
+                (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && (!isStartMonth || (card.initialUsedBalance || 0) === 0 || inst.date >= liquidityStartDate)
               );
 
               matchingInCycle.forEach((inst) => {
@@ -735,8 +738,12 @@ export class NexaFinancialEngine {
     if (tx.type === 'transferencia') return { isInflow: false, isOutflow: false, amount: 0 };
     if (tx.type === 'gasto_desde_ahorro') return { isInflow: false, isOutflow: false, amount: 0 };
 
-    // Credit card purchases do not deduct cash liquidity immediately; payment obligations do
-    if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') {
+    // Credit card purchases (cargos a TDC) do not deduct cash liquidity immediately; payment obligations do
+    const isCreditCardCharge =
+      (tx.paymentMethodType === 'tarjeta_credito' || !!tx.creditCardId) &&
+      tx.type !== 'pago_tarjeta';
+
+    if (isCreditCardCharge) {
       return { isInflow: false, isOutflow: false, amount: 0 };
     }
 
@@ -1603,7 +1610,7 @@ export class NexaFinancialEngine {
               return;
             }
             if (tx.type === 'gasto_desde_ahorro') return;
-            if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+            if ((tx.paymentMethodType === 'tarjeta_credito' || !!tx.creditCardId) && tx.type !== 'pago_tarjeta') return;
 
             const targetAccount = accounts.find((a) => a.id === tx.accountId) || accounts.find((a) => a.isActive);
             const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
@@ -1646,7 +1653,7 @@ export class NexaFinancialEngine {
               return;
             }
             if (tx.type === 'gasto_desde_ahorro') return;
-            if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+            if ((tx.paymentMethodType === 'tarjeta_credito' || !!tx.creditCardId) && tx.type !== 'pago_tarjeta') return;
 
             const targetAccount = accounts.find((a) => a.id === tx.accountId) || accounts.find((a) => a.isActive);
 
@@ -1731,7 +1738,7 @@ export class NexaFinancialEngine {
               return;
             }
             if (tx.type === 'gasto_desde_ahorro') return;
-            if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+            if ((tx.paymentMethodType === 'tarjeta_credito' || !!tx.creditCardId) && tx.type !== 'pago_tarjeta') return;
 
             const targetAccount = accounts.find((a) => a.id === tx.accountId) || accounts.find((a) => a.isActive);
             const isCash = targetAccount ? targetAccount.type === 'efectivo' : false;
@@ -1806,7 +1813,7 @@ export class NexaFinancialEngine {
     let creditCardDebt = 0;
     creditCards.forEach((c) => {
       if (c.isActive) {
-        creditCardDebt += NexaFinancialEngine.calculateCardCurrentBalance(c, allTransactions).balance;
+        creditCardDebt += NexaFinancialEngine.calculateCardCurrentBalance(c, allTransactions, undefined, liquidityStartDate).balance;
       }
     });
 
@@ -2065,7 +2072,7 @@ export class NexaFinancialEngine {
       }
 
       // Ignore credit card purchases (which do not debit bank/cash directly)
-      if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+      if ((tx.paymentMethodType === 'tarjeta_credito' || !!tx.creditCardId) && tx.type !== 'pago_tarjeta') return;
       // Ignore expenses from savings fund
       if (tx.type === 'gasto_desde_ahorro') return;
 
@@ -2144,7 +2151,7 @@ export class NexaFinancialEngine {
       }
 
       // Ignore credit card purchases (which do not debit bank/cash directly)
-      if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+      if ((tx.paymentMethodType === 'tarjeta_credito' || !!tx.creditCardId) && tx.type !== 'pago_tarjeta') return;
       // Ignore expenses from savings fund
       if (tx.type === 'gasto_desde_ahorro') return;
 
@@ -2501,6 +2508,7 @@ export class NexaFinancialEngine {
       installmentPurchases: InstallmentPurchase[];
       loans: Loan[];
       transactions: Transaction[];
+      liquidityStartDate?: string;
     }
   ): MonthProjection[] {
     const projections: MonthProjection[] = [];
@@ -2530,6 +2538,7 @@ export class NexaFinancialEngine {
         creditCards: data.creditCards,
         accounts: data.accounts,
         existingTransactions: data.transactions,
+        liquidityStartDate: data.liquidityStartDate,
       });
 
       const combined = [...monthTxs, ...projectedEvents];
@@ -2635,14 +2644,16 @@ export class NexaFinancialEngine {
       if (tx.status === 'cancelado') return;
       if (tx.creditCardId !== card.id) return;
       if (asOfDate && tx.date > asOfDate) return;
-      if (tx.date < liquidityStartDate) return;
+      if (tx.date < liquidityStartDate && (card.initialUsedBalance || 0) > 0) return;
 
       // Extrafinanciamiento cuota: does NOT affect credit card purchase limit (Requirement: no afecta el límite de compras de la TDC)
       if (tx.type === 'cuota_prestamo' || tx.origin?.startsWith('prestamo:')) {
         return;
       }
 
-      if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') {
+      const isTdcCharge = (tx.paymentMethodType === 'tarjeta_credito' || tx.creditCardId === card.id) && tx.type !== 'pago_tarjeta';
+
+      if (isTdcCharge) {
         balance += tx.amount;
       } else if (tx.type === 'pago_tarjeta') {
         balance = Math.max(0, balance - tx.amount);
@@ -3175,7 +3186,7 @@ export class NexaFinancialEngine {
       }
 
       // Ignore credit card purchases (which do not debit cash/bank directly)
-      if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+      if ((tx.paymentMethodType === 'tarjeta_credito' || !!tx.creditCardId) && tx.type !== 'pago_tarjeta') return;
       // Ignore direct expenses from savings fund
       if (tx.type === 'gasto_desde_ahorro') return;
 
