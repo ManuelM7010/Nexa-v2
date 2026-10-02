@@ -40,6 +40,7 @@ import {
   Clock,
   Target,
   Percent,
+  PiggyBank,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -72,6 +73,7 @@ export const BudgetView: React.FC = () => {
     todayStr,
     accounts,
     creditCards,
+    savingsAccounts,
     toggleTransactionStatus,
     setEditingTransaction,
     setIsNewTxOpen,
@@ -132,10 +134,78 @@ export const BudgetView: React.FC = () => {
   // Table filters & sorting
   const [tableSearch, setTableSearch] = useState('');
   const [tableStatusFilter, setTableStatusFilter] = useState<'all' | 'normal' | 'warning' | 'exceeded'>('all');
+  const [tableScopeFilter, setTableScopeFilter] = useState<'all' | 'operational' | 'savings'>('all');
   const [tableSortBy, setTableSortBy] = useState<'name' | 'budget' | 'real' | 'available' | 'pct'>('pct');
   const [tableSortAsc, setTableSortAsc] = useState(false);
 
   const expenseCategories = categories.filter((c) => c.type === 'gasto');
+
+  // Savings vs Operational Category Breakdown
+  const savingsCategoriesAnalysis = useMemo(
+    () =>
+      budgetAnalysis.filter(
+        (b) =>
+          b.isSavingsCategory ||
+          b.savingsAccount ||
+          categories.find((c) => c.id === b.categoryId)?.isSavingsCategory
+      ),
+    [budgetAnalysis, categories]
+  );
+
+  const operationalCategoriesAnalysis = useMemo(
+    () =>
+      budgetAnalysis.filter(
+        (b) =>
+          !b.isSavingsCategory &&
+          !b.savingsAccount &&
+          !categories.find((c) => c.id === b.categoryId)?.isSavingsCategory
+      ),
+    [budgetAnalysis, categories]
+  );
+
+  const totalSavingsBudgeted = useMemo(
+    () => savingsCategoriesAnalysis.reduce((acc, b) => acc + b.budgetedAmount, 0),
+    [savingsCategoriesAnalysis]
+  );
+  const totalSavingsContributed = useMemo(
+    () => savingsCategoriesAnalysis.reduce((acc, b) => acc + (b.realSpent || b.realAmount || 0), 0),
+    [savingsCategoriesAnalysis]
+  );
+  const totalOperationalBudgeted = useMemo(
+    () => operationalCategoriesAnalysis.reduce((acc, b) => acc + b.budgetedAmount, 0),
+    [operationalCategoriesAnalysis]
+  );
+  const totalOperationalSpent = useMemo(
+    () => operationalCategoriesAnalysis.reduce((acc, b) => acc + (b.realSpent || b.realAmount || 0), 0),
+    [operationalCategoriesAnalysis]
+  );
+
+  // Quick sync budget from goal
+  const handleSyncSavingsBudget = async (categoryId: string, savAccount?: any) => {
+    let amount = savAccount?.monthlyPlannedContribution || 0;
+    if (amount <= 0 && savAccount?.targetAmount > 0) {
+      if (savAccount.targetDate) {
+        const [tY, tM] = savAccount.targetDate.split('-').map(Number);
+        const months = Math.max(1, (tY - selectedYear) * 12 + (tM - selectedMonth));
+        const remaining = Math.max(0, savAccount.targetAmount - (savAccount.currentBalance || 0));
+        amount = Math.ceil(remaining / months);
+      } else {
+        amount = Math.ceil(savAccount.targetAmount / 12);
+      }
+    }
+    if (amount <= 0) amount = 10000; // $100.00 default fallback
+
+    const existing = budgets.find(
+      (b) => b.year === selectedYear && b.month === selectedMonth && b.categoryId === categoryId
+    );
+    await saveBudget({
+      id: existing ? existing.id : `bgt_${categoryId}_${selectedYear}_${selectedMonth}`,
+      year: selectedYear,
+      month: selectedMonth,
+      categoryId,
+      budgetedAmount: amount,
+    });
+  };
 
   // Global Totals
   const totalBudgeted = useMemo(
@@ -436,6 +506,15 @@ export const BudgetView: React.FC = () => {
         if (tableStatusFilter === 'exceeded') {
           return item.status === 'exceeded' || item.status === 'sobregiro';
         }
+
+        // Scope filter: all / operational / savings
+        const isSav =
+          item.isSavingsCategory ||
+          !!item.savingsAccount ||
+          !!categories.find((c) => c.id === item.categoryId)?.isSavingsCategory;
+        if (tableScopeFilter === 'operational' && isSav) return false;
+        if (tableScopeFilter === 'savings' && !isSav) return false;
+
         return true;
       })
       .sort((a, b) => {
@@ -455,7 +534,7 @@ export const BudgetView: React.FC = () => {
         }
         return tableSortAsc ? diff : -diff;
       });
-  }, [budgetAnalysis, selectedCategoryName, tableSearch, tableStatusFilter, tableSortBy, tableSortAsc]);
+  }, [budgetAnalysis, categories, selectedCategoryName, tableSearch, tableStatusFilter, tableScopeFilter, tableSortBy, tableSortAsc]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -501,8 +580,8 @@ export const BudgetView: React.FC = () => {
             {formatMoney(totalBudgeted, settings.currencySymbol)}
           </div>
           <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-            <span>{budgetedCategories.length} de {expenseCategories.length} con meta</span>
-            <span className="font-mono text-slate-300">100% Meta</span>
+            <span>Operativo: {formatMoney(totalOperationalBudgeted, settings.currencySymbol)}</span>
+            <span className="font-mono text-emerald-400">Ahorro: {formatMoney(totalSavingsBudgeted, settings.currencySymbol)}</span>
           </div>
         </div>
 
@@ -520,16 +599,8 @@ export const BudgetView: React.FC = () => {
             {formatMoney(totalRealSpent, settings.currencySymbol)}
           </div>
           <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-            <span>
-              {overallExecutionPct}% consumido (Día {currentDay}/{totalDays})
-            </span>
-            <span
-              className={`font-mono font-bold ${
-                paceDelta > 5 ? 'text-amber-400' : 'text-emerald-400'
-              }`}
-            >
-              {paceDelta > 0 ? `+${paceDelta}% ritmo` : `${paceDelta}% ritmo`}
-            </span>
+            <span>Gastos: {formatMoney(totalOperationalSpent, settings.currencySymbol)}</span>
+            <span className="font-mono text-emerald-400">Aportes: {formatMoney(totalSavingsContributed, settings.currencySymbol)}</span>
           </div>
         </div>
 
@@ -1546,6 +1617,55 @@ export const BudgetView: React.FC = () => {
           </div>
         </div>
 
+        {/* Scope Filter Tabs (Todas / Gastos Operativos / Metas & Ahorro) */}
+        <div className="px-4 py-2.5 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setTableScopeFilter('all')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                tableScopeFilter === 'all'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Todas ({budgetAnalysis.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTableScopeFilter('operational')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                tableScopeFilter === 'operational'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Gastos Operativos ({operationalCategoriesAnalysis.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTableScopeFilter('savings')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                tableScopeFilter === 'savings'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-emerald-400 hover:text-emerald-300'
+              }`}
+            >
+              <PiggyBank className="w-3.5 h-3.5" />
+              <span>Metas & Ahorro ({savingsCategoriesAnalysis.length})</span>
+            </button>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-3 text-xs text-slate-400">
+            <span>
+              Ahorro Presupuestado: <strong className="text-emerald-400 font-mono">{formatMoney(totalSavingsBudgeted, settings.currencySymbol)}</strong>
+            </span>
+            <span>
+              Aportado este mes: <strong className="text-white font-mono">{formatMoney(totalSavingsContributed, settings.currencySymbol)}</strong>
+            </span>
+          </div>
+        </div>
+
         {/* Active Filter Banner from Interactive Chart Selection */}
         {selectedCategoryName && (
           <div className="mx-4 mt-3 p-3 rounded-xl bg-blue-950/40 border border-blue-500/40 flex items-center justify-between text-xs animate-in fade-in duration-150">
@@ -1666,6 +1786,19 @@ export const BudgetView: React.FC = () => {
                 const isEditing = editingCategoryId === catId;
                 const isExpanded = !!expandedCategories[catId];
                 const isSelected = selectedCategoryName?.toLowerCase() === catName.toLowerCase();
+                const isSavingsCat =
+                  item.isSavingsCategory ||
+                  !!item.savingsAccount ||
+                  !!categories.find((c) => c.id === catId)?.isSavingsCategory;
+                const linkedSavings =
+                  item.savingsAccount ||
+                  savingsAccounts.find(
+                    (s) =>
+                      s.categoryId === catId ||
+                      s.id === catId ||
+                      `cat_sav_${s.id}` === catId ||
+                      s.category === catId
+                  );
                 const categoryMovements = allMonthTransactions.filter(
                   (tx) => tx.categoryId === catId && tx.type !== 'transferencia'
                 );
@@ -1681,7 +1814,7 @@ export const BudgetView: React.FC = () => {
                     >
                       {/* Category Name & Expand Toggle */}
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={() => toggleExpandCategory(catId)}
@@ -1710,6 +1843,14 @@ export const BudgetView: React.FC = () => {
                               {categoryMovements.length}
                             </span>
                           </div>
+
+                          {isSavingsCat && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shrink-0">
+                              <PiggyBank className="w-2.5 h-2.5" />
+                              <span>Meta / Ahorro</span>
+                            </span>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => {
@@ -1742,7 +1883,21 @@ export const BudgetView: React.FC = () => {
                             className="w-24 bg-slate-950 border border-blue-500 rounded px-2 py-1 text-right text-white focus:outline-none"
                           />
                         ) : (
-                          formatMoney(item.budgetedAmount, settings.currencySymbol)
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className={item.budgetedAmount === 0 && isSavingsCat ? 'text-slate-400' : 'text-white'}>
+                              {formatMoney(item.budgetedAmount, settings.currencySymbol)}
+                            </span>
+                            {isSavingsCat && linkedSavings && item.budgetedAmount === 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleSyncSavingsBudget(catId, linkedSavings)}
+                                className="text-[9px] text-emerald-400 hover:text-emerald-300 font-bold bg-emerald-500/15 hover:bg-emerald-500/25 px-1.5 py-0.5 rounded border border-emerald-500/30 transition cursor-pointer"
+                                title="Asignar aporte sugerido de la meta al presupuesto"
+                              >
+                                ⚡ Asignar Aporte
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
 
@@ -1886,6 +2041,60 @@ export const BudgetView: React.FC = () => {
                       <tr key={`${catId}-breakdown`} className="bg-slate-950/80 border-b border-slate-800">
                         <td colSpan={8} className="p-3 sm:p-4 pl-4 sm:pl-10">
                           <div className="rounded-xl bg-slate-900 border border-slate-800/80 p-3 sm:p-4 space-y-3 shadow-inner">
+                            {/* Dedicated Linked Savings Goal Card */}
+                            {linkedSavings && (
+                              <div className="p-3.5 rounded-xl bg-slate-950 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-10 h-10 rounded-xl flex items-center justify-center font-bold shadow-md shrink-0"
+                                    style={{
+                                      backgroundColor: `${linkedSavings.color}25`,
+                                      color: linkedSavings.color,
+                                      borderColor: `${linkedSavings.color}40`,
+                                      borderWidth: 1,
+                                    }}
+                                  >
+                                    <PiggyBank className="w-5 h-5" />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-xs font-bold text-white">{linkedSavings.name}</h4>
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                        Meta Sincronizada con Presupuesto
+                                      </span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-3 flex-wrap">
+                                      <span>
+                                        Meta Total: <strong className="text-white font-mono">{formatMoney(linkedSavings.targetAmount, settings.currencySymbol)}</strong>
+                                      </span>
+                                      <span>
+                                        Acumulado: <strong className="text-emerald-400 font-mono">{formatMoney(linkedSavings.currentBalance, settings.currencySymbol)}</strong>
+                                      </span>
+                                      {linkedSavings.targetDate && (
+                                        <span>Fecha meta: <strong className="text-blue-300 font-mono">{linkedSavings.targetDate}</strong></span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {item.budgetedAmount === 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSyncSavingsBudget(catId, linkedSavings)}
+                                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                                    >
+                                      Sincronizar Aporte en Presupuesto
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs font-mono text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                                      Presupuestado: {formatMoney(item.budgetedAmount, settings.currencySymbol)}/mes
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
                               <div className="flex items-center gap-2">
                                 <span

@@ -39,6 +39,7 @@ export interface SavingsAccount {
   color: string;
   icon: string;
   category: SavingsCategory;
+  categoryId?: string; // Linked category in categories for Presupuesto integration
   targetDate?: string; // YYYY-MM-DD
   monthlyPlannedContribution?: number; // in cents
   notes?: string;
@@ -82,6 +83,8 @@ export interface Category {
   icon: string;
   color: string;
   subcategories: string[];
+  isSavingsCategory?: boolean;
+  savingsAccountId?: string;
 }
 
 export interface Budget {

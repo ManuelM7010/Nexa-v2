@@ -42,6 +42,8 @@ export interface BudgetAnalysisItem {
   availableBalance: number; // alias
   status: 'ahorro' | 'en_presupuesto' | 'alerta' | 'sobregiro' | 'normal' | 'warning' | 'exceeded';
   transactions: Transaction[];
+  isSavingsCategory?: boolean;
+  savingsAccount?: SavingsAccount;
 }
 
 export interface ExecutiveSummary {
@@ -1180,7 +1182,8 @@ export class NexaFinancialEngine {
     month: number,
     categories: Category[],
     budgets: Budget[],
-    allMonthTransactions: Transaction[]
+    allMonthTransactions: Transaction[],
+    savingsAccounts?: SavingsAccount[]
   ): BudgetAnalysisItem[] {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     const relevantTxs = allMonthTransactions.filter(
@@ -1195,7 +1198,32 @@ export class NexaFinancialEngine {
       );
       const budgetedAmount = catBudgets.reduce((acc, b) => acc + b.budgetedAmount, 0);
 
-      const catTxs = relevantTxs.filter((tx) => tx.categoryId === cat.id);
+      const matchedSavings = savingsAccounts?.find(
+        (s) =>
+          s.categoryId === cat.id ||
+          s.id === cat.savingsAccountId ||
+          `cat_sav_${s.id}` === cat.id ||
+          (s.category && (s.category === cat.id || `sav_cat_${s.category}` === cat.id))
+      );
+      const isSavCat = !!(cat.isSavingsCategory || matchedSavings);
+
+      const catTxs = relevantTxs.filter((tx) => {
+        if (tx.categoryId === cat.id) return true;
+        if (tx.savingsAccountId && savingsAccounts) {
+          const sav = savingsAccounts.find((s) => s.id === tx.savingsAccountId);
+          if (
+            sav &&
+            (sav.categoryId === cat.id ||
+              `cat_sav_${sav.id}` === cat.id ||
+              sav.category === cat.id ||
+              `sav_cat_${sav.category}` === cat.id ||
+              (matchedSavings && sav.id === matchedSavings.id))
+          ) {
+            return true;
+          }
+        }
+        return false;
+      });
 
       let realAmount = 0;
       let plannedPendingAmount = 0;
@@ -1243,6 +1271,8 @@ export class NexaFinancialEngine {
         availableBalance: budgetedAmount - realAmount,
         status,
         transactions: catTxs,
+        isSavingsCategory: isSavCat,
+        savingsAccount: matchedSavings,
       };
     });
   }

@@ -192,6 +192,7 @@ export const SavingsView: React.FC = () => {
     accounts,
     transactions,
     categories,
+    saveCategory,
     settings,
     todayStr,
     executiveSummary,
@@ -281,6 +282,7 @@ export const SavingsView: React.FC = () => {
   // Form states for Account creation/edit
   const [accountName, setAccountName] = useState('');
   const [accountCategory, setAccountCategory] = useState<string>('general');
+  const [accountCategoryId, setAccountCategoryId] = useState<string>('');
   const [accountTargetAmountStr, setAccountTargetAmountStr] = useState('');
   const [accountInitialBalanceStr, setAccountInitialBalanceStr] = useState('');
   const [accountTargetDate, setAccountTargetDate] = useState('');
@@ -430,6 +432,7 @@ export const SavingsView: React.FC = () => {
       setEditingAccount(account);
       setAccountName(account.name);
       setAccountCategory(account.category);
+      setAccountCategoryId(account.categoryId || account.category || '');
       setAccountTargetAmountStr(centsToDollars(account.targetAmount).toFixed(2));
       setAccountInitialBalanceStr(centsToDollars(account.initialBalance).toFixed(2));
       setAccountTargetDate(account.targetDate || '');
@@ -439,7 +442,9 @@ export const SavingsView: React.FC = () => {
     } else {
       setEditingAccount(null);
       setAccountName('');
-      setAccountCategory('general');
+      setAccountCategory('emergencia');
+      const firstSavCat = categories.find((c) => c.isSavingsCategory) || categories[0];
+      setAccountCategoryId(firstSavCat?.id || 'cat_sav_emergencia');
       setAccountTargetAmountStr('1000.00');
       setAccountInitialBalanceStr('0.00');
       setAccountTargetDate('');
@@ -463,6 +468,7 @@ export const SavingsView: React.FC = () => {
       id: editingAccount ? editingAccount.id : undefined,
       name: accountName.trim(),
       category: accountCategory as SavingsCategory,
+      categoryId: accountCategoryId || undefined,
       targetAmount,
       initialBalance,
       targetDate: accountTargetDate || undefined,
@@ -475,12 +481,12 @@ export const SavingsView: React.FC = () => {
     setIsAccountModalOpen(false);
   };
 
-  const handleCreateCustomCategory = (e: React.FormEvent) => {
+  const handleCreateCustomCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
-    const id = newCatName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
+    const catId = `cat_sav_${newCatName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}_${Date.now()}`;
     const newCat: CustomSavingsCategoryItem = {
-      id,
+      id: catId,
       name: newCatName.trim(),
       color: newCatColor,
       icon: newCatIcon,
@@ -492,7 +498,20 @@ export const SavingsView: React.FC = () => {
     } catch (err) {
       console.error('Error saving custom category', err);
     }
-    setAccountCategory(id);
+
+    // Save directly to the main categories collection so it appears immediately in Presupuesto!
+    await saveCategory({
+      id: catId,
+      name: newCatName.trim(),
+      type: 'gasto',
+      color: newCatColor,
+      icon: newCatIcon,
+      subcategories: ['Aporte Mensual', 'Aporte Extra'],
+      isSavingsCategory: true,
+    });
+
+    setAccountCategoryId(catId);
+    setAccountCategory(newCatName.trim());
     setAccountColor(newCatColor);
     setAccountIcon(newCatIcon);
     setIsNewCategoryModalOpen(false);
@@ -954,10 +973,15 @@ export const SavingsView: React.FC = () => {
                         <h3 className="text-base font-bold text-white line-clamp-1">{account.name}</h3>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span
-                            className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md"
+                            className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md flex items-center gap-1"
                             style={{ backgroundColor: `${account.color}20`, color: account.color }}
                           >
-                            {customCategories.find((c) => c.id === account.category)?.name || account.category}
+                            <span>
+                              {categories.find((c) => c.id === account.categoryId || c.id === account.category)?.name ||
+                                customCategories.find((c) => c.id === account.category)?.name ||
+                                account.category}
+                            </span>
+                            <span className="text-[9px] opacity-75 font-normal lowercase">| en presupuesto</span>
                           </span>
                         </div>
                       </div>
@@ -2047,7 +2071,7 @@ export const SavingsView: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs font-semibold text-slate-300">
-                      Categoría
+                      Categoría de Presupuesto & Metas *
                     </label>
                     <button
                       type="button"
@@ -2064,24 +2088,49 @@ export const SavingsView: React.FC = () => {
                     </button>
                   </div>
                   <select
-                    value={accountCategory}
+                    value={accountCategoryId || accountCategory}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setAccountCategory(val);
-                      const catObj = customCategories.find((c) => c.id === val);
-                      if (catObj) {
-                        setAccountColor(catObj.color);
-                        setAccountIcon(catObj.icon);
+                      setAccountCategoryId(val);
+                      const foundCat = categories.find((c) => c.id === val);
+                      if (foundCat) {
+                        setAccountCategory(foundCat.name);
+                        setAccountColor(foundCat.color);
+                        if (foundCat.icon) setAccountIcon(foundCat.icon);
+                      } else {
+                        const custom = customCategories.find((c) => c.id === val);
+                        if (custom) {
+                          setAccountCategory(custom.name);
+                          setAccountColor(custom.color);
+                          setAccountIcon(custom.icon);
+                        }
                       }
                     }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
                   >
-                    {customCategories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
+                    <optgroup label="🎯 Categorías de Ahorro y Metas (Sincronizadas con Presupuesto)">
+                      {categories
+                        .filter((c) => c.isSavingsCategory)
+                        .map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label="📂 Categorías Generales de Gasto">
+                      {categories
+                        .filter((c) => !c.isSavingsCategory && c.type === 'gasto')
+                        .map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                    </optgroup>
                   </select>
+                  <p className="text-[11px] text-emerald-400/90 mt-1 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    <span>Esta categoría aparece directamente en el módulo de Presupuesto para asignar límites y controlar aportes.</span>
+                  </p>
                 </div>
 
                 {/* Interactive Visual Icon Picker */}

@@ -386,11 +386,65 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           loadedSavings = defaultSavings;
         }
 
+        // Synchronize savings categories with categories table for Presupuesto integration
+        let currentCats = catList.length > 0 ? [...catList] : [...getDefaultCategories()];
+        let didUpdateCats = false;
+        let didUpdateSavs = false;
+        let currentSavs = [...(loadedSavings || [])];
+
+        currentSavs = currentSavs.map((sav) => {
+          let matchedCat = currentCats.find(
+            (c) =>
+              c.id === sav.categoryId ||
+              c.savingsAccountId === sav.id ||
+              c.id === `cat_sav_${sav.id}` ||
+              c.name.toLowerCase() === sav.name.toLowerCase() ||
+              c.name.toLowerCase() === `ahorro: ${sav.name.toLowerCase()}`
+          );
+
+          if (!matchedCat) {
+            matchedCat = {
+              id: sav.categoryId || `cat_sav_${sav.id}`,
+              name: `Ahorro: ${sav.name}`,
+              type: 'gasto',
+              color: sav.color || '#10b981',
+              icon: sav.icon || 'PiggyBank',
+              subcategories: ['Aporte Mensual', 'Aporte Extra'],
+              isSavingsCategory: true,
+              savingsAccountId: sav.id,
+            };
+            currentCats.push(matchedCat);
+            didUpdateCats = true;
+          } else if (!matchedCat.isSavingsCategory || !matchedCat.savingsAccountId) {
+            matchedCat = {
+              ...matchedCat,
+              isSavingsCategory: true,
+              savingsAccountId: sav.id,
+            };
+            const idx = currentCats.findIndex((c) => c.id === matchedCat.id);
+            if (idx >= 0) currentCats[idx] = matchedCat;
+            didUpdateCats = true;
+          }
+
+          if (sav.categoryId !== matchedCat.id) {
+            didUpdateSavs = true;
+            return { ...sav, categoryId: matchedCat.id };
+          }
+          return sav;
+        });
+
+        if (didUpdateCats) {
+          await storage.putBatch('categories', currentCats);
+        }
+        if (didUpdateSavs) {
+          await storage.putBatch('savingsAccounts', currentSavs);
+        }
+
         setAccounts(accList);
         setCreditCards(cardList);
-        setSavingsAccounts(loadedSavings || []);
+        setSavingsAccounts(currentSavs);
         setTransactions(txList);
-        setCategories(catList.length > 0 ? catList : getDefaultCategories());
+        setCategories(currentCats);
         setBudgets(bgtList);
         setItemBudgets(itemBgtList);
         setGroceryItems(groceryList || []);
@@ -562,9 +616,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       selectedMonth,
       categories,
       budgets,
-      allMonthTransactions
+      allMonthTransactions,
+      savingsAccounts
     );
-  }, [selectedYear, selectedMonth, categories, budgets, allMonthTransactions]);
+  }, [selectedYear, selectedMonth, categories, budgets, allMonthTransactions, savingsAccounts]);
 
   // Detailed Itemized Budget (Gasto por Gasto e Ingreso por Ingreso)
   const detailedBudget = useMemo(() => {
@@ -772,6 +827,59 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const saveSavingsAccount = async (savData: Partial<SavingsAccount> & { name: string }) => {
     const now = new Date().toISOString();
     const id = savData.id || `sav_${Date.now()}`;
+
+    // Determine or create linked category in categories table for Presupuesto
+    let targetCatId = savData.categoryId;
+    let targetCat = categories.find((c) => c.id === targetCatId);
+
+    if (!targetCat) {
+      // Find by savingsAccountId or matching name
+      targetCat = categories.find(
+        (c) =>
+          c.savingsAccountId === id ||
+          c.id === `cat_sav_${id}` ||
+          c.name.toLowerCase() === savData.name.toLowerCase() ||
+          c.name.toLowerCase() === `ahorro: ${savData.name.toLowerCase()}`
+      );
+    }
+
+    if (!targetCat) {
+      targetCatId = targetCatId || `cat_sav_${id}`;
+      targetCat = {
+        id: targetCatId,
+        name: `Ahorro: ${savData.name}`,
+        type: 'gasto',
+        color: savData.color || '#10b981',
+        icon: savData.icon || 'PiggyBank',
+        subcategories: ['Aporte Mensual', 'Aporte Extra'],
+        isSavingsCategory: true,
+        savingsAccountId: id,
+      };
+      await storage.put('categories', targetCat);
+      setCategories((prev) => {
+        const idx = prev.findIndex((c) => c.id === targetCat!.id);
+        if (idx >= 0) {
+          const cp = [...prev];
+          cp[idx] = targetCat!;
+          return cp;
+        }
+        return [...prev, targetCat!];
+      });
+    } else {
+      targetCatId = targetCat.id;
+      if (!targetCat.isSavingsCategory || targetCat.savingsAccountId !== id) {
+        const updatedCat: Category = {
+          ...targetCat,
+          isSavingsCategory: true,
+          savingsAccountId: id,
+          color: savData.color || targetCat.color,
+          icon: savData.icon || targetCat.icon,
+        };
+        await storage.put('categories', updatedCat);
+        setCategories((prev) => prev.map((c) => (c.id === updatedCat.id ? updatedCat : c)));
+      }
+    }
+
     const newSav: SavingsAccount = {
       id,
       name: savData.name,
@@ -781,7 +889,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       color: savData.color || '#10b981',
       icon: savData.icon || 'ShieldCheck',
       category: savData.category || 'general',
+      categoryId: targetCatId,
       targetDate: savData.targetDate,
+      monthlyPlannedContribution: savData.monthlyPlannedContribution,
       notes: savData.notes,
       isArchived: savData.isArchived || false,
       createdAt: savData.createdAt || now,
@@ -818,6 +928,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const targetSav = savingsAccounts.find((s) => s.id === toSavingsAccountId);
     const txDate = date || todayStr;
     const txStatus: TransactionStatus = status || (txDate > todayStr ? 'planificado' : 'realizado');
+    const catId = targetSav?.categoryId || `cat_sav_${toSavingsAccountId}`;
 
     await saveTransaction({
       concept: concept || `Aporte a Ahorro: ${targetSav?.name || 'Fondo de Ahorro'}`,
@@ -827,6 +938,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       paymentMethodType: sourceAcc?.type === 'efectivo' ? 'efectivo' : 'banco',
       accountId: fromAccountId,
       savingsAccountId: toSavingsAccountId,
+      categoryId: catId,
       status: txStatus,
       notes: notes || `Transferencia desde ${sourceAcc?.name || 'Cuenta'} hacia fondo de ahorro`,
     });
