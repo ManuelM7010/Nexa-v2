@@ -563,21 +563,6 @@ export const CreditCardStatementsView: React.FC = () => {
             </div>
           </div>
 
-      {/* Prior to Liquidity Start Notification */}
-      {`${selectedYear}-${String(selectedMonth).padStart(2, '0')}` < liquidityStartDate.slice(0, 7) && (
-        <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
-          <Clock className="w-5 h-5 flex-shrink-0 text-amber-400" />
-          <div>
-            <p className="font-bold text-amber-200">
-              Corte anterior a la fecha oficial de inicio de liquidez ({formatDateEs(liquidityStartDate, { withYear: true })})
-            </p>
-            <p className="text-amber-300/80 mt-0.5">
-              Por configuración del sistema, las cuotas, suscripciones y gastos de meses anteriores no se cobran ni generan deudas en estados de cuenta previos al inicio de liquidez. Solo computan consumos y pagos a partir de dicha fecha.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Global TDDC Summary Header */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
@@ -1105,36 +1090,32 @@ export const CreditCardStatementsView: React.FC = () => {
                 </span>
                 <button
                   onClick={() => {
-                    const [ly, lm] = liquidityStartDate.split('-').map(Number);
-                    const prevM = lm === 1 ? 12 : lm - 1;
-                    const prevY = lm === 1 ? ly - 1 : ly;
-                    const prevMonthStart = `${prevY}-${String(prevM).padStart(2, '0')}-01`;
-                    setRangeStartDate(prevMonthStart);
-                    setRangeEndDate(liquidityStartDate);
+                    setRangeStartDate('2026-08-01');
+                    setRangeEndDate('2026-09-15');
                   }}
                   className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeEndDate === liquidityStartDate
+                    rangeStartDate === '2026-08-01' && rangeEndDate === '2026-09-15'
                       ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
                       : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
                   }`}
-                  title={`Período previo hasta inicio de liquidez (${liquidityStartDate})`}
+                  title="Ejemplo explícito: 01 de Agosto al 15 de Septiembre"
                 >
-                  📌 Hasta Inicio Liquidez ({formatDateEs(liquidityStartDate, { withDayName: false, withYear: false })})
+                  📌 01 Ago - 15 Sep
                 </button>
 
                 <button
                   onClick={() => {
-                    setRangeStartDate(liquidityStartDate);
-                    setRangeEndDate(todayStr);
+                    setRangeStartDate('2026-08-01');
+                    setRangeEndDate(todayStr || '2026-09-27');
                   }}
                   className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeStartDate === liquidityStartDate && rangeEndDate === todayStr
+                    rangeStartDate === '2026-08-01' && rangeEndDate === (todayStr || '2026-09-27')
                       ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
                       : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
                   }`}
-                  title="Desde inicio de liquidez hasta la fecha de hoy"
+                  title="Ejemplo explícito: 01 de Agosto hasta hoy (27 de Septiembre)"
                 >
-                  ⚡ Inicio Liquidez a Hoy
+                  ⚡ 01 Ago - 27 Sep (Hoy)
                 </button>
 
                 <button

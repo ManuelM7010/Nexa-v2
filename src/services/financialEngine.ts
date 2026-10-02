@@ -2894,25 +2894,25 @@ export class NexaFinancialEngine {
     const paymentDueDate = `${payYear}-${String(payMonth).padStart(2, '0')}-${String(payDayActual).padStart(2, '0')}`;
     const cycleMonthKey = `${year}-${String(month).padStart(2, '0')}`;
 
-    // Charges and purchases inside this billing cycle period [cycleStartDate, cycleEndDate] >= liquidityStartDate
+    // Charges and purchases inside this billing cycle period [cycleStartDate, cycleEndDate]
     const cycleTxs = allTransactions.filter((tx) => {
       if (tx.creditCardId !== card.id) return false;
       if (tx.status === 'cancelado') return false;
-      return tx.date >= cycleStartDate && tx.date <= cycleEndDate && tx.date >= liquidityStartDate;
+      return tx.date >= cycleStartDate && tx.date <= cycleEndDate;
     });
 
     // Expenses / Purchases
     const purchaseTxs = cycleTxs.filter(
-      (tx) => tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta'
+      (tx) => (tx.paymentMethodType === 'tarjeta_credito' || tx.creditCardId === card.id) && tx.type !== 'pago_tarjeta'
     );
     let purchasesSum = purchaseTxs.reduce((sum, tx) => sum + tx.amount, 0);
 
-    // Active Installment Purchases for this card that apply to this cycle >= liquidityStartDate
+    // Active Installment Purchases for this card that apply to this cycle [cycleStartDate, cycleEndDate]
     installmentPurchases.forEach((ip) => {
       if (ip.creditCardId === card.id) {
         const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
         const matchingInCycle = schedule.filter(
-          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && inst.date >= liquidityStartDate
+          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
         );
 
         matchingInCycle.forEach((inst) => {
@@ -2944,14 +2944,14 @@ export class NexaFinancialEngine {
       }
     });
 
-    // Active Loans with Extrafinanciamiento (charged to this credit card) >= liquidityStartDate
+    // Active Loans with Extrafinanciamiento (charged to this credit card)
     (loans || []).forEach((loan) => {
       const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
       if (isTdc && loan.creditCardId === card.id) {
         if (loan.remainingBalance <= 0 || loan.remainingInstallmentsCount <= 0) return;
         const schedule = NexaFinancialEngine.getLoanSchedule(loan);
         const matchingInCycle = schedule.filter(
-          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate && inst.date >= liquidityStartDate
+          (inst) => inst.date >= cycleStartDate && inst.date <= cycleEndDate
         );
 
         matchingInCycle.forEach((inst) => {
@@ -2983,9 +2983,9 @@ export class NexaFinancialEngine {
       }
     });
 
-    // Prior cycle balance (for initial month, include initialUsedBalance if any)
+    // Prior cycle balance (for initial setup, include initialUsedBalance if any)
     let previousCycleBalance = 0;
-    if (cycleMonthKey === liquidityStartDate.slice(0, 7) && cycleEndDate >= liquidityStartDate) {
+    if (cycleMonthKey <= '2026-09') {
       previousCycleBalance = card.initialUsedBalance || 0;
     }
 
@@ -2995,13 +2995,12 @@ export class NexaFinancialEngine {
     // Payments and abonos applied to this statement
     // Includes:
     // 1) Explicitly assigned via creditCardCycleKey === cycleMonthKey
-    // 2) Default window: payments made between cycleStartDate and paymentDueDate that are not assigned to another cycle >= liquidityStartDate
+    // 2) Default window: payments made between cycleStartDate and paymentDueDate that are not assigned to another cycle
     const effectivePayDeadline = paymentDueDate > cycleEndDate ? paymentDueDate : cycleEndDate;
     const appliedPayments = allTransactions.filter((tx) => {
       if (tx.creditCardId !== card.id) return false;
       if (tx.status === 'cancelado') return false;
       if (tx.type !== 'pago_tarjeta') return false;
-      if (tx.date < liquidityStartDate) return false;
 
       if (tx.creditCardCycleKey) {
         return tx.creditCardCycleKey === cycleMonthKey;
