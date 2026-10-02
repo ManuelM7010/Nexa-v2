@@ -27,7 +27,8 @@ export type SavingsCategory =
   | 'hogar'
   | 'retiro'
   | 'educacion'
-  | 'general';
+  | 'general'
+  | (string & {});
 
 export interface SavingsAccount {
   id: string;
@@ -39,6 +40,7 @@ export interface SavingsAccount {
   icon: string;
   category: SavingsCategory;
   targetDate?: string; // YYYY-MM-DD
+  monthlyPlannedContribution?: number; // in cents
   notes?: string;
   isArchived?: boolean;
   createdAt: string;

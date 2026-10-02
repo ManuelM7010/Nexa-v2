@@ -2004,6 +2004,137 @@ export class NexaFinancialEngine {
   }
 
   /**
+   * Calculates the exact real balance of an account as of todayStr (Fecha Actual).
+   * Takes into account initialBalance + all realized inflows/outflows/transfers up to todayStr.
+   */
+  static calculateAccountRealCurrentBalance(
+    account: Account,
+    todayStr: string,
+    allTransactions: Transaction[],
+    accounts: Account[],
+    liquidityStartDate: string = '2026-09-15'
+  ): number {
+    if (todayStr < liquidityStartDate) {
+      return 0;
+    }
+
+    let balance = account.initialBalance;
+
+    allTransactions.forEach((tx) => {
+      if (tx.status !== 'realizado') return;
+      if (tx.date < liquidityStartDate || tx.date > todayStr) return;
+
+      // 1. Direct transfer between accounts
+      if (tx.type === 'transferencia') {
+        if (tx.accountId === account.id) {
+          balance -= tx.amount;
+        } else if (tx.transferToAccountId === account.id) {
+          balance += tx.amount;
+        }
+        return;
+      }
+
+      // Ignore credit card purchases (which do not debit bank/cash directly)
+      if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+      // Ignore expenses from savings fund
+      if (tx.type === 'gasto_desde_ahorro') return;
+
+      const isForThisAccount =
+        tx.accountId === account.id ||
+        (!tx.accountId && account.id === (accounts.find((a) => a.isActive)?.id || accounts[0]?.id));
+
+      if (!isForThisAccount) return;
+
+      if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
+        balance += tx.amount;
+      } else {
+        balance -= tx.amount;
+      }
+    });
+
+    return Math.max(0, balance);
+  }
+
+  /**
+   * Calculates the exact projected or final balance of an account as of the end of the selected month (monthEndStr).
+   * Takes into account initialBalance + all non-cancelled inflows/outflows/transfers up to monthEndStr.
+   * If month is strictly prior to liquidityStartDate, returns 0.
+   */
+  static calculateAccountEndOfMonthBalance(
+    account: Account,
+    year: number,
+    month: number,
+    allTransactions: Transaction[],
+    accounts: Account[],
+    liquidityStartDate: string = '2026-09-15',
+    projectedEvents: Transaction[] = []
+  ): number {
+    const daysInTargetMonth = daysInMonth(year, month);
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+    const monthEndStr = `${monthKey}-${String(daysInTargetMonth).padStart(2, '0')}`;
+
+    if (monthEndStr < liquidityStartDate) {
+      return 0;
+    }
+
+    let balance = account.initialBalance;
+
+    // Combine explicit transactions and projected events, avoiding duplicate ids
+    const seenIds = new Set<string>();
+    const combinedTxs: Transaction[] = [];
+
+    allTransactions.forEach((tx) => {
+      if (tx.status === 'cancelado') return;
+      if (!seenIds.has(tx.id)) {
+        seenIds.add(tx.id);
+        combinedTxs.push(tx);
+      }
+    });
+
+    projectedEvents.forEach((tx) => {
+      if (tx.status === 'cancelado') return;
+      if (!seenIds.has(tx.id)) {
+        seenIds.add(tx.id);
+        combinedTxs.push(tx);
+      }
+    });
+
+    combinedTxs.forEach((tx) => {
+      if (tx.status === 'cancelado') return;
+      if (tx.date < liquidityStartDate || tx.date > monthEndStr) return;
+
+      // 1. Direct transfer between accounts
+      if (tx.type === 'transferencia') {
+        if (tx.accountId === account.id) {
+          balance -= tx.amount;
+        } else if (tx.transferToAccountId === account.id) {
+          balance += tx.amount;
+        }
+        return;
+      }
+
+      // Ignore credit card purchases (which do not debit bank/cash directly)
+      if (tx.paymentMethodType === 'tarjeta_credito' && tx.type !== 'pago_tarjeta') return;
+      // Ignore expenses from savings fund
+      if (tx.type === 'gasto_desde_ahorro') return;
+
+      const isForThisAccount =
+        tx.accountId === account.id ||
+        (!tx.accountId && account.id === (accounts.find((a) => a.isActive)?.id || accounts[0]?.id));
+
+      if (!isForThisAccount) return;
+
+      if (tx.type === 'ingreso' || tx.type === 'retiro_ahorro') {
+        balance += tx.amount;
+      } else {
+        balance -= tx.amount;
+      }
+    });
+
+    return Math.max(0, balance);
+  }
+
+  /**
    * Calculates individual Savings Account Current Balance based on initial balance and all operations
    */
   static calculateSavingsAccountBalance(
@@ -2049,6 +2180,107 @@ export class NexaFinancialEngine {
       totalWithdrawn,
       totalSpent,
       progressPercentage,
+    };
+  }
+
+  /**
+   * Calculates Savings Account Metrics strictly aware of the selected month (year, month).
+   * Only includes transactions and contributions up to the end of the selected month,
+   * accurately reflecting progress at that point in time (as requested by user).
+   */
+  static calculateSavingsAccountMonthlyStats(
+    account: SavingsAccount,
+    allTransactions: Transaction[],
+    selectedYear: number,
+    selectedMonth: number,
+    todayStr: string
+  ): {
+    accumulatedAtSelectedMonth: number;
+    progressAtSelectedMonth: number;
+    remainingAtSelectedMonth: number;
+    monthContributions: number;
+    monthWithdrawals: number;
+    monthSpent: number;
+    currentRealBalance: number;
+    finalProjectedBalance: number;
+    isGoalReachedAtSelectedMonth: boolean;
+  } {
+    const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+    const daysInCurrentMonth = daysInMonth(selectedYear, selectedMonth);
+    const monthEndStr = `${monthKey}-${String(daysInCurrentMonth).padStart(2, '0')}`;
+
+    let accumulatedAtSelectedMonth = account.initialBalance;
+    let monthContributions = 0;
+    let monthWithdrawals = 0;
+    let monthSpent = 0;
+
+    let currentRealBalance = account.initialBalance;
+    let finalProjectedBalance = account.initialBalance;
+
+    allTransactions.forEach((tx) => {
+      if (tx.status === 'cancelado') return;
+      if (tx.savingsAccountId !== account.id) return;
+
+      // 1. Transactions affecting final total
+      if (tx.type === 'aporte_ahorro') {
+        finalProjectedBalance += tx.amount;
+      } else if (tx.type === 'retiro_ahorro' || tx.type === 'gasto_desde_ahorro') {
+        finalProjectedBalance -= tx.amount;
+      }
+
+      // 2. Real transactions up to todayStr
+      if (tx.date <= todayStr && tx.status === 'realizado') {
+        if (tx.type === 'aporte_ahorro') {
+          currentRealBalance += tx.amount;
+        } else if (tx.type === 'retiro_ahorro' || tx.type === 'gasto_desde_ahorro') {
+          currentRealBalance -= tx.amount;
+        }
+      }
+
+      // 3. Transactions up to the end of the selected month
+      if (tx.date <= monthEndStr) {
+        if (tx.type === 'aporte_ahorro') {
+          accumulatedAtSelectedMonth += tx.amount;
+        } else if (tx.type === 'retiro_ahorro' || tx.type === 'gasto_desde_ahorro') {
+          accumulatedAtSelectedMonth -= tx.amount;
+        }
+      }
+
+      // 4. Specifically inside the selected month
+      if (tx.date.startsWith(monthKey)) {
+        if (tx.type === 'aporte_ahorro') {
+          monthContributions += tx.amount;
+        } else if (tx.type === 'retiro_ahorro') {
+          monthWithdrawals += tx.amount;
+        } else if (tx.type === 'gasto_desde_ahorro') {
+          monthSpent += tx.amount;
+        }
+      }
+    });
+
+    accumulatedAtSelectedMonth = Math.max(0, accumulatedAtSelectedMonth);
+    currentRealBalance = Math.max(0, currentRealBalance);
+    finalProjectedBalance = Math.max(0, finalProjectedBalance);
+
+    const progressAtSelectedMonth =
+      account.targetAmount > 0
+        ? Math.min(100, Math.round((accumulatedAtSelectedMonth / account.targetAmount) * 100))
+        : 100;
+
+    const remainingAtSelectedMonth = Math.max(0, account.targetAmount - accumulatedAtSelectedMonth);
+    const isGoalReachedAtSelectedMonth =
+      account.targetAmount > 0 && accumulatedAtSelectedMonth >= account.targetAmount;
+
+    return {
+      accumulatedAtSelectedMonth,
+      progressAtSelectedMonth,
+      remainingAtSelectedMonth,
+      monthContributions,
+      monthWithdrawals,
+      monthSpent,
+      currentRealBalance,
+      finalProjectedBalance,
+      isGoalReachedAtSelectedMonth,
     };
   }
 

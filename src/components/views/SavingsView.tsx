@@ -7,6 +7,7 @@ import {
   dollarsToCents,
   centsToDollars,
   formatDisplayDate,
+  MONTH_NAMES_ES,
 } from '../../utils/formatters';
 import {
   PiggyBank,
@@ -37,6 +38,35 @@ import {
   Target,
   ArrowUpRight,
   HelpCircle,
+  Wallet,
+  DollarSign,
+  Coins,
+  Landmark,
+  Gem,
+  CreditCard,
+  Award,
+  Trophy,
+  Flag,
+  Bike,
+  Compass,
+  Rocket,
+  Anchor,
+  Heart,
+  Sun,
+  Coffee,
+  Gift,
+  Smartphone,
+  GraduationCap,
+  BookOpen,
+  Briefcase,
+  Building2,
+  Dumbbell,
+  Watch,
+  Music,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Tag,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -54,6 +84,106 @@ import {
   CartesianGrid,
 } from 'recharts';
 
+export interface CustomSavingsCategoryItem {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+}
+
+const DEFAULT_SAVINGS_CATEGORIES: CustomSavingsCategoryItem[] = [
+  { id: 'emergencia', name: 'Fondo de Emergencia', color: '#10b981', icon: 'ShieldCheck' },
+  { id: 'meta', name: 'Meta Financiera', color: '#6366f1', icon: 'Target' },
+  { id: 'inversion', name: 'Inversión / Oportunidad', color: '#f59e0b', icon: 'TrendingUp' },
+  { id: 'viaje', name: 'Viaje / Vacaciones', color: '#0ea5e9', icon: 'Plane' },
+  { id: 'vivienda', name: 'Vivienda / Hogar', color: '#06b6d4', icon: 'Home' },
+  { id: 'vehiculo', name: 'Vehículo / Auto', color: '#3b82f6', icon: 'Car' },
+  { id: 'tecnologia', name: 'Tecnología / Equipos', color: '#8b5cf6', icon: 'Laptop' },
+  { id: 'educacion', name: 'Educación / Cursos', color: '#f97316', icon: 'GraduationCap' },
+  { id: 'salud', name: 'Salud & Bienestar', color: '#ec4899', icon: 'Heart' },
+  { id: 'retiro', name: 'Retiro / Largo Plazo', color: '#a855f7', icon: 'Landmark' },
+  { id: 'negocio', name: 'Negocio / Emprendimiento', color: '#14b8a6', icon: 'Briefcase' },
+  { id: 'general', name: 'Ahorro General', color: '#64748b', icon: 'PiggyBank' },
+];
+
+const AVAILABLE_ICONS = [
+  { id: 'ShieldCheck', label: 'Escudo / Protección', category: 'Seguridad' },
+  { id: 'Target', label: 'Diana / Meta', category: 'Metas' },
+  { id: 'Trophy', label: 'Trofeo / Éxito', category: 'Metas' },
+  { id: 'Award', label: 'Medalla / Logro', category: 'Metas' },
+  { id: 'Flag', label: 'Bandera / Hito', category: 'Metas' },
+  { id: 'Sparkles', label: 'Estrellas / Sueño', category: 'Metas' },
+  { id: 'PiggyBank', label: 'Alcancía / Ahorro', category: 'Finanzas' },
+  { id: 'Wallet', label: 'Billetera', category: 'Finanzas' },
+  { id: 'DollarSign', label: 'Dólar / Dinero', category: 'Finanzas' },
+  { id: 'Coins', label: 'Monedas', category: 'Finanzas' },
+  { id: 'TrendingUp', label: 'Gráfico Crecimiento', category: 'Finanzas' },
+  { id: 'Landmark', label: 'Banco / Patrimonio', category: 'Finanzas' },
+  { id: 'Gem', label: 'Diamante / Riqueza', category: 'Finanzas' },
+  { id: 'CreditCard', label: 'Tarjeta', category: 'Finanzas' },
+  { id: 'Plane', label: 'Avión / Viajes', category: 'Viajes' },
+  { id: 'Car', label: 'Auto / Vehículo', category: 'Transporte' },
+  { id: 'Bike', label: 'Bicicleta / Movilidad', category: 'Transporte' },
+  { id: 'Compass', label: 'Brújula / Explorar', category: 'Viajes' },
+  { id: 'Rocket', label: 'Cohete / Despegue', category: 'Metas' },
+  { id: 'Anchor', label: 'Ancla / Seguridad', category: 'Seguridad' },
+  { id: 'Home', label: 'Casa / Hogar', category: 'Hogar' },
+  { id: 'Heart', label: 'Corazón / Salud', category: 'Salud' },
+  { id: 'Sun', label: 'Sol / Vacaciones', category: 'Viajes' },
+  { id: 'Coffee', label: 'Café / Estilo de vida', category: 'Vida' },
+  { id: 'Gift', label: 'Regalo / Festividades', category: 'Hogar' },
+  { id: 'ShoppingBag', label: 'Compras / Gustos', category: 'Hogar' },
+  { id: 'Laptop', label: 'Computadora / Tecnología', category: 'Tecnología' },
+  { id: 'Smartphone', label: 'Celular / Gadget', category: 'Tecnología' },
+  { id: 'GraduationCap', label: 'Graduación / Educación', category: 'Educación' },
+  { id: 'BookOpen', label: 'Libro / Estudio', category: 'Educación' },
+  { id: 'Briefcase', label: 'Maletín / Emprendimiento', category: 'Trabajo' },
+  { id: 'Building2', label: 'Edificio / Inmuebles', category: 'Hogar' },
+  { id: 'Dumbbell', label: 'Mancuerna / Fitness', category: 'Salud' },
+  { id: 'Watch', label: 'Reloj / Tiempo', category: 'Vida' },
+  { id: 'Music', label: 'Música / Pasatiempo', category: 'Vida' },
+];
+
+const SAVINGS_CATEGORIES_STORAGE_KEY = 'nexa_custom_savings_categories';
+
+const ICON_COMPONENTS: Record<string, React.ComponentType<{ className?: string }>> = {
+  PiggyBank,
+  Wallet,
+  DollarSign,
+  TrendingUp,
+  Coins,
+  Landmark,
+  Gem,
+  CreditCard,
+  ShieldCheck,
+  Target,
+  Award,
+  Trophy,
+  Flag,
+  Sparkles,
+  Plane,
+  Car,
+  Bike,
+  Compass,
+  Rocket,
+  Anchor,
+  Home,
+  Heart,
+  Sun,
+  Coffee,
+  Gift,
+  ShoppingBag,
+  Laptop,
+  Smartphone,
+  GraduationCap,
+  BookOpen,
+  Briefcase,
+  Building2,
+  Dumbbell,
+  Watch,
+  Music,
+};
+
 type SavingsViewMode = 'tarjetas' | 'tabla' | 'movimientos' | 'graficos' | 'simulador';
 
 export const SavingsView: React.FC = () => {
@@ -65,6 +195,10 @@ export const SavingsView: React.FC = () => {
     settings,
     todayStr,
     executiveSummary,
+    selectedYear,
+    selectedMonth,
+    setSelectedYear,
+    setSelectedMonth,
     saveSavingsAccount,
     deleteSavingsAccount,
     transferToSavings,
@@ -72,8 +206,45 @@ export const SavingsView: React.FC = () => {
     spendFromSavings,
   } = useFinance();
 
+  const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+  const monthName = MONTH_NAMES_ES[selectedMonth - 1] || 'Mes';
+  const daysInSelectedMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+
   // Mode Selection
   const [activeMode, setActiveMode] = useState<SavingsViewMode>('tarjetas');
+
+  // Custom Categories state with localStorage persistence
+  const [customCategories, setCustomCategories] = useState<CustomSavingsCategoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(SAVINGS_CATEGORIES_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const merged = [...DEFAULT_SAVINGS_CATEGORIES];
+          parsed.forEach((cat: CustomSavingsCategoryItem) => {
+            if (!merged.some((m) => m.id === cat.id)) {
+              merged.push(cat);
+            }
+          });
+          return merged;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading custom savings categories', e);
+    }
+    return DEFAULT_SAVINGS_CATEGORIES;
+  });
+
+  // New Category Modal states
+  const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatColor, setNewCatColor] = useState('#6366f1');
+  const [newCatIcon, setNewCatIcon] = useState('Target');
+
+  // Visual Icon Picker state
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [iconSearchQuery, setIconSearchQuery] = useState('');
+  const [iconCategoryFilter, setIconCategoryFilter] = useState('all');
 
   // Modals state
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -109,7 +280,7 @@ export const SavingsView: React.FC = () => {
 
   // Form states for Account creation/edit
   const [accountName, setAccountName] = useState('');
-  const [accountCategory, setAccountCategory] = useState<SavingsCategory>('general');
+  const [accountCategory, setAccountCategory] = useState<string>('general');
   const [accountTargetAmountStr, setAccountTargetAmountStr] = useState('');
   const [accountInitialBalanceStr, setAccountInitialBalanceStr] = useState('');
   const [accountTargetDate, setAccountTargetDate] = useState('');
@@ -122,27 +293,52 @@ export const SavingsView: React.FC = () => {
   const [simCurrentSavedStr, setSimCurrentSavedStr] = useState('300');
   const [simTargetMonthsStr, setSimTargetMonthsStr] = useState('6');
 
-  // Calculate balances per savings account
+  // Calculate Month-Aware balances per savings account (strictly aware of selected month!)
   const accountsWithCalculations = useMemo(() => {
     return savingsAccounts.map((sav) => {
-      const stats = NexaFinancialEngine.calculateSavingsAccountBalance(sav, transactions);
+      const stats = NexaFinancialEngine.calculateSavingsAccountMonthlyStats(
+        sav,
+        transactions,
+        selectedYear,
+        selectedMonth,
+        todayStr
+      );
       return {
         ...sav,
         ...stats,
+        // for backward compatibility with existing sub-tabs (table, movements, charts):
+        currentBalance: stats.accumulatedAtSelectedMonth,
+        progressPercentage: stats.progressAtSelectedMonth,
+        totalContributed: stats.monthContributions,
+        totalWithdrawn: stats.monthWithdrawals,
+        totalSpent: stats.monthSpent,
       };
     });
-  }, [savingsAccounts, transactions]);
+  }, [savingsAccounts, transactions, selectedYear, selectedMonth, todayStr]);
 
-  // Aggregate totals
-  const totalSavings = useMemo(() => {
-    return accountsWithCalculations.reduce((acc, s) => acc + s.currentBalance, 0);
+  // Dynamic Aggregate totals evaluated at the selected month
+  const totalAccumulatedAtSelectedMonth = useMemo(() => {
+    return accountsWithCalculations.reduce((acc, s) => acc + s.accumulatedAtSelectedMonth, 0);
+  }, [accountsWithCalculations]);
+
+  const totalMonthContributions = useMemo(() => {
+    return accountsWithCalculations.reduce((acc, s) => acc + s.monthContributions, 0);
+  }, [accountsWithCalculations]);
+
+  const totalRemainingAtSelectedMonth = useMemo(() => {
+    return accountsWithCalculations.reduce((acc, s) => acc + s.remainingAtSelectedMonth, 0);
   }, [accountsWithCalculations]);
 
   const totalTarget = useMemo(() => {
     return accountsWithCalculations.reduce((acc, s) => acc + s.targetAmount, 0);
   }, [accountsWithCalculations]);
 
-  const globalProgress = totalTarget > 0 ? Math.min(100, Math.round((totalSavings / totalTarget) * 100)) : 100;
+  const totalFinalProjected = useMemo(() => {
+    return accountsWithCalculations.reduce((acc, s) => acc + s.finalProjectedBalance, 0);
+  }, [accountsWithCalculations]);
+
+  const globalProgressAtSelectedMonth =
+    totalTarget > 0 ? Math.min(100, Math.round((totalAccumulatedAtSelectedMonth / totalTarget) * 100)) : 100;
 
   // Filter savings transactions
   const savingsTransactions = useMemo(() => {
@@ -193,14 +389,15 @@ export const SavingsView: React.FC = () => {
   }, [savingsTransactions]);
 
   // Open modals with defaults
-  const openTransferModal = (savingsId?: string) => {
+  const openTransferModal = (savingsId?: string, defaultDate?: string) => {
     const targetId = savingsId || savingsAccounts[0]?.id || '';
     setSelectedSavingsId(targetId);
     setTransferSourceAccId(accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || '');
     setTransferAmountStr('');
     setTransferConcept('');
     setTransferNotes('');
-    setTransferDate(todayStr);
+    const dateUsed = defaultDate || (monthKey === todayStr.slice(0, 7) ? todayStr : `${monthKey}-01`);
+    setTransferDate(dateUsed);
     setIsTransferModalOpen(true);
   };
 
@@ -211,7 +408,8 @@ export const SavingsView: React.FC = () => {
     setWithdrawAmountStr('');
     setWithdrawConcept('');
     setWithdrawNotes('');
-    setWithdrawDate(todayStr);
+    const dateUsed = monthKey === todayStr.slice(0, 7) ? todayStr : `${monthKey}-01`;
+    setWithdrawDate(dateUsed);
     setIsWithdrawModalOpen(true);
   };
 
@@ -222,7 +420,8 @@ export const SavingsView: React.FC = () => {
     setSpendConcept('');
     setSpendCategoryId(categories.find((c) => c.type === 'gasto')?.id || '');
     setSpendNotes('');
-    setSpendDate(todayStr);
+    const dateUsed = monthKey === todayStr.slice(0, 7) ? todayStr : `${monthKey}-01`;
+    setSpendDate(dateUsed);
     setIsSpendModalOpen(true);
   };
 
@@ -248,6 +447,7 @@ export const SavingsView: React.FC = () => {
       setAccountIcon('ShieldCheck');
       setAccountNotes('');
     }
+    setIconPickerOpen(false);
     setIsAccountModalOpen(true);
   };
 
@@ -262,7 +462,7 @@ export const SavingsView: React.FC = () => {
     await saveSavingsAccount({
       id: editingAccount ? editingAccount.id : undefined,
       name: accountName.trim(),
-      category: accountCategory,
+      category: accountCategory as SavingsCategory,
       targetAmount,
       initialBalance,
       targetDate: accountTargetDate || undefined,
@@ -275,10 +475,36 @@ export const SavingsView: React.FC = () => {
     setIsAccountModalOpen(false);
   };
 
+  const handleCreateCustomCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    const id = newCatName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
+    const newCat: CustomSavingsCategoryItem = {
+      id,
+      name: newCatName.trim(),
+      color: newCatColor,
+      icon: newCatIcon,
+    };
+    const updated = [...customCategories, newCat];
+    setCustomCategories(updated);
+    try {
+      localStorage.setItem(SAVINGS_CATEGORIES_STORAGE_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.error('Error saving custom category', err);
+    }
+    setAccountCategory(id);
+    setAccountColor(newCatColor);
+    setAccountIcon(newCatIcon);
+    setIsNewCategoryModalOpen(false);
+    setNewCatName('');
+  };
+
   const handleTransferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = dollarsToCents(transferAmountStr || '0');
     if (amount <= 0 || !transferSourceAccId || !selectedSavingsId) return;
+
+    const status = transferDate > todayStr ? 'planificado' : 'realizado';
 
     await transferToSavings(
       transferSourceAccId,
@@ -286,7 +512,8 @@ export const SavingsView: React.FC = () => {
       amount,
       transferConcept.trim() || undefined,
       transferDate,
-      transferNotes.trim() || undefined
+      transferNotes.trim() || undefined,
+      status
     );
 
     setIsTransferModalOpen(false);
@@ -334,22 +561,8 @@ export const SavingsView: React.FC = () => {
 
   // Helper icon renderer
   const renderCategoryIcon = (iconName: string, className = 'w-5 h-5') => {
-    switch (iconName) {
-      case 'ShieldCheck':
-        return <ShieldCheck className={className} />;
-      case 'Plane':
-        return <Plane className={className} />;
-      case 'TrendingUp':
-        return <TrendingUp className={className} />;
-      case 'Home':
-        return <Home className={className} />;
-      case 'Car':
-        return <Car className={className} />;
-      case 'Laptop':
-        return <Laptop className={className} />;
-      default:
-        return <PiggyBank className={className} />;
-    }
+    const IconCmp = ICON_COMPONENTS[iconName] || PiggyBank;
+    return <IconCmp className={className} />;
   };
 
   // Simulator calculations
@@ -371,13 +584,13 @@ export const SavingsView: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                Ahorros & Fondos de Reserva
+                Ahorros & Metas Financieras
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                   Separado de Liquidez Ordinaria
                 </span>
               </h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                Pasa dinero entre tu banco y fondos de ahorro, reintegra para liquidez o gasta directo sin tocar tu flujo operativo
+                Proyecta metas, programa aportes mensuales y visualiza el avance exacto mes a mes de tus fondos de reserva
               </p>
             </div>
           </div>
@@ -415,7 +628,7 @@ export const SavingsView: React.FC = () => {
           <button
             onClick={() => openAccountModal()}
             id="btn-savings-new-account"
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow-md shadow-purple-900/30 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Nueva Meta / Fondo</span>
@@ -423,71 +636,194 @@ export const SavingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Cards: Segregation & Consolidated Wealth */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total in Savings */}
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-            <span className="font-semibold uppercase tracking-wider">Total en Fondos de Ahorro</span>
-            <PiggyBank className="w-4 h-4 text-emerald-400" />
+      {/* Month Navigation Strip for Goals & Savings Progress */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30">
+            <Calendar className="w-5 h-5" />
           </div>
-          <div className="text-2xl font-bold text-emerald-400 font-mono">
-            {formatMoney(totalSavings, settings.currencySymbol)}
-          </div>
-          <div className="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>{savingsAccounts.length} fondos activos configurados</span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">
+                Mes Seleccionado para Metas y Avance
+              </span>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  monthKey === todayStr.slice(0, 7)
+                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                    : monthKey > todayStr.slice(0, 7)
+                    ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}
+              >
+                {monthKey === todayStr.slice(0, 7)
+                  ? 'Mes Actual'
+                  : monthKey > todayStr.slice(0, 7)
+                  ? 'Proyección Futura'
+                  : 'Histórico'}
+              </span>
+            </div>
+            <h2 className="text-lg font-black text-white flex items-center gap-2">
+              <span>{monthName} {selectedYear}</span>
+              <span className="text-xs font-normal text-slate-400">
+                (El avance de cada meta se evalúa hasta el {daysInSelectedMonth} de {monthName})
+              </span>
+            </h2>
           </div>
         </div>
 
-        {/* Ordinary Liquidity */}
+        {/* Quick Month Navigation Controls */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => {
+              if (selectedMonth === 1) {
+                setSelectedYear(selectedYear - 1);
+                setSelectedMonth(12);
+              } else {
+                setSelectedMonth(selectedMonth - 1);
+              }
+            }}
+            className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            title="Mes anterior"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => {
+              const [nowY, nowM] = todayStr.split('-').map(Number);
+              setSelectedYear(nowY);
+              setSelectedMonth(nowM);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+              monthKey === todayStr.slice(0, 7)
+                ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-900/30'
+                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            Mes Actual (Hoy)
+          </button>
+
+          <button
+            onClick={() => {
+              if (selectedMonth === 12) {
+                setSelectedYear(selectedYear + 1);
+                setSelectedMonth(1);
+              } else {
+                setSelectedMonth(selectedMonth + 1);
+              }
+            }}
+            className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            title="Mes siguiente"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Cards: Dynamic Month Perspective & Consolidated Wealth */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* Card 1: Total Acumulado en Fondos al Mes Seleccionado */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-emerald-500/30 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span className="font-semibold uppercase tracking-wider text-emerald-400">
+              Acumulado a {monthName.slice(0, 3)}
+            </span>
+            <PiggyBank className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-2xl font-bold text-white font-mono">
+            {formatMoney(totalAccumulatedAtSelectedMonth, settings.currencySymbol)}
+          </div>
+          <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+            <span>Meta: {formatMoney(totalTarget, settings.currencySymbol)}</span>
+            <span className="font-bold text-emerald-400 font-mono">{globalProgressAtSelectedMonth}%</span>
+          </div>
+          <div className="w-full bg-slate-950 h-1.5 rounded-full mt-1.5 overflow-hidden">
+            <div
+              className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+              style={{ width: `${globalProgressAtSelectedMonth}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Card 2: Aportes en este Mes Seleccionado */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-purple-500/30 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between text-xs text-purple-400 mb-1">
+            <span className="font-semibold uppercase tracking-wider">
+              Aporte de {monthName.slice(0, 3)}
+            </span>
+            <Sparkles className="w-4 h-4 text-purple-400" />
+          </div>
+          <div className="text-2xl font-bold text-purple-300 font-mono">
+            +{formatMoney(totalMonthContributions, settings.currencySymbol)}
+          </div>
+          <div className="text-[11px] text-slate-400 mt-2">
+            <span>Aportes planificados/reales en el mes</span>
+          </div>
+        </div>
+
+        {/* Card 3: Monto Pendiente Restante al Mes */}
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-            <span className="font-semibold uppercase tracking-wider">Liquidez Ordinaria (Banco/Caja)</span>
+            <span className="font-semibold uppercase tracking-wider">
+              Faltante a la Meta
+            </span>
+            <Target className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-2xl font-bold text-amber-400 font-mono">
+            {formatMoney(totalRemainingAtSelectedMonth, settings.currencySymbol)}
+          </div>
+          <div className="text-[11px] text-slate-400 mt-2">
+            <span>Por acumular desde {monthName}</span>
+          </div>
+        </div>
+
+        {/* Card 4: Liquidez Ordinaria (Banco/Caja) */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span className="font-semibold uppercase tracking-wider">
+              Liquidez Ordinaria
+            </span>
             <Clock className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-2xl font-bold text-white font-mono">
             {formatMoney(executiveSummary.currentRealCashBalance, settings.currencySymbol)}
           </div>
-          <div className="text-xs text-slate-400 mt-2 flex items-center justify-between">
+          <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
             <span>Disponible inmediato</span>
             <span className="text-blue-400 font-medium">Flujo Operativo</span>
           </div>
         </div>
 
-        {/* Total Liquid Wealth (Consolidated) */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-emerald-500/30 shadow-lg relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-emerald-300 mb-1">
-            <span className="font-semibold uppercase tracking-wider">Patrimonio Líquido Total</span>
-            <Sparkles className="w-4 h-4 text-emerald-400" />
+        {/* Card 5: Patrimonio Líquido Total en el Mes */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span className="font-semibold uppercase tracking-wider">
+              Patrimonio Líquido
+            </span>
+            <ShieldCheck className="w-4 h-4 text-teal-400" />
           </div>
           <div className="text-2xl font-bold text-white font-mono">
-            {formatMoney(executiveSummary.totalLiquidWealth, settings.currencySymbol)}
+            {formatMoney(totalAccumulatedAtSelectedMonth + executiveSummary.currentRealCashBalance, settings.currencySymbol)}
           </div>
-          <div className="text-xs text-slate-400 mt-2">
-            <span>Liquidez ordinaria + Fondos de Ahorro</span>
+          <div className="text-[11px] text-slate-400 mt-2">
+            <span>Ahorros a {monthName} + Liquidez</span>
           </div>
         </div>
 
-        {/* Global Progress towards Goals */}
+        {/* Card 6: Proyección Final Planificada */}
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-            <span className="font-semibold uppercase tracking-wider">Progreso Meta Consolidada</span>
-            <Target className="w-4 h-4 text-purple-400" />
+            <span className="font-semibold uppercase tracking-wider">
+              Proyección Final Total
+            </span>
+            <TrendingUp className="w-4 h-4 text-indigo-400" />
           </div>
-          <div className="flex items-baseline justify-between">
-            <div className="text-2xl font-bold text-purple-400 font-mono">
-              {globalProgress}%
-            </div>
-            <div className="text-xs text-slate-400 font-mono">
-              Meta: {formatMoney(totalTarget, settings.currencySymbol)}
-            </div>
+          <div className="text-2xl font-bold text-indigo-300 font-mono">
+            {formatMoney(totalFinalProjected, settings.currencySymbol)}
           </div>
-          <div className="w-full bg-slate-800 h-2 rounded-full mt-2.5 overflow-hidden">
-            <div
-              className="bg-purple-500 h-full rounded-full transition-all duration-500"
-              style={{ width: `${globalProgress}%` }}
-            />
+          <div className="text-[11px] text-slate-400 mt-2">
+            <span>Con todos los aportes futuros</span>
           </div>
         </div>
       </div>
@@ -528,34 +864,102 @@ export const SavingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* MODE 1: TARJETAS DE METAS Y FONDOS */}
+      {/* MODE 1: TARJETAS DE METAS Y FONDOS (DINÁMICAS SEGÚN EL MES SELECCIONADO) */}
       {activeMode === 'tarjetas' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {accountsWithCalculations.map((account) => {
-            const remaining = Math.max(0, account.targetAmount - account.currentBalance);
-            const isAchieved = account.targetAmount > 0 && account.currentBalance >= account.targetAmount;
+            const isAchievedAtSelectedMonth = account.isGoalReachedAtSelectedMonth;
+            const remainingAtSelectedMonth = account.remainingAtSelectedMonth;
+            const progress = account.progressAtSelectedMonth;
+            const monthContribution = account.monthContributions;
+
+            // Target date calculations relative to selected month
+            let monthsLeftToTarget: number | null = null;
+            let suggestedMonthlyContribution = 0;
+            if (account.targetDate) {
+              const [tY, tM] = account.targetDate.split('-').map(Number);
+              monthsLeftToTarget = (tY - selectedYear) * 12 + (tM - selectedMonth);
+              if (monthsLeftToTarget > 0 && remainingAtSelectedMonth > 0) {
+                suggestedMonthlyContribution = Math.ceil(remainingAtSelectedMonth / monthsLeftToTarget);
+              }
+            }
+
+            // Quick monthly progression generator for the goal (5 months progression centered around selectedMonth)
+            const projectionPills = [-1, 0, 1, 2, 3].map((offset) => {
+              let pM = selectedMonth + offset;
+              let pY = selectedYear;
+              while (pM > 12) {
+                pM -= 12;
+                pY += 1;
+              }
+              while (pM < 1) {
+                pM += 12;
+                pY -= 1;
+              }
+              const pDays = new Date(pY, pM, 0).getDate();
+              const pKey = `${pY}-${String(pM).padStart(2, '0')}`;
+              const pMonthEnd = `${pKey}-${String(pDays).padStart(2, '0')}`;
+
+              // Calculate accumulated up to pMonthEnd
+              let pAcc = account.initialBalance;
+              let pMonthAporte = 0;
+              transactions.forEach((tx) => {
+                if (tx.status === 'cancelado' || tx.savingsAccountId !== account.id) return;
+                if (tx.date <= pMonthEnd) {
+                  if (tx.type === 'aporte_ahorro') pAcc += tx.amount;
+                  else if (tx.type === 'retiro_ahorro' || tx.type === 'gasto_desde_ahorro') pAcc -= tx.amount;
+                }
+                if (tx.date.startsWith(pKey) && tx.type === 'aporte_ahorro') {
+                  pMonthAporte += tx.amount;
+                }
+              });
+              pAcc = Math.max(0, pAcc);
+              const pPct =
+                account.targetAmount > 0
+                  ? Math.min(100, Math.round((pAcc / account.targetAmount) * 100))
+                  : 100;
+              return {
+                year: pY,
+                month: pM,
+                monthNameShort: MONTH_NAMES_ES[pM - 1]?.slice(0, 3) || '',
+                accumulated: pAcc,
+                contribution: pMonthAporte,
+                percentage: pPct,
+                isCurrentSelected: pY === selectedYear && pM === selectedMonth,
+              };
+            });
 
             return (
               <div
                 key={account.id}
                 id={`savings-card-${account.id}`}
-                className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between relative hover:border-slate-700 transition"
+                className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between relative hover:border-slate-700 transition space-y-4"
               >
                 <div>
-                  {/* Top Header */}
+                  {/* Top Header with Custom Category and Icon */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-3">
                       <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
-                        style={{ backgroundColor: `${account.color}25`, color: account.color }}
+                        className="w-11 h-11 rounded-xl flex items-center justify-center text-white shadow-md flex-shrink-0"
+                        style={{
+                          backgroundColor: `${account.color}25`,
+                          color: account.color,
+                          borderColor: `${account.color}50`,
+                          borderWidth: 1,
+                        }}
                       >
-                        {renderCategoryIcon(account.icon)}
+                        {renderCategoryIcon(account.icon, 'w-6 h-6')}
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-white line-clamp-1">{account.name}</h3>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                          {account.category}
-                        </span>
+                        <h3 className="text-base font-bold text-white line-clamp-1">{account.name}</h3>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span
+                            className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md"
+                            style={{ backgroundColor: `${account.color}20`, color: account.color }}
+                          >
+                            {customCategories.find((c) => c.id === account.category)?.name || account.category}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -563,95 +967,163 @@ export const SavingsView: React.FC = () => {
                       <button
                         onClick={() => openAccountModal(account)}
                         title="Editar fondo"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDeleteAccount(account.id, account.name)}
                         title="Eliminar fondo"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Balance Display */}
-                  <div className="mt-4">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs text-slate-400">Balance Acumulado</span>
-                      {isAchieved && (
-                        <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> ¡Meta Alcanzada!
+                  {/* Dual Month-Aware Cards inside the Goal Card:
+                      1. Saldo Acumulado a este Mes Seleccionado
+                      2. Aporte en este Mes Seleccionado */}
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    {/* Sub-Card 1: Acumulado al Mes */}
+                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span className="font-semibold uppercase tracking-wider">
+                          Acumulado a {monthName.slice(0, 3)}
                         </span>
-                      )}
+                        {isAchievedAtSelectedMonth && (
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        )}
+                      </div>
+                      <div className="text-lg font-black text-white font-mono">
+                        {formatMoney(account.accumulatedAtSelectedMonth, settings.currencySymbol)}
+                      </div>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        Saldo al {daysInSelectedMonth} {monthName}
+                      </span>
                     </div>
-                    <div className="text-2xl font-black text-white font-mono mt-0.5">
-                      {formatMoney(account.currentBalance, settings.currencySymbol)}
+
+                    {/* Sub-Card 2: Aporte del Mes */}
+                    <div className="p-3 rounded-xl bg-slate-950/80 border border-purple-500/20">
+                      <div className="flex items-center justify-between text-[10px] text-purple-400 mb-0.5">
+                        <span className="font-semibold uppercase tracking-wider">
+                          Aporte {monthName.slice(0, 3)}
+                        </span>
+                        <Sparkles className="w-3 h-3 text-purple-400" />
+                      </div>
+                      <div
+                        className={`text-lg font-black font-mono ${
+                          monthContribution > 0 ? 'text-emerald-400' : 'text-slate-400'
+                        }`}
+                      >
+                        {monthContribution > 0 ? `+${formatMoney(monthContribution, settings.currencySymbol)}` : '$0.00'}
+                      </div>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        {monthContribution > 0 ? 'Aporte en el mes' : 'Sin aporte en el mes'}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Progress Bar */}
+                  {/* Goal Progress Bar & Metrics */}
                   {account.targetAmount > 0 && (
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-xs text-slate-400 font-mono mb-1">
-                        <span>Meta: {formatMoney(account.targetAmount, settings.currencySymbol)}</span>
-                        <span className="font-bold text-white">{account.progressPercentage}%</span>
+                    <div className="mt-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800/80">
+                      <div className="flex items-center justify-between text-xs text-slate-400 font-mono mb-1.5">
+                        <span className="font-medium text-slate-300">
+                          Meta: {formatMoney(account.targetAmount, settings.currencySymbol)}
+                        </span>
+                        <span className="font-black text-white px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[11px]">
+                          {progress}% a {monthName}
+                        </span>
                       </div>
-                      <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                      <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
                         <div
                           className="h-full rounded-full transition-all duration-500"
                           style={{
-                            width: `${account.progressPercentage}%`,
+                            width: `${progress}%`,
                             backgroundColor: account.color,
                           }}
                         />
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                        <span>Falta: {formatMoney(remaining, settings.currencySymbol)}</span>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2">
+                        <span>
+                          Falta: <strong className="text-white font-mono">{formatMoney(remainingAtSelectedMonth, settings.currencySymbol)}</strong>
+                        </span>
                         {account.targetDate && (
-                          <span className="flex items-center gap-1 text-slate-400">
-                            <Calendar className="w-3 h-3" /> {formatDisplayDate(account.targetDate)}
+                          <span className="flex items-center gap-1 text-slate-300">
+                            <Calendar className="w-3 h-3 text-blue-400" /> {formatDisplayDate(account.targetDate)}
                           </span>
                         )}
                       </div>
+
+                      {/* Smart Monthly Target Pace */}
+                      {monthsLeftToTarget !== null && monthsLeftToTarget > 0 && remainingAtSelectedMonth > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400">
+                            Faltan {monthsLeftToTarget} {monthsLeftToTarget === 1 ? 'mes' : 'meses'}
+                          </span>
+                          <span className="font-mono text-purple-300 font-semibold bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                            Sugerido: {formatMoney(suggestedMonthlyContribution, settings.currencySymbol)}/mes
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Stats breakdown */}
-                  <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-800/80 text-[11px]">
-                    <div className="bg-slate-950/60 rounded-lg p-2 border border-slate-800/50">
-                      <div className="text-slate-400 text-[10px]">Aportado</div>
-                      <div className="font-semibold text-emerald-400 font-mono truncate">
-                        +{formatMoney(account.totalContributed, settings.currencySymbol)}
-                      </div>
-                    </div>
-                    <div className="bg-slate-950/60 rounded-lg p-2 border border-slate-800/50">
-                      <div className="text-slate-400 text-[10px]">A Liquidez</div>
-                      <div className="font-semibold text-blue-400 font-mono truncate">
-                        -{formatMoney(account.totalWithdrawn, settings.currencySymbol)}
-                      </div>
-                    </div>
-                    <div className="bg-slate-950/60 rounded-lg p-2 border border-slate-800/50">
-                      <div className="text-slate-400 text-[10px]">Gastado</div>
-                      <div className="font-semibold text-amber-400 font-mono truncate">
-                        -{formatMoney(account.totalSpent, settings.currencySymbol)}
-                      </div>
+                  {/* Interactive Month-by-Month Progress Strip */}
+                  <div className="mt-3">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block mb-1.5">
+                      Evolución Mensual (Haz clic en un mes para ver su avance):
+                    </span>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {projectionPills.map((pill) => (
+                        <button
+                          key={`${pill.year}-${pill.month}`}
+                          onClick={() => {
+                            setSelectedYear(pill.year);
+                            setSelectedMonth(pill.month);
+                          }}
+                          className={`p-1.5 rounded-lg border text-center transition cursor-pointer ${
+                            pill.isCurrentSelected
+                              ? 'bg-purple-600/20 border-purple-500 text-purple-200 ring-1 ring-purple-500/40 shadow-sm'
+                              : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}
+                        >
+                          <span className="text-[10px] block font-bold capitalize">
+                            {pill.monthNameShort}
+                          </span>
+                          <span className="text-[9px] font-mono text-slate-300 block truncate">
+                            {formatMoney(pill.accumulated, settings.currencySymbol)}
+                          </span>
+                          <span
+                            className={`text-[8px] font-bold block ${
+                              pill.percentage >= 100 ? 'text-emerald-400' : 'text-slate-400'
+                            }`}
+                          >
+                            {pill.percentage}%
+                          </span>
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {account.notes && (
-                    <p className="text-xs text-slate-400 mt-3 italic line-clamp-2 bg-slate-950/40 p-2 rounded-lg border border-slate-800/40">
-                      "{account.notes}"
-                    </p>
-                  )}
+                  {/* Reference to Real Balance Today and Total Future Planned */}
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2 px-1">
+                    <span>
+                      Saldo real hoy: <strong className="text-slate-200 font-mono">{formatMoney(account.currentRealBalance, settings.currencySymbol)}</strong>
+                    </span>
+                    <span>
+                      Proyección final: <strong className="text-indigo-300 font-mono">{formatMoney(account.finalProjectedBalance, settings.currencySymbol)}</strong>
+                    </span>
+                  </div>
                 </div>
 
                 {/* Card Quick Action Buttons */}
-                <div className="grid grid-cols-3 gap-1.5 mt-5 pt-3 border-t border-slate-800">
+                <div className="grid grid-cols-3 gap-1.5 pt-3 border-t border-slate-800">
                   <button
-                    onClick={() => openTransferModal(account.id)}
+                    onClick={() => {
+                      const dateUsed = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+                      openTransferModal(account.id, dateUsed);
+                    }}
                     className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
@@ -797,13 +1269,13 @@ export const SavingsView: React.FC = () => {
                     )}
                   </td>
                   <td className="p-3 text-right font-mono text-emerald-300 text-sm">
-                    {formatMoney(totalSavings, settings.currencySymbol)}
+                    {formatMoney(totalAccumulatedAtSelectedMonth, settings.currencySymbol)}
                   </td>
                   <td className="p-3 text-right font-mono text-white">
                     {formatMoney(totalTarget, settings.currencySymbol)}
                   </td>
                   <td className="p-3 text-center font-mono text-purple-400">
-                    {globalProgress}%
+                    {globalProgressAtSelectedMonth}%
                   </td>
                   <td></td>
                 </tr>
@@ -953,7 +1425,7 @@ export const SavingsView: React.FC = () => {
                   <p className="text-xs text-slate-400">Crecimiento del capital ahorrado a lo largo del tiempo</p>
                 </div>
                 <span className="text-xs font-mono font-bold text-emerald-400">
-                  {formatMoney(totalSavings, settings.currencySymbol)}
+                  {formatMoney(totalAccumulatedAtSelectedMonth, settings.currencySymbol)}
                 </span>
               </div>
 
@@ -1570,44 +2042,153 @@ export const SavingsView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-3">
+                {/* Category Selection with "+ Nueva Categoría" */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Categoría
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-300">
+                      Categoría
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewCatName('');
+                        setNewCatColor(accountColor);
+                        setNewCatIcon(accountIcon);
+                        setIsNewCategoryModalOpen(true);
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-bold text-purple-400 hover:text-purple-300 transition cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Nueva Categoría</span>
+                    </button>
+                  </div>
                   <select
                     value={accountCategory}
-                    onChange={(e) => setAccountCategory(e.target.value as SavingsCategory)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAccountCategory(val);
+                      const catObj = customCategories.find((c) => c.id === val);
+                      if (catObj) {
+                        setAccountColor(catObj.color);
+                        setAccountIcon(catObj.icon);
+                      }
+                    }}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   >
-                    <option value="emergencia">Fondo de Emergencia</option>
-                    <option value="viaje">Viaje / Vacaciones</option>
-                    <option value="inversion">Inversión / Oportunidad</option>
-                    <option value="vivienda">Vivienda / Hogar</option>
-                    <option value="vehiculo">Vehículo / Transporte</option>
-                    <option value="tecnologia">Tecnología / Equipos</option>
-                    <option value="retiro">Retiro / Largo Plazo</option>
-                    <option value="general">Ahorro General</option>
+                    {customCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
+                {/* Interactive Visual Icon Picker */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Icono
-                  </label>
-                  <select
-                    value={accountIcon}
-                    onChange={(e) => setAccountIcon(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-300">
+                      Icono Identificador
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIconPickerOpen(!iconPickerOpen)}
+                      className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition cursor-pointer"
+                    >
+                      {iconPickerOpen ? 'Ocultar selector' : 'Explorar iconos'}
+                    </button>
+                  </div>
+
+                  {/* Chosen Icon Preview */}
+                  <div
+                    onClick={() => setIconPickerOpen(!iconPickerOpen)}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition cursor-pointer"
                   >
-                    <option value="ShieldCheck">Escudo (Seguridad / Emergencia)</option>
-                    <option value="Plane">Avión (Viaje)</option>
-                    <option value="TrendingUp">Gráfico Crecimiento (Inversión)</option>
-                    <option value="Home">Casa (Hogar / Vivienda)</option>
-                    <option value="Car">Auto (Vehículo)</option>
-                    <option value="Laptop">Computadora (Tecnología)</option>
-                    <option value="PiggyBank">Alcancía (General)</option>
-                  </select>
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-9 h-9 rounded-lg flex items-center justify-center shadow-md"
+                        style={{ backgroundColor: `${accountColor}25`, color: accountColor }}
+                      >
+                        {renderCategoryIcon(accountIcon, 'w-5 h-5')}
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-white block">
+                          {AVAILABLE_ICONS.find((i) => i.id === accountIcon)?.label || accountIcon}
+                        </span>
+                        <span className="text-[10px] text-slate-400">Clic para cambiar icono</span>
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-400 font-mono">
+                      {iconPickerOpen ? '▲' : '▼'}
+                    </span>
+                  </div>
+
+                  {/* Expanded Visual Icon Picker Grid */}
+                  {iconPickerOpen && (
+                    <div className="mt-2 p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                      {/* Search & Category Filter */}
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-500" />
+                          <input
+                            type="text"
+                            placeholder="Buscar icono..."
+                            value={iconSearchQuery}
+                            onChange={(e) => setIconSearchQuery(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Icon category chips */}
+                      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5 text-[10px]">
+                        {['all', 'Finanzas', 'Metas', 'Seguridad', 'Viajes', 'Transporte', 'Hogar', 'Tecnología', 'Educación', 'Salud', 'Vida'].map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setIconCategoryFilter(cat)}
+                            className={`px-2 py-0.5 rounded-md font-medium whitespace-nowrap transition cursor-pointer ${
+                              iconCategoryFilter === cat
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-slate-900 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {cat === 'all' ? 'Todos' : cat}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Icons Grid */}
+                      <div className="grid grid-cols-7 gap-1.5 max-h-40 overflow-y-auto p-1 bg-slate-900/50 rounded-lg border border-slate-800/80">
+                        {AVAILABLE_ICONS.filter((i) => {
+                          const matchesSearch =
+                            !iconSearchQuery.trim() ||
+                            i.label.toLowerCase().includes(iconSearchQuery.toLowerCase()) ||
+                            i.id.toLowerCase().includes(iconSearchQuery.toLowerCase());
+                          const matchesCat =
+                            iconCategoryFilter === 'all' || i.category === iconCategoryFilter;
+                          return matchesSearch && matchesCat;
+                        }).map((icon) => (
+                          <button
+                            key={icon.id}
+                            type="button"
+                            onClick={() => {
+                              setAccountIcon(icon.id);
+                              setIconPickerOpen(false);
+                            }}
+                            className={`p-2 rounded-lg flex flex-col items-center justify-center transition cursor-pointer ${
+                              accountIcon === icon.id
+                                ? 'bg-emerald-500/30 text-emerald-300 ring-1 ring-emerald-500'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                            }`}
+                            title={icon.label}
+                          >
+                            {renderCategoryIcon(icon.id, 'w-4 h-4')}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1700,6 +2281,116 @@ export const SavingsView: React.FC = () => {
                   className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md shadow-emerald-900/40"
                 >
                   {editingAccount ? 'Guardar Cambios' : 'Crear Fondo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: NUEVA CATEGORÍA DE AHORRO PERSONALIZADA */}
+      {isNewCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-purple-500/30 shadow-2xl p-6 text-slate-100 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2 text-purple-400 font-bold">
+                <Tag className="w-5 h-5" />
+                <span>Crear Nueva Categoría de Ahorro</span>
+              </div>
+              <button
+                onClick={() => setIsNewCategoryModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCustomCategory} className="space-y-4 mt-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nombre de la Categoría *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Ej. Boda, Negocio Propio, Gimnasio, Cursos..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Color Representativo
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {['#6366f1', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#f97316', '#14b8a6', '#ef4444'].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNewCatColor(c)}
+                      className={`w-7 h-7 rounded-full transition cursor-pointer ${
+                        newCatColor === c ? 'ring-2 ring-white scale-110' : 'opacity-70 hover:opacity-100'
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Icono por Defecto
+                </label>
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800 mb-2">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
+                    style={{ backgroundColor: `${newCatColor}25`, color: newCatColor }}
+                  >
+                    {renderCategoryIcon(newCatIcon, 'w-5 h-5')}
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">
+                      {AVAILABLE_ICONS.find((i) => i.id === newCatIcon)?.label || newCatIcon}
+                    </span>
+                    <span className="text-[10px] text-slate-400">Icono seleccionado</span>
+                  </div>
+                </div>
+
+                {/* Quick Icon Selector for Category */}
+                <div className="grid grid-cols-6 gap-2 max-h-36 overflow-y-auto p-1.5 bg-slate-950/60 rounded-xl border border-slate-800">
+                  {AVAILABLE_ICONS.map((icon) => (
+                    <button
+                      key={icon.id}
+                      type="button"
+                      onClick={() => setNewCatIcon(icon.id)}
+                      className={`p-2 rounded-lg flex flex-col items-center justify-center transition cursor-pointer ${
+                        newCatIcon === icon.id
+                          ? 'bg-purple-600/30 text-purple-300 ring-1 ring-purple-500'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                      }`}
+                      title={icon.label}
+                    >
+                      {renderCategoryIcon(icon.id, 'w-4 h-4')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsNewCategoryModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow-md shadow-purple-900/40 cursor-pointer"
+                >
+                  Guardar Categoría
                 </button>
               </div>
             </form>

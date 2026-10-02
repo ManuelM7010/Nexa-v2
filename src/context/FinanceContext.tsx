@@ -4,6 +4,7 @@ import {
   CreditCard,
   Transaction,
   TransactionType,
+  TransactionStatus,
   Category,
   Budget,
   ItemBudget,
@@ -122,7 +123,8 @@ interface FinanceContextType {
     amount: number,
     concept?: string,
     date?: string,
-    notes?: string
+    notes?: string,
+    status?: TransactionStatus
   ) => Promise<void>;
   withdrawFromSavings: (
     fromSavingsAccountId: string,
@@ -809,11 +811,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     amount: number,
     concept?: string,
     date?: string,
-    notes?: string
+    notes?: string,
+    status?: TransactionStatus
   ) => {
     const sourceAcc = accounts.find((a) => a.id === fromAccountId);
     const targetSav = savingsAccounts.find((s) => s.id === toSavingsAccountId);
     const txDate = date || todayStr;
+    const txStatus: TransactionStatus = status || (txDate > todayStr ? 'planificado' : 'realizado');
 
     await saveTransaction({
       concept: concept || `Aporte a Ahorro: ${targetSav?.name || 'Fondo de Ahorro'}`,
@@ -823,7 +827,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       paymentMethodType: sourceAcc?.type === 'efectivo' ? 'efectivo' : 'banco',
       accountId: fromAccountId,
       savingsAccountId: toSavingsAccountId,
-      status: 'realizado',
+      status: txStatus,
       notes: notes || `Transferencia desde ${sourceAcc?.name || 'Cuenta'} hacia fondo de ahorro`,
     });
   };

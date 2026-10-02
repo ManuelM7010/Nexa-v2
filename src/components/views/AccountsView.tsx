@@ -29,6 +29,7 @@ export const AccountsView: React.FC = () => {
     deleteAccount,
     saveTransaction,
     transactions,
+    allMonthTransactions,
     executiveSummary,
     selectedYear,
     selectedMonth,
@@ -61,15 +62,79 @@ export const AccountsView: React.FC = () => {
 
   const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const monthName = MONTH_NAMES_ES[selectedMonth - 1] || 'Mes';
+  const daysInCurrentMonth = new Date(selectedYear, selectedMonth, 0).getDate();
 
   const liquidityStart = settings.liquidityStartDate || '2026-09-15';
   const isPriorToStartMonth = monthKey < liquidityStart.slice(0, 7);
+
+  // Exact balances for each account:
+  // 1. Balance as of today (Fecha Actual)
+  // 2. Projected/Actual balance as of end of selected month (Fin de Mes)
+  const accountBalancesDetail = useMemo(() => {
+    const map = new Map<string, { balanceToday: number; balanceEndOfMonth: number }>();
+    accounts.forEach((acc) => {
+      const balanceToday = NexaFinancialEngine.calculateAccountRealCurrentBalance(
+        acc,
+        todayStr,
+        transactions,
+        accounts,
+        liquidityStart
+      );
+      const balanceEndOfMonth = NexaFinancialEngine.calculateAccountEndOfMonthBalance(
+        acc,
+        selectedYear,
+        selectedMonth,
+        transactions,
+        accounts,
+        liquidityStart,
+        allMonthTransactions
+      );
+      map.set(acc.id, { balanceToday, balanceEndOfMonth });
+    });
+    return map;
+  }, [accounts, todayStr, transactions, liquidityStart, selectedYear, selectedMonth, allMonthTransactions]);
+
+  const totalTodayLiquidity = useMemo(() => {
+    return accounts
+      .filter((a) => a.isActive)
+      .reduce((sum, a) => sum + (accountBalancesDetail.get(a.id)?.balanceToday ?? 0), 0);
+  }, [accounts, accountBalancesDetail]);
+
+  const totalEndOfMonthLiquidity = useMemo(() => {
+    return accounts
+      .filter((a) => a.isActive)
+      .reduce((sum, a) => sum + (accountBalancesDetail.get(a.id)?.balanceEndOfMonth ?? 0), 0);
+  }, [accounts, accountBalancesDetail]);
+
+  const totalTodayBank = useMemo(() => {
+    return accounts
+      .filter((a) => a.isActive && a.type !== 'efectivo')
+      .reduce((sum, a) => sum + (accountBalancesDetail.get(a.id)?.balanceToday ?? 0), 0);
+  }, [accounts, accountBalancesDetail]);
+
+  const totalEndOfMonthBank = useMemo(() => {
+    return accounts
+      .filter((a) => a.isActive && a.type !== 'efectivo')
+      .reduce((sum, a) => sum + (accountBalancesDetail.get(a.id)?.balanceEndOfMonth ?? 0), 0);
+  }, [accounts, accountBalancesDetail]);
+
+  const totalTodayCash = useMemo(() => {
+    return accounts
+      .filter((a) => a.isActive && a.type === 'efectivo')
+      .reduce((sum, a) => sum + (accountBalancesDetail.get(a.id)?.balanceToday ?? 0), 0);
+  }, [accounts, accountBalancesDetail]);
+
+  const totalEndOfMonthCash = useMemo(() => {
+    return accounts
+      .filter((a) => a.isActive && a.type === 'efectivo')
+      .reduce((sum, a) => sum + (accountBalancesDetail.get(a.id)?.balanceEndOfMonth ?? 0), 0);
+  }, [accounts, accountBalancesDetail]);
 
   // Calculate detailed monthly breakdown for each account based on selected month
   const accountSummaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof NexaFinancialEngine.getAccountMonthlyBreakdown>>();
     accounts.forEach((acc) => {
-      const currentBal = executiveSummary.accountBalances?.[acc.id] ?? (isPriorToStartMonth ? 0 : acc.initialBalance);
+      const currentBal = accountBalancesDetail.get(acc.id)?.balanceEndOfMonth ?? (isPriorToStartMonth ? 0 : acc.initialBalance);
       const breakdown = NexaFinancialEngine.getAccountMonthlyBreakdown(
         acc,
         selectedYear,
@@ -82,7 +147,7 @@ export const AccountsView: React.FC = () => {
       map.set(acc.id, breakdown);
     });
     return map;
-  }, [accounts, executiveSummary.accountBalances, selectedYear, selectedMonth, transactions, liquidityStart, isPriorToStartMonth]);
+  }, [accounts, accountBalancesDetail, selectedYear, selectedMonth, transactions, liquidityStart, isPriorToStartMonth]);
 
   // Aggregate monthly flows
   const totalMonthInflows = useMemo(() => {
@@ -254,27 +319,51 @@ export const AccountsView: React.FC = () => {
         </div>
       )}
 
-      {/* Aggregate KPI Cards - Synchronized with Real Liquidity */}
+      {/* Aggregate KPI Cards - Dual Horizon: Fecha Actual (Hoy) & Fin de Mes Seleccionado */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Consolidado Total */}
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-lg">
+        {/* Card 1: Monto a Fecha Actual (Hoy) */}
+        <div className="rounded-2xl bg-slate-900 border border-emerald-500/30 p-4 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold uppercase text-slate-400">
-              Liquidez Consolidada
+            <span className="text-xs font-semibold uppercase text-emerald-400 flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              Monto Fecha Actual
             </span>
-            <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-              {executiveSummary.periodLabel || 'Actual'}
+            <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/25">
+              Hoy ({formatDateEs(todayStr, { withDayName: false, withYear: false })})
             </span>
           </div>
           <div className="text-2xl font-black text-white font-mono">
-            {formatMoney(consolidatedLiquidity, settings.currencySymbol)}
+            {formatMoney(totalTodayLiquidity, settings.currencySymbol)}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            Suma exacta de tus {accounts.length} cuentas activas en {monthName}
+            Dinero real disponible en tus {accounts.filter((a) => a.isActive).length} cuentas activas
           </p>
         </div>
 
-        {/* Card 2: En Bancos */}
+        {/* Card 2: Monto a Fin de Mes Seleccionado */}
+        <div className="rounded-2xl bg-slate-900 border border-blue-500/30 p-4 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold uppercase text-blue-400 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" />
+              Monto a Fin de Mes
+            </span>
+            <span className="text-[10px] font-mono font-bold text-blue-300 bg-blue-500/15 px-2 py-0.5 rounded-full border border-blue-500/25">
+              Cierre {daysInCurrentMonth} {monthName}
+            </span>
+          </div>
+          <div className="text-2xl font-black text-white font-mono">
+            {formatMoney(totalEndOfMonthLiquidity, settings.currencySymbol)}
+          </div>
+          <p className="text-[11px] mt-1 font-medium flex items-center gap-1">
+            <span className={totalEndOfMonthLiquidity - totalTodayLiquidity >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+              {totalEndOfMonthLiquidity - totalTodayLiquidity >= 0 ? '+' : ''}
+              {formatMoney(totalEndOfMonthLiquidity - totalTodayLiquidity, settings.currencySymbol)}
+            </span>
+            <span className="text-slate-400">vs fecha actual</span>
+          </p>
+        </div>
+
+        {/* Card 3: En Bancos & Billeteras */}
         <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-lg">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase text-slate-400">
@@ -283,54 +372,28 @@ export const AccountsView: React.FC = () => {
             <Building2 className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-2xl font-black text-blue-400 font-mono">
-            {formatMoney(executiveSummary.bankBalance, settings.currencySymbol)}
+            {formatMoney(totalTodayBank, settings.currencySymbol)}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Fondos en instituciones bancarias y billeteras
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+            <span>Hoy: {formatMoney(totalTodayBank, settings.currencySymbol)}</span>
+            <span className="text-slate-300 font-mono font-bold">Fin mes: {formatMoney(totalEndOfMonthBank, settings.currencySymbol)}</span>
           </p>
         </div>
 
-        {/* Card 3: En Efectivo */}
+        {/* Card 4: En Efectivo */}
         <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-lg">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase text-slate-400">
-              En Efectivo
+              En Efectivo Disponible
             </span>
             <Wallet className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-black text-emerald-400 font-mono">
-            {formatMoney(executiveSummary.cashBalance, settings.currencySymbol)}
+            {formatMoney(totalTodayCash, settings.currencySymbol)}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            Dinero físico disponible de inmediato
-          </p>
-        </div>
-
-        {/* Card 4: Flujo Neto Cuentas en el Mes */}
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-lg">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold uppercase text-slate-400">
-              Flujo del Mes en Cuentas
-            </span>
-            <span
-              className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                totalMonthInflows >= totalMonthOutflows
-                  ? 'bg-emerald-500/20 text-emerald-300'
-                  : 'bg-rose-500/20 text-rose-300'
-              }`}
-            >
-              {totalMonthInflows >= totalMonthOutflows ? 'Superávit' : 'Déficit'}
-            </span>
-          </div>
-          <div
-            className={`text-2xl font-black font-mono ${
-              totalMonthInflows - totalMonthOutflows >= 0 ? 'text-emerald-400' : 'text-rose-400'
-            }`}
-          >
-            {formatMoney(totalMonthInflows - totalMonthOutflows, settings.currencySymbol)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            +{formatMoney(totalMonthInflows, settings.currencySymbol)} / -{formatMoney(totalMonthOutflows, settings.currencySymbol)}
+          <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+            <span>Hoy: {formatMoney(totalTodayCash, settings.currencySymbol)}</span>
+            <span className="text-slate-300 font-mono font-bold">Fin mes: {formatMoney(totalEndOfMonthCash, settings.currencySymbol)}</span>
           </p>
         </div>
       </div>
@@ -338,8 +401,12 @@ export const AccountsView: React.FC = () => {
       {/* Accounts Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {accounts.map((acc) => {
+          const detail = accountBalancesDetail.get(acc.id);
+          const balanceToday = detail?.balanceToday ?? 0;
+          const balanceEndOfMonth = detail?.balanceEndOfMonth ?? 0;
+          const balanceDiff = balanceEndOfMonth - balanceToday;
+
           const summary = accountSummaries.get(acc.id);
-          const currentBal = summary?.currentBalance ?? acc.initialBalance;
           const openingBal = summary?.openingBalance ?? acc.initialBalance;
           const monthIn = summary?.monthInflow ?? 0;
           const monthOut = summary?.monthOutflow ?? 0;
@@ -348,9 +415,9 @@ export const AccountsView: React.FC = () => {
           const movementsCount = summary?.movements.length ?? 0;
           const isExpanded = expandedAccountId === acc.id;
 
-          const pctOfTotal =
-            consolidatedLiquidity > 0
-              ? Math.round((Math.max(0, currentBal) / consolidatedLiquidity) * 100)
+          const pctOfTodayTotal =
+            totalTodayLiquidity > 0
+              ? Math.round((Math.max(0, balanceToday) / totalTodayLiquidity) * 100)
               : 0;
 
           return (
@@ -407,18 +474,46 @@ export const AccountsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Balance Display with % share */}
-              <div className="pt-2 border-t border-slate-800/80">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">
-                    Saldo al corte ({monthName} {selectedYear})
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-400 font-bold bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
-                    {pctOfTotal}% de liquidez
+              {/* Dual Balance Cards:
+                  1. Tarjeta: Monto según la fecha actual
+                  2. Tarjeta: Monto a fin de mes según mes seleccionado */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-800/80">
+                {/* Tarjeta A: Monto según fecha actual */}
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-emerald-500/25 relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Saldo Fecha Actual
+                    </span>
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
+                      Hoy
+                    </span>
+                  </div>
+                  <div className="text-lg font-black text-white font-mono">
+                    {formatMoney(balanceToday, settings.currencySymbol)}
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    {pctOfTodayTotal}% del total hoy
                   </span>
                 </div>
-                <div className="text-2xl font-black text-white font-mono">
-                  {formatMoney(currentBal, settings.currencySymbol)}
+
+                {/* Tarjeta B: Monto a fin de mes según mes seleccionado */}
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-blue-500/25 relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      Saldo Fin de Mes
+                    </span>
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/20">
+                      {daysInCurrentMonth} {monthName}
+                    </span>
+                  </div>
+                  <div className="text-lg font-black text-white font-mono">
+                    {formatMoney(balanceEndOfMonth, settings.currencySymbol)}
+                  </div>
+                  <span className={`text-[10px] font-medium mt-0.5 block ${balanceDiff >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {balanceDiff >= 0 ? '+' : ''}{formatMoney(balanceDiff, settings.currencySymbol)} vs hoy
+                  </span>
                 </div>
               </div>
 
