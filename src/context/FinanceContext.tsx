@@ -229,10 +229,38 @@ interface FinanceContextType {
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Current real date of the day
+  // Current real date of the day (e.g., 2026-10-04)
   const todayStr = getTodayDateStr();
-  const [selectedYear, setSelectedYear] = useState(2026);
-  const [selectedMonth, setSelectedMonth] = useState(9); // September
+
+  // Initialize dynamically with the current real year and month
+  const initialYear = () => {
+    try {
+      const parts = todayStr.split('-');
+      if (parts[0]) {
+        const y = parseInt(parts[0], 10);
+        if (!isNaN(y) && y >= 2020) return y;
+      }
+    } catch {
+      // fallback
+    }
+    return new Date().getFullYear();
+  };
+
+  const initialMonth = () => {
+    try {
+      const parts = todayStr.split('-');
+      if (parts[1]) {
+        const m = parseInt(parts[1], 10);
+        if (!isNaN(m) && m >= 1 && m <= 12) return m;
+      }
+    } catch {
+      // fallback
+    }
+    return new Date().getMonth() + 1;
+  };
+
+  const [selectedYear, setSelectedYear] = useState<number>(initialYear);
+  const [selectedMonth, setSelectedMonth] = useState<number>(initialMonth);
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isNewTxOpen, setIsNewTxOpen] = useState(false);

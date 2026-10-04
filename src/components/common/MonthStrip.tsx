@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { MONTH_NAMES_SHORT_ES, MONTH_NAMES_ES } from '../../utils/formatters';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, CheckCircle2 } from 'lucide-react';
@@ -11,9 +11,22 @@ export const MonthStrip: React.FC = () => {
     setSelectedMonth,
     setSelectedPeriod,
     monthlyCloses,
+    todayStr,
   } = useFinance();
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const realCurrentYear = parseInt(todayStr.slice(0, 4), 10) || new Date().getFullYear();
+  const realCurrentMonth = parseInt(todayStr.slice(5, 7), 10) || (new Date().getMonth() + 1);
+  const isBrowsingDifferentMonth = selectedYear !== realCurrentYear || selectedMonth !== realCurrentMonth;
+
+  // Auto-scroll to selected month on mount and on selection change
+  useEffect(() => {
+    const el = document.getElementById(`btn-month-${selectedYear}-${selectedMonth}`);
+    if (el && scrollRef.current) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [selectedYear, selectedMonth]);
 
   const years = [2026, 2027, 2028, 2029, 2030];
 
@@ -66,8 +79,19 @@ export const MonthStrip: React.FC = () => {
             </select>
           </div>
 
-          <div className="text-xs font-semibold text-slate-300">
-            Período: <span className="text-blue-400 font-bold">{MONTH_NAMES_ES[selectedMonth - 1]} {selectedYear}</span>
+          <div className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+            <span>Período:</span>
+            <span className="text-blue-400 font-bold">{MONTH_NAMES_ES[selectedMonth - 1]} {selectedYear}</span>
+            {isBrowsingDifferentMonth && (
+              <button
+                type="button"
+                onClick={() => setSelectedPeriod(realCurrentYear, realCurrentMonth)}
+                className="px-2 py-0.5 rounded-md bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-blue-300 border border-blue-400/30 text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
+                title={`Volver al mes actual (${MONTH_NAMES_ES[realCurrentMonth - 1]} ${realCurrentYear})`}
+              >
+                <span>Hoy</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-1">
