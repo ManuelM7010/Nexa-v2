@@ -293,14 +293,14 @@ export const SettingsView: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    Modo Claro Fintech
+                    Modo Claro — Letras & Marcos Oscuros
                     {settings.theme === 'fintech-light' && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-bold border border-amber-500/40">
-                        Luminoso
+                        Alto Contraste
                       </span>
                     )}
                   </h4>
-                  <p className="text-[11px] text-slate-400">Luminosidad natural, alto contraste para oficina o exteriores</p>
+                  <p className="text-[11px] text-slate-400">Letras negras nítidas y marcos oscuros bien definidos en todos los módulos</p>
                 </div>
               </div>
               {settings.theme === 'fintech-light' && (
@@ -322,7 +322,7 @@ export const SettingsView: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed mb-3">
-              Superficie blanca nítida con tipografía en pizarra profunda (WCAG AAA) para evitar textos deslavados. Los acentos financieros se adaptan con tonos ricos e intensos.
+              Fondo estructurado con tarjetas blancas enmarcadas con bordes oscuros (#334155), tipografía en negro profundo y máxima definición en todas las tablas, números y controles.
             </p>
 
             <button

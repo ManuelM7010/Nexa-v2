@@ -94,7 +94,11 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white font-sans antialiased ${
+      id="nexa-app-root"
+      data-theme={settings.theme === 'fintech-light' ? 'light' : 'dark'}
+      className={`min-h-screen ${
+        settings.theme === 'fintech-light' ? 'theme-light' : 'theme-dark'
+      } bg-slate-950 text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white font-sans antialiased ${
         isPrivacyMode ? 'privacy-active' : ''
       }`}
     >
