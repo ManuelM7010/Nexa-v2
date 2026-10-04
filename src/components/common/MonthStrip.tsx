@@ -86,7 +86,7 @@ export const MonthStrip: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedPeriod(realCurrentYear, realCurrentMonth)}
-                className="px-2 py-0.5 rounded-md bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-blue-300 border border-blue-400/30 text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
+                className="px-2 py-0.5 rounded-md bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 border border-blue-400/30 text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
                 title={`Volver al mes actual (${MONTH_NAMES_ES[realCurrentMonth - 1]} ${realCurrentYear})`}
               >
                 <span>Hoy</span>

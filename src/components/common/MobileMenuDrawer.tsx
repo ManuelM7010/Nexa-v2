@@ -277,7 +277,7 @@ export const MobileMenuDrawer: React.FC = () => {
               }}
               className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl border text-[10px] font-semibold cursor-pointer transition ${
                 isCalculatorOpen
-                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-500 dark:text-amber-300'
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
                   : 'bg-slate-800 border-slate-700/60 text-slate-300 hover:text-white'
               }`}
             >
@@ -290,7 +290,7 @@ export const MobileMenuDrawer: React.FC = () => {
               onClick={toggleTheme}
               className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl border text-[10px] font-semibold cursor-pointer transition ${
                 settings.theme === 'fintech-light'
-                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-300'
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
                   : 'bg-slate-800 border-slate-700/60 text-slate-300 hover:text-white'
               }`}
             >

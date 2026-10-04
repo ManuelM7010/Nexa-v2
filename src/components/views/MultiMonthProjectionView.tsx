@@ -527,17 +527,17 @@ export const MultiMonthProjectionView: React.FC = () => {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-blue-50/90 dark:bg-slate-900 border border-blue-200 dark:border-blue-500/30 rounded-2xl p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-blue-200 dark:border-slate-800 pb-3">
+            <div id="projection-what-if-banner" className="bg-slate-900 border border-blue-500/30 rounded-2xl p-5 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400">
+                  <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    <h3 className="text-sm font-bold text-white">
                       Simulador Interactivo de Sensibilidad ("What-If")
                     </h3>
-                    <p className="text-xs text-slate-700 dark:text-slate-400">
+                    <p className="text-xs text-slate-400">
                       Ajusta variables en tiempo real para visualizar el impacto futuro sobre tu liquidez y ahorro al mes 12.
                     </p>
                   </div>

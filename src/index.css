@@ -632,6 +632,50 @@ body.light,
   border-color: #bfdbfe !important;
 }
 
+[data-theme="light"] #starting-liquidity-banner,
+.theme-light #starting-liquidity-banner,
+[data-theme="light"] #settings-privacy-banner,
+.theme-light #settings-privacy-banner,
+[data-theme="light"] #projection-what-if-banner,
+.theme-light #projection-what-if-banner {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+[data-theme="light"] #starting-liquidity-banner .text-white,
+.theme-light #starting-liquidity-banner .text-white,
+[data-theme="light"] #settings-privacy-banner .text-white,
+.theme-light #settings-privacy-banner .text-white,
+[data-theme="light"] #projection-what-if-banner .text-white,
+.theme-light #projection-what-if-banner .text-white {
+  color: #1e3a8a !important;
+}
+
+[data-theme="light"] #starting-liquidity-banner p,
+.theme-light #starting-liquidity-banner p,
+[data-theme="light"] #settings-privacy-banner p,
+.theme-light #settings-privacy-banner p,
+[data-theme="light"] #projection-what-if-banner p,
+.theme-light #projection-what-if-banner p {
+  color: #334155 !important;
+}
+
+[data-theme="light"] #grocery-pareto-banner,
+.theme-light #grocery-pareto-banner {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+
+[data-theme="light"] #grocery-pareto-banner .text-white,
+.theme-light #grocery-pareto-banner .text-white {
+  color: #78350f !important;
+}
+
+[data-theme="light"] #grocery-pareto-banner p,
+.theme-light #grocery-pareto-banner p {
+  color: #92400e !important;
+}
+
 [data-theme="light"] [class*="from-rose-950"],
 .theme-light [class*="from-rose-950"] {
   background-image: none !important;
