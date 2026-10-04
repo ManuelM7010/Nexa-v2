@@ -1,50 +1,14 @@
 @import "tailwindcss";
 
 /* =========================================================
-   NEXA FINANCE — DOS CONFIGURACIONES INDEPENDIENTES
-   CONFIGURACIÓN 1: MODO OSCURO FINTECH (Predeterminado)
-   CONFIGURACIÓN 2: MODO CLARO DE ALTO CONTRASTE (Letras Oscuras & Marcos Oscuros)
+   NEXA FINANCE — EXECUTIVE FINTECH DESIGN SYSTEM
+   1. MODO OSCURO (Fintech Dark — Profundo, Elegante, Baja Fatiga)
+   2. MODO CLARO (Executive Light — Tenue, Armonioso, Cristalino)
    ========================================================= */
 
-:root,
-[data-theme="dark"],
-html.dark,
-body.dark,
-.theme-dark {
-  color-scheme: dark;
-  --color-canvas: #020617;
-  --color-card: #0b1329;
-  --color-card-subtle: #0f172a;
-  --color-card-hover: #131f3d;
-  --color-border: #1e293b;
-  --color-border-light: #334155;
-  --color-text-main: #f8fafc;
-  --color-text-sub: #cbd5e1;
-  --color-text-muted: #94a3b8;
-  --color-emerald-text: #34d399;
-  --color-rose-text: #f87171;
-  --color-blue-text: #38bdf8;
-  --color-amber-text: #fbbf24;
-}
-
-[data-theme="light"],
-html.light,
-body.light,
-.theme-light {
-  color-scheme: light;
-  --color-canvas: #f1f5f9;
-  --color-card: #ffffff;
-  --color-card-subtle: #f8fafc;
-  --color-card-hover: #e2e8f0;
-  --color-border: #334155;
-  --color-border-light: #475569;
-  --color-text-main: #000000;
-  --color-text-sub: #0f172a;
-  --color-text-muted: #334155;
-  --color-emerald-text: #047857;
-  --color-rose-text: #be123c;
-  --color-blue-text: #1d4ed8;
-  --color-amber-text: #b45309;
+::selection {
+  background-color: #2563eb;
+  color: #ffffff;
 }
 
 /* Privacy Mode Styling (Camouflage on Mobile & Public) */
@@ -78,25 +42,46 @@ html {
   }
 }
 
-/* =========================================================================
-   CONFIGURACIÓN 2: MODO CLARO DE ALTO CONTRASTE
-   LETRAS OSCURAS (Dark text, zero washed-out copy)
-   MARCOS OSCUROS (Dark defined borders for clear containers and structure)
-   ========================================================================= */
+/* =========================================================
+   CONFIGURACIÓN 1: MODO OSCURO FINTECH
+   ========================================================= */
+:root,
+[data-theme="dark"],
+html.dark,
+body.dark,
+.theme-dark {
+  color-scheme: dark;
+}
+
+/* =========================================================
+   CONFIGURACIÓN 2: MODO CLARO EXECUTIVE FINTECH
+   Combinaciones de colores tenues, armoniosas y de alta gama:
+   - Lienzo suave en pizarra/zinc (#f8fafc)
+   - Tarjetas blancas inmaculadas con bordes sutiles definidos (#cbd5e1 / #94a3b8)
+   - Tipografía ejecutiva en pizarra profunda (#0f172a / #334155)
+   - Acentos financieros tenues con micro-fondos pasteles refinados
+   ========================================================= */
+[data-theme="light"],
+html.light,
+body.light,
+.theme-light {
+  color-scheme: light;
+}
 
 /* 1. LIENZO Y FONDO BASE */
 [data-theme="light"] body,
 html.light body,
 body.light,
 .theme-light,
-[data-theme="light"] #nexa-app-root {
-  background-color: #f1f5f9 !important;
-  color: #000000 !important;
+[data-theme="light"] #nexa-app-root,
+.theme-light#nexa-app-root {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
 }
 
 [data-theme="light"] .bg-slate-950,
 .theme-light .bg-slate-950 {
-  background-color: #f1f5f9 !important;
+  background-color: #f8fafc !important;
 }
 
 [data-theme="light"] .bg-slate-950\/95,
@@ -105,20 +90,20 @@ body.light,
 [data-theme="light"] .bg-slate-950\/70,
 [data-theme="light"] .bg-slate-950\/60,
 [data-theme="light"] .bg-slate-950\/50,
-[data-theme="light"] .bg-slate-950\/40,
 .theme-light .bg-slate-950\/95,
 .theme-light .bg-slate-950\/90,
 .theme-light .bg-slate-950\/80 {
-  background-color: rgba(255, 255, 255, 0.98) !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
 }
 
-/* 2. TARJETAS, MÓDULOS Y CONTENEDORES CON MARCOS OSCUROS */
+/* 2. TARJETAS Y CONTENEDORES (Crisp White + Refined Border + Layered Shadow) */
 [data-theme="light"] .bg-slate-900,
 .theme-light .bg-slate-900 {
   background-color: #ffffff !important;
-  border-color: #334155 !important;
-  border-width: 1.5px !important;
-  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.06) !important;
+  border-color: #cbd5e1 !important;
+  border-width: 1px !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 14px -2px rgba(15, 23, 42, 0.05) !important;
 }
 
 [data-theme="light"] .bg-slate-900\/95,
@@ -131,10 +116,10 @@ body.light,
 .theme-light .bg-slate-900\/90,
 .theme-light .bg-slate-900\/80 {
   background-color: #ffffff !important;
-  border-color: #334155 !important;
+  border-color: #cbd5e1 !important;
 }
 
-/* Sub-paneles, bloques de resumen y fondos secundarios */
+/* Sub-paneles, insets y fondos secundarios */
 [data-theme="light"] .bg-slate-850,
 [data-theme="light"] .bg-slate-800,
 [data-theme="light"] .bg-slate-750,
@@ -144,10 +129,10 @@ body.light,
 .theme-light .bg-slate-750,
 .theme-light .bg-slate-700 {
   background-color: #f8fafc !important;
-  border-color: #475569 !important;
+  border-color: #e2e8f0 !important;
 }
 
-/* Estados Hover en elementos interactivos */
+/* Estados Hover suaves */
 [data-theme="light"] .hover\:bg-slate-900:hover,
 [data-theme="light"] .hover\:bg-slate-850:hover,
 [data-theme="light"] .hover\:bg-slate-800:hover,
@@ -156,10 +141,10 @@ body.light,
 .theme-light .hover\:bg-slate-850:hover,
 .theme-light .hover\:bg-slate-800:hover,
 .theme-light .hover\:bg-slate-750:hover {
-  background-color: #e2e8f0 !important;
+  background-color: #f1f5f9 !important;
 }
 
-/* 3. MARCOS OSCUROS EN TODAS LAS SECCIONES Y BORDES */
+/* 3. BORDES Y MARCOS ESTRUCTURALES ELEGANTES */
 [data-theme="light"] .border-slate-950,
 [data-theme="light"] .border-slate-900,
 [data-theme="light"] .border-slate-850,
@@ -167,8 +152,6 @@ body.light,
 [data-theme="light"] .border-slate-750,
 [data-theme="light"] .border-slate-700,
 [data-theme="light"] .border-slate-600,
-[data-theme="light"] [class*="border-slate-800"],
-[data-theme="light"] [class*="border-slate-700"],
 .theme-light .border-slate-950,
 .theme-light .border-slate-900,
 .theme-light .border-slate-850,
@@ -176,7 +159,7 @@ body.light,
 .theme-light .border-slate-750,
 .theme-light .border-slate-700,
 .theme-light .border-slate-600 {
-  border-color: #334155 !important;
+  border-color: #cbd5e1 !important;
 }
 
 [data-theme="light"] .divide-slate-900,
@@ -187,54 +170,61 @@ body.light,
 .theme-light .divide-slate-850,
 .theme-light .divide-slate-800,
 .theme-light .divide-slate-700 {
-  border-color: #475569 !important;
+  border-color: #e2e8f0 !important;
 }
 
-/* 4. LETRAS OSCURAS EN TODOS LOS TEXTOS, NÚMEROS Y ENCABEZADOS (WCAG AAA) */
+/* 4. TIPOGRAFÍA EJECUTIVA (Deep Slate Navy, WCAG AAA) */
 [data-theme="light"] .text-white,
 .theme-light .text-white {
-  color: #000000 !important;
+  color: #0f172a !important;
 }
 
 [data-theme="light"] .text-slate-100,
 [data-theme="light"] .text-slate-200,
 .theme-light .text-slate-100,
 .theme-light .text-slate-200 {
-  color: #090d16 !important;
+  color: #0f172a !important;
 }
 
 [data-theme="light"] .text-slate-300,
 .theme-light .text-slate-300 {
-  color: #0f172a !important;
-  font-weight: 600;
+  color: #334155 !important;
+  font-weight: 500;
 }
 
 [data-theme="light"] .text-slate-400,
 .theme-light .text-slate-400 {
-  color: #1e293b !important;
+  color: #475569 !important;
   font-weight: 500;
 }
 
 [data-theme="light"] .text-slate-500,
 .theme-light .text-slate-500 {
-  color: #334155 !important;
+  color: #64748b !important;
 }
 
 [data-theme="light"] .text-slate-600,
 [data-theme="light"] .text-slate-700,
 .theme-light .text-slate-600,
 .theme-light .text-slate-700 {
-  color: #0f172a !important;
+  color: #334155 !important;
 }
 
-/* Forzar que párrafos y descripciones generales tengan letras oscuras legibles */
 [data-theme="light"] p,
-[data-theme="light"] span:not([class*="bg-"]):not([class*="text-emerald"]):not([class*="text-rose"]):not([class*="text-blue"]):not([class*="text-amber"]):not([class*="text-purple"]),
 .theme-light p {
-  color: #0f172a;
+  color: #334155 !important;
 }
 
-/* 5. ACENTOS FINANCIEROS CLAROS PERO PROFUNDOS Y NÍTIDOS */
+/* 5. ACENTOS FINANCIEROS TENUES Y PROFESIONALES */
+/* Azul Ejecutivo (Liquidez, Bancos, Primario) */
+[data-theme="light"] .text-blue-400,
+[data-theme="light"] .text-blue-300,
+.theme-light .text-blue-400,
+.theme-light .text-blue-300 {
+  color: #1d4ed8 !important;
+}
+
+/* Esmeralda Bosque (Ingresos, Saldos Positivos, Metas) */
 [data-theme="light"] .text-emerald-400,
 [data-theme="light"] .text-emerald-300,
 .theme-light .text-emerald-400,
@@ -242,6 +232,7 @@ body.light,
   color: #047857 !important;
 }
 
+/* Carmesí Borgoña (Gastos, Deudas, Egresos) */
 [data-theme="light"] .text-rose-400,
 [data-theme="light"] .text-rose-300,
 [data-theme="light"] .text-red-400,
@@ -253,20 +244,7 @@ body.light,
   color: #be123c !important;
 }
 
-[data-theme="light"] .text-blue-400,
-[data-theme="light"] .text-blue-300,
-.theme-light .text-blue-400,
-.theme-light .text-blue-300 {
-  color: #1d4ed8 !important;
-}
-
-[data-theme="light"] .text-sky-400,
-[data-theme="light"] .text-sky-300,
-.theme-light .text-sky-400,
-.theme-light .text-sky-300 {
-  color: #0369a1 !important;
-}
-
+/* Ámbar Coñac (Alertas, Pendientes, Advertencias) */
 [data-theme="light"] .text-amber-400,
 [data-theme="light"] .text-amber-300,
 .theme-light .text-amber-400,
@@ -274,6 +252,15 @@ body.light,
   color: #b45309 !important;
 }
 
+/* Cielo / Cyan (Proyecciones, Flujo, Cierre) */
+[data-theme="light"] .text-sky-400,
+[data-theme="light"] .text-sky-300,
+.theme-light .text-sky-400,
+.theme-light .text-sky-300 {
+  color: #0284c7 !important;
+}
+
+/* Violeta / Púrpura (Tarjetas, Cuotas, Préstamos) */
 [data-theme="light"] .text-purple-400,
 [data-theme="light"] .text-purple-300,
 [data-theme="light"] .text-indigo-400,
@@ -285,7 +272,8 @@ body.light,
   color: #6d28d9 !important;
 }
 
-/* 6. PASTILLAS, BADGES Y ETIQUETAS CON MARCOS OSCUROS Y FONDOS PASTEL */
+/* 6. PASTILLAS, BADGES Y ETIQUETAS EN TONOS TENUES Y ELEGANTES */
+/* Esmeralda Suave */
 [data-theme="light"] .bg-emerald-500\/10,
 [data-theme="light"] .bg-emerald-500\/15,
 [data-theme="light"] .bg-emerald-500\/20,
@@ -294,12 +282,13 @@ body.light,
 .theme-light .bg-emerald-500\/10,
 .theme-light .bg-emerald-500\/15,
 .theme-light .bg-emerald-500\/20 {
-  background-color: #d1fae5 !important;
-  color: #065f46 !important;
-  border-color: #059669 !important;
-  font-weight: 700 !important;
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+  font-weight: 600 !important;
 }
 
+/* Rosa / Carmesí Suave */
 [data-theme="light"] .bg-rose-500\/10,
 [data-theme="light"] .bg-rose-500\/15,
 [data-theme="light"] .bg-rose-500\/20,
@@ -308,12 +297,13 @@ body.light,
 .theme-light .bg-rose-500\/10,
 .theme-light .bg-rose-500\/15,
 .theme-light .bg-rose-500\/20 {
-  background-color: #ffe4e6 !important;
-  color: #9f1239 !important;
-  border-color: #e11d48 !important;
-  font-weight: 700 !important;
+  background-color: #fff1f2 !important;
+  color: #be123c !important;
+  border-color: #fecdd3 !important;
+  font-weight: 600 !important;
 }
 
+/* Azul Ejecutivo Suave */
 [data-theme="light"] .bg-blue-500\/10,
 [data-theme="light"] .bg-blue-500\/15,
 [data-theme="light"] .bg-blue-500\/20,
@@ -323,12 +313,13 @@ body.light,
 .theme-light .bg-blue-500\/10,
 .theme-light .bg-blue-500\/15,
 .theme-light .bg-blue-500\/20 {
-  background-color: #dbeafe !important;
-  color: #1e40af !important;
-  border-color: #2563eb !important;
-  font-weight: 700 !important;
+  background-color: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #bfdbfe !important;
+  font-weight: 600 !important;
 }
 
+/* Ámbar / Miel Suave */
 [data-theme="light"] .bg-amber-500\/10,
 [data-theme="light"] .bg-amber-500\/15,
 [data-theme="light"] .bg-amber-500\/20,
@@ -337,40 +328,39 @@ body.light,
 .theme-light .bg-amber-500\/10,
 .theme-light .bg-amber-500\/15,
 .theme-light .bg-amber-500\/20 {
-  background-color: #fef3c7 !important;
-  color: #78350f !important;
-  border-color: #d97706 !important;
-  font-weight: 700 !important;
+  background-color: #fffbeb !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
+  font-weight: 600 !important;
 }
 
+/* Cielo Suave */
 [data-theme="light"] .bg-sky-500\/10,
 [data-theme="light"] .bg-sky-500\/15,
 [data-theme="light"] .bg-sky-500\/20,
 .theme-light .bg-sky-500\/10,
 .theme-light .bg-sky-500\/15,
 .theme-light .bg-sky-500\/20 {
-  background-color: #e0f2fe !important;
-  color: #075985 !important;
-  border-color: #0284c7 !important;
-  font-weight: 700 !important;
+  background-color: #f0f9ff !important;
+  color: #0284c7 !important;
+  border-color: #bae6fd !important;
+  font-weight: 600 !important;
 }
 
+/* Púrpura / Lila Suave */
 [data-theme="light"] .bg-purple-500\/10,
 [data-theme="light"] .bg-purple-500\/15,
 [data-theme="light"] .bg-purple-500\/20,
-[data-theme="light"] .bg-indigo-500\/10,
-[data-theme="light"] .bg-indigo-500\/15,
-[data-theme="light"] .bg-indigo-500\/20,
 .theme-light .bg-purple-500\/10,
 .theme-light .bg-purple-500\/15,
 .theme-light .bg-purple-500\/20 {
-  background-color: #ede9fe !important;
-  color: #4c1d95 !important;
-  border-color: #7c3aed !important;
-  font-weight: 700 !important;
+  background-color: #f5f3ff !important;
+  color: #6d28d9 !important;
+  border-color: #ddd6fe !important;
+  font-weight: 600 !important;
 }
 
-/* 7. CONTROLES DE FORMULARIO CON MARCOS OSCUROS Y LETRAS NEGRAS */
+/* 7. CONTROLES DE FORMULARIO (Inputs, Selects, Textareas) */
 [data-theme="light"] input,
 [data-theme="light"] select,
 [data-theme="light"] textarea,
@@ -378,10 +368,20 @@ body.light,
 .theme-light select,
 .theme-light textarea {
   background-color: #ffffff !important;
-  color: #000000 !important;
-  border-color: #334155 !important;
-  border-width: 1.5px !important;
-  font-weight: 600 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  border-width: 1px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.03) !important;
+}
+
+[data-theme="light"] input:hover,
+[data-theme="light"] select:hover,
+[data-theme="light"] textarea:hover,
+.theme-light input:hover,
+.theme-light select:hover,
+.theme-light textarea:hover {
+  border-color: #94a3b8 !important;
 }
 
 [data-theme="light"] input:focus,
@@ -390,95 +390,228 @@ body.light,
 .theme-light input:focus,
 .theme-light select:focus,
 .theme-light textarea:focus {
-  border-color: #1d4ed8 !important;
-  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.25) !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
 }
 
 [data-theme="light"] input::placeholder,
 [data-theme="light"] textarea::placeholder,
 .theme-light input::placeholder,
 .theme-light textarea::placeholder {
-  color: #475569 !important;
+  color: #94a3b8 !important;
   font-weight: normal;
 }
 
 [data-theme="light"] select option,
 .theme-light select option {
   background-color: #ffffff !important;
-  color: #000000 !important;
+  color: #0f172a !important;
 }
 
-/* 8. TABLAS CON LÍNEAS OSCURAS Y ENCABEZADOS CONTRASTADOS */
+/* 8. TABLAS REFINADAS */
 [data-theme="light"] table,
 .theme-light table {
-  border-color: #334155 !important;
+  border-color: #e2e8f0 !important;
 }
 
 [data-theme="light"] th,
 .theme-light th {
-  background-color: #e2e8f0 !important;
-  color: #000000 !important;
-  border-color: #334155 !important;
-  border-bottom-width: 2px !important;
-  font-weight: 800 !important;
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  border-color: #e2e8f0 !important;
+  border-bottom-width: 1px !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
 }
 
 [data-theme="light"] td,
 .theme-light td {
-  color: #090d16 !important;
-  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  border-color: #f1f5f9 !important;
 }
 
 [data-theme="light"] tr:hover,
 .theme-light tr:hover {
-  background-color: #e2e8f0 !important;
+  background-color: #f8fafc !important;
 }
 
-/* 9. HEADER, BARRA DE MÓDULOS Y LÍNEA DE TIEMPO MENSUAL */
+/* 9. HEADER Y BARRA DE MÓDULOS REFINADOS */
 [data-theme="light"] header,
 .theme-light header {
-  background-color: #ffffff !important;
-  border-bottom: 2px solid #334155 !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.02) !important;
 }
 
 [data-theme="light"] #main-nav-bar,
 .theme-light #main-nav-bar {
-  background-color: #ffffff !important;
-  border-bottom: 2px solid #334155 !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
 }
 
-/* Pestañas inactivas en barra de navegación: texto oscuro bien legible */
+/* Pestañas inactivas en barra de módulos */
 [data-theme="light"] #main-nav-bar button,
 .theme-light #main-nav-bar button {
-  color: #0f172a !important;
-  font-weight: 700 !important;
+  color: #475569 !important;
+  font-weight: 600 !important;
 }
 
-/* Pestaña activa en barra de navegación */
+[data-theme="light"] #main-nav-bar button:hover,
+.theme-light #main-nav-bar button:hover {
+  color: #0f172a !important;
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] #main-nav-bar button svg,
+.theme-light #main-nav-bar button svg {
+  color: #64748b !important;
+}
+
+[data-theme="light"] #main-nav-bar button:hover svg,
+.theme-light #main-nav-bar button:hover svg {
+  color: #0f172a !important;
+}
+
+/* Pestaña activa en barra de navegación: píldora azul tenue */
 [data-theme="light"] #main-nav-bar button[aria-selected="true"],
 .theme-light #main-nav-bar button[aria-selected="true"] {
-  background-color: #dbeafe !important;
+  background-color: #eff6ff !important;
   color: #1d4ed8 !important;
-  border: 1.5px solid #2563eb !important;
+  border: 1px solid #bfdbfe !important;
+  box-shadow: 0 1px 2px 0 rgba(37, 99, 235, 0.06) !important;
 }
 
-/* Barra de meses (MonthStrip) */
+[data-theme="light"] #main-nav-bar button[aria-selected="true"] svg,
+.theme-light #main-nav-bar button[aria-selected="true"] svg {
+  color: #1d4ed8 !important;
+}
+
+/* Botones del MonthStrip */
 [data-theme="light"] [id^="btn-month-"],
 .theme-light [id^="btn-month-"] {
   background-color: #ffffff !important;
-  border: 1.5px solid #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+}
+
+[data-theme="light"] [id^="btn-month-"]:hover,
+.theme-light [id^="btn-month-"]:hover {
+  border-color: #94a3b8 !important;
   color: #0f172a !important;
-  font-weight: 700 !important;
+}
+
+[data-theme="light"] [id^="btn-month-"] span,
+.theme-light [id^="btn-month-"] span {
+  color: #334155 !important;
+  font-weight: 600 !important;
 }
 
 [data-theme="light"] [id^="btn-month-"].bg-blue-600,
 .theme-light [id^="btn-month-"].bg-blue-600 {
-  background-color: #1d4ed8 !important;
-  color: #ffffff !important;
-  border-color: #1e40af !important;
+  background-color: #2563eb !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 2px 6px -1px rgba(37, 99, 235, 0.35) !important;
 }
 
-/* Degradados para navegación y máscaras en modo claro */
+[data-theme="light"] [id^="btn-month-"].bg-blue-600 span,
+.theme-light [id^="btn-month-"].bg-blue-600 span {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+/* Botones utilitarios del Header */
+[data-theme="light"] #btn-header-calculator,
+[data-theme="light"] #btn-header-theme,
+[data-theme="light"] #btn-header-search,
+[data-theme="light"] #btn-header-privacy,
+[data-theme="light"] #btn-header-alerts,
+[data-theme="light"] #btn-reset-period,
+.theme-light #btn-header-calculator,
+.theme-light #btn-header-theme,
+.theme-light #btn-header-search,
+.theme-light #btn-header-privacy,
+.theme-light #btn-header-alerts,
+.theme-light #btn-reset-period {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+}
+
+[data-theme="light"] #btn-header-calculator:hover,
+[data-theme="light"] #btn-header-theme:hover,
+[data-theme="light"] #btn-header-search:hover,
+[data-theme="light"] #btn-header-privacy:hover,
+[data-theme="light"] #btn-header-alerts:hover,
+[data-theme="light"] #btn-reset-period:hover {
+  background-color: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] #btn-header-calculator span,
+[data-theme="light"] #btn-header-theme span,
+[data-theme="light"] #btn-header-search span,
+[data-theme="light"] #btn-header-privacy span,
+[data-theme="light"] #btn-header-alerts span,
+[data-theme="light"] #btn-reset-period span,
+.theme-light #btn-header-calculator span,
+.theme-light #btn-header-theme span,
+.theme-light #btn-header-search span,
+.theme-light #btn-header-privacy span,
+.theme-light #btn-header-alerts span,
+.theme-light #btn-reset-period span {
+  color: #334155 !important;
+}
+
+/* Indicador de Modo Claro activo en el Header */
+[data-theme="light"] #btn-header-theme,
+.theme-light #btn-header-theme {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #b45309 !important;
+}
+
+[data-theme="light"] #btn-header-theme span,
+.theme-light #btn-header-theme span {
+  color: #b45309 !important;
+  font-weight: 700 !important;
+}
+
+/* Botón pequeño de calculadora en todos los módulos */
+[data-theme="light"] [data-calculator-trigger="true"],
+.theme-light [data-calculator-trigger="true"] {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+}
+
+[data-theme="light"] [data-calculator-trigger="true"] span,
+.theme-light [data-calculator-trigger="true"] span {
+  color: #334155 !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] [data-calculator-trigger="true"]:hover,
+.theme-light [data-calculator-trigger="true"]:hover {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #b45309 !important;
+}
+
+[data-theme="light"] [data-calculator-trigger="true"]:hover span,
+.theme-light [data-calculator-trigger="true"]:hover span {
+  color: #b45309 !important;
+}
+
+/* Máscaras de desvanecimiento suave en carrusel de pestañas */
 [data-theme="light"] .from-slate-950,
 .theme-light .from-slate-950 {
   --tw-gradient-from: #ffffff !important;
@@ -491,96 +624,98 @@ body.light,
   --tw-gradient-to: #ffffff !important;
 }
 
-/* 10. PROTECCIÓN DE BOTONES SÓLIDOS (MANTIENEN TEXTO EN BLANCO PURO) */
+/* Neutralización de degradados oscuros/grises en modo claro para máxima legibilidad */
+[data-theme="light"] [class*="from-blue-950"],
+.theme-light [class*="from-blue-950"] {
+  background-image: none !important;
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+[data-theme="light"] [class*="from-rose-950"],
+.theme-light [class*="from-rose-950"] {
+  background-image: none !important;
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+
+[data-theme="light"] [class*="from-amber-950"],
+.theme-light [class*="from-amber-950"] {
+  background-image: none !important;
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+
+[data-theme="light"] [class*="from-slate-900"],
+[data-theme="light"] [class*="from-indigo-950"],
+.theme-light [class*="from-slate-900"],
+.theme-light [class*="from-indigo-950"] {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* 10. BOTONES SÓLIDOS DE ACCIÓN PRIMARIA (Mantienen texto blanco puro) */
 [data-theme="light"] button.bg-blue-600,
 [data-theme="light"] button.bg-blue-500,
 [data-theme="light"] button.bg-emerald-600,
 [data-theme="light"] button.bg-emerald-500,
 [data-theme="light"] button.bg-rose-600,
 [data-theme="light"] button.bg-rose-500,
-[data-theme="light"] button.bg-red-600,
 [data-theme="light"] button.bg-purple-600,
-[data-theme="light"] button.bg-indigo-600,
-[data-theme="light"] button.bg-sky-600,
 [data-theme="light"] button.bg-amber-600,
-[data-theme="light"] button.bg-amber-500,
-[data-theme="light"] button[class*="bg-gradient-to-"],
-[data-theme="light"] [class*="bg-blue-600"],
-[data-theme="light"] [class*="bg-blue-500"],
-[data-theme="light"] [class*="bg-emerald-600"],
-[data-theme="light"] [class*="bg-emerald-500"],
-[data-theme="light"] [class*="bg-rose-600"],
-[data-theme="light"] [class*="bg-rose-500"],
-[data-theme="light"] [class*="bg-red-600"],
-[data-theme="light"] [class*="bg-purple-600"],
-[data-theme="light"] [class*="bg-indigo-600"],
-[data-theme="light"] [class*="bg-sky-600"],
+[data-theme="light"] button#btn-new-transaction,
 .theme-light button.bg-blue-600,
 .theme-light button.bg-blue-500,
 .theme-light button.bg-emerald-600,
-.theme-light button.bg-emerald-500,
 .theme-light button.bg-rose-600,
-.theme-light button.bg-rose-500,
-.theme-light button[class*="bg-gradient-to-"] {
+.theme-light button#btn-new-transaction {
   color: #ffffff !important;
+  font-weight: 700 !important;
 }
 
-[data-theme="light"] button.bg-blue-600 *,
-[data-theme="light"] button.bg-blue-500 *,
-[data-theme="light"] button.bg-emerald-600 *,
-[data-theme="light"] button.bg-emerald-500 *,
-[data-theme="light"] button.bg-rose-600 *,
-[data-theme="light"] button.bg-rose-500 *,
-[data-theme="light"] button.bg-red-600 *,
-[data-theme="light"] button.bg-purple-600 *,
-[data-theme="light"] button.bg-indigo-600 *,
-[data-theme="light"] button.bg-amber-600 *,
-[data-theme="light"] button.bg-amber-500 *,
-[data-theme="light"] button[class*="bg-gradient-to-"] *,
-[data-theme="light"] button.bg-sky-600 *,
-[data-theme="light"] [class*="bg-blue-600"] *,
-[data-theme="light"] [class*="bg-blue-500"] *,
-[data-theme="light"] [class*="bg-emerald-600"] *,
-[data-theme="light"] [class*="bg-emerald-500"] *,
-[data-theme="light"] [class*="bg-rose-600"] *,
-[data-theme="light"] [class*="bg-rose-500"] *,
-[data-theme="light"] [class*="bg-red-600"] *,
-[data-theme="light"] [class*="bg-purple-600"] *,
-[data-theme="light"] [class*="bg-indigo-600"] *,
-[data-theme="light"] [class*="bg-sky-600"] *,
-.theme-light button.bg-blue-600 *,
-.theme-light button.bg-blue-500 *,
-.theme-light button.bg-emerald-600 *,
-.theme-light button.bg-rose-600 * {
+[data-theme="light"] button.bg-blue-600 span,
+[data-theme="light"] button.bg-blue-600 svg,
+[data-theme="light"] button.bg-blue-500 span,
+[data-theme="light"] button.bg-blue-500 svg,
+[data-theme="light"] button.bg-emerald-600 span,
+[data-theme="light"] button.bg-emerald-600 svg,
+[data-theme="light"] button.bg-rose-600 span,
+[data-theme="light"] button.bg-rose-600 svg,
+[data-theme="light"] button.bg-purple-600 span,
+[data-theme="light"] button.bg-purple-600 svg,
+[data-theme="light"] button#btn-new-transaction span,
+[data-theme="light"] button#btn-new-transaction svg,
+.theme-light button.bg-blue-600 span,
+.theme-light button.bg-blue-600 svg,
+.theme-light button.bg-emerald-600 span,
+.theme-light button.bg-emerald-600 svg,
+.theme-light button.bg-rose-600 span,
+.theme-light button.bg-rose-600 svg,
+.theme-light button#btn-new-transaction span,
+.theme-light button#btn-new-transaction svg {
   color: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 /* 11. CALCULADORA RÁPIDA DESPLEGABLE EN MODO CLARO */
 [data-theme="light"] [data-calculator-popover="true"],
 .theme-light [data-calculator-popover="true"] {
   background-color: #ffffff !important;
-  border: 2px solid #334155 !important;
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05) !important;
 }
 
 [data-theme="light"] [data-calculator-popover="true"] button,
 .theme-light [data-calculator-popover="true"] button {
-  border-color: #475569 !important;
-  color: #000000 !important;
-  font-weight: 700 !important;
-}
-
-[data-theme="light"] [data-calculator-trigger="true"],
-.theme-light [data-calculator-trigger="true"] {
-  background-color: #ffffff !important;
-  border: 1.5px solid #475569 !important;
+  border-color: #e2e8f0 !important;
   color: #0f172a !important;
+  font-weight: 600 !important;
 }
 
-[data-theme="light"] [data-calculator-trigger="true"]:hover,
-.theme-light [data-calculator-trigger="true"]:hover {
-  background-color: #e2e8f0 !important;
-  border-color: #d97706 !important;
+[data-theme="light"] [data-calculator-popover="true"] button:hover,
+.theme-light [data-calculator-popover="true"] button:hover {
+  background-color: #f1f5f9 !important;
 }
 
 /* 12. MODALES Y VENTANAS EMERGENTES */
@@ -591,25 +726,25 @@ body.light,
 .theme-light .bg-black\/75,
 .theme-light .bg-black\/80,
 .theme-light .bg-slate-950\/80 {
-  background-color: rgba(15, 23, 42, 0.6) !important;
+  background-color: rgba(15, 23, 42, 0.5) !important;
   backdrop-filter: blur(4px);
 }
 
-/* Impresión */
+/* 13. IMPRESIÓN */
 @media print {
   header, nav, #btn-new-transaction, #btn-open-affordability, #btn-open-render-guide, .no-print, [data-calculator-trigger] {
     display: none !important;
   }
   body, html, #root, main {
     background-color: #ffffff !important;
-    color: #000000 !important;
+    color: #0f172a !important;
   }
   .bg-slate-950, .bg-slate-900, .bg-slate-850, .bg-slate-800 {
     background-color: #ffffff !important;
-    color: #000000 !important;
-    border-color: #334155 !important;
+    color: #0f172a !important;
+    border-color: #e2e8f0 !important;
   }
   .text-white, .text-slate-100, .text-slate-200, .text-slate-300, .text-slate-400 {
-    color: #000000 !important;
+    color: #0f172a !important;
   }
 }

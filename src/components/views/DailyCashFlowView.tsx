@@ -144,24 +144,24 @@ export const DailyCashFlowView: React.FC = () => {
 
       {/* Starting Period Informative Banner */}
       {isStartMonth && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/60 via-slate-900 to-blue-950/40 border border-blue-800/60 text-xs shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-blue-50/90 dark:bg-slate-900 border border-blue-200 dark:border-blue-900/60 text-xs shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400 shrink-0 font-bold text-sm">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
               15
             </div>
             <div>
-              <div className="text-white font-semibold flex items-center gap-2">
-                <span>Punto de partida de liquidez: 15 de Septiembre de 2026</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono font-bold">Oficial</span>
+              <div className="text-slate-900 dark:text-white font-bold flex items-center gap-2">
+                <span className="text-sm">Punto de partida de liquidez: 15 de Septiembre de 2026</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300 font-mono font-bold">Oficial</span>
               </div>
-              <p className="text-slate-400 text-[11px] mt-0.5">
+              <p className="text-slate-700 dark:text-slate-300 text-xs mt-0.5">
                 Los saldos bancarios y efectivo inician oficialmente el 15 de septiembre. Los días 1 al 14 se preservan como histórico previo con balance en $0.00.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 self-end sm:self-auto">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-500/10 border border-blue-400/20 text-blue-300 font-mono text-[11px] shrink-0 font-medium">
-              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 text-xs shrink-0 font-bold">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               Continuidad activa
             </span>
           </div>
@@ -239,18 +239,18 @@ export const DailyCashFlowView: React.FC = () => {
         {/* Card 4: Saldo Final / Apertura Mes Siguiente */}
         <div
           onClick={() => setSelectedKpiCard('final')}
-          className="bg-slate-900/90 border border-blue-900/50 hover:border-blue-400/60 rounded-2xl p-4 relative overflow-hidden shadow-sm bg-gradient-to-br from-blue-950/20 to-slate-900 cursor-pointer transition active:scale-[0.99] group"
+          className="bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-900/50 hover:border-blue-400 rounded-2xl p-4 relative overflow-hidden shadow-xs cursor-pointer transition active:scale-[0.99] group"
         >
-          <div className="flex items-center justify-between text-xs text-blue-300 mb-1">
+          <div className="flex items-center justify-between text-xs text-blue-600 dark:text-blue-300 mb-1">
             <span className="font-semibold uppercase tracking-wider text-[10px]">Saldo Final Estimado</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">Continuo ✓</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold">Continuo ✓</span>
           </div>
-          <div className={`text-xl font-bold font-mono ${monthFinalBalance < 0 ? 'text-rose-400' : 'text-blue-300'}`}>
+          <div className={`text-xl font-bold font-mono ${monthFinalBalance < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-blue-700 dark:text-blue-300'}`}>
             {formatMoney(monthFinalBalance, settings.currencySymbol)}
           </div>
-          <div className="flex items-center justify-between text-[11px] text-emerald-400/90 mt-1 font-medium">
+          <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
             <span className="truncate">Apertura mes prox.</span>
-            <span className="text-[10px] text-blue-400 group-hover:underline">Detalle</span>
+            <span className="text-[10px] text-blue-600 dark:text-blue-400 group-hover:underline">Detalle</span>
           </div>
         </div>
 
@@ -262,14 +262,14 @@ export const DailyCashFlowView: React.FC = () => {
               scrollToDay(lowestLiquidityDay.date);
             }
           }}
-          className={`bg-slate-900/90 border rounded-2xl p-4 relative overflow-hidden shadow-sm cursor-pointer transition active:scale-[0.99] group ${
+          className={`bg-white dark:bg-slate-900 border rounded-2xl p-4 relative overflow-hidden shadow-xs cursor-pointer transition active:scale-[0.99] group ${
             !lowestLiquidityDay
-              ? 'border-slate-800'
+              ? 'border-slate-200 dark:border-slate-800'
               : lowestLiquidityDay.finalBalance < 0
-              ? 'border-rose-500/50 bg-gradient-to-br from-rose-950/25 to-slate-900 hover:border-rose-400'
+              ? 'border-rose-300 dark:border-rose-500/50 bg-rose-50/50 dark:bg-slate-900 hover:border-rose-400'
               : lowestLiquidityDay.finalBalance < 15000
-              ? 'border-amber-500/50 bg-gradient-to-br from-amber-950/25 to-slate-900 hover:border-amber-400'
-              : 'border-slate-800 hover:border-sky-500/50'
+              ? 'border-amber-300 dark:border-amber-500/50 bg-amber-50/50 dark:bg-slate-900 hover:border-amber-400'
+              : 'border-slate-200 dark:border-slate-800 hover:border-sky-500/50'
           }`}
         >
           <div className="flex items-center justify-between text-xs mb-1">

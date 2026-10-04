@@ -106,6 +106,7 @@ export const DashboardView: React.FC = () => {
             onClick={() => setSelectedCardModal('liquidez')}
             className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
           >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-400" />
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
                 {executiveSummary.isCurrentMonth
@@ -142,6 +143,7 @@ export const DashboardView: React.FC = () => {
             onClick={() => setSelectedCardModal('cierre')}
             className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
           >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-400 to-blue-500" />
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-semibold uppercase tracking-wider">
                 Liquidez Proyectada Cierre
@@ -174,6 +176,7 @@ export const DashboardView: React.FC = () => {
             onClick={() => setSelectedCardModal('disponible')}
             className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
           >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-semibold uppercase tracking-wider">
                 Disponible Libre Real
@@ -206,6 +209,7 @@ export const DashboardView: React.FC = () => {
             onClick={() => setSelectedCardModal('deuda')}
             className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-rose-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
           >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-amber-500" />
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-xs font-semibold uppercase tracking-wider">
                 Deuda Total Externa
@@ -228,7 +232,8 @@ export const DashboardView: React.FC = () => {
       {/* 2. SECONDARY METRICS ROW: Planned vs Real Month Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         {/* Ingresos */}
-        <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4">
+        <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500/80" />
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
               <ArrowUpRight className="w-4 h-4 text-emerald-400" /> Ingresos del Mes
@@ -272,7 +277,8 @@ export const DashboardView: React.FC = () => {
         </div>
 
         {/* Gastos */}
-        <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4">
+        <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-rose-500/80" />
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
               <ArrowDownRight className="w-4 h-4 text-rose-400" /> Gastos del Mes
@@ -316,7 +322,8 @@ export const DashboardView: React.FC = () => {
         </div>
 
         {/* Ahorro Neto Estimado */}
-        <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4">
+        <div className="rounded-2xl bg-slate-900/60 border border-slate-800/80 p-4 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-400 to-indigo-500" />
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
               <TrendingUp className="w-4 h-4 text-sky-400" /> Ahorro Neto Estimado

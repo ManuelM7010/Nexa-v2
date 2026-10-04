@@ -647,9 +647,9 @@ export const CreditCardStatementsView: React.FC = () => {
       {statement && currentCard && (
         <div className="space-y-6">
           {/* Statement Document Card */}
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-2xl">
+          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
             {/* Statement Header */}
-            <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border-b border-slate-800 p-6">
+            <div className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0 mt-0.5">

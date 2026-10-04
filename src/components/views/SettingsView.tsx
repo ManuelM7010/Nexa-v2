@@ -344,14 +344,14 @@ export const SettingsView: React.FC = () => {
       </div>
 
       {/* Privacy & Architecture banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-900/40 p-5">
+      <div className="rounded-2xl bg-blue-50/80 dark:bg-slate-900 border border-blue-200 dark:border-blue-900/40 p-5 shadow-xs">
         <div className="flex items-start gap-3">
-          <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+          <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <h3 className="text-sm font-bold text-white">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
               Arquitectura Local-First de Confidencialidad Total
             </h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
               NEXA Finance fue diseñada para funcionar <strong>100% en tu dispositivo</strong> sin costos recurrentes, sin servidores centrales que almacenen tus datos y sin telemetría ni analítica invasiva. Tus estados de cuenta y transacciones no salen de tu máquina.
             </p>
           </div>
