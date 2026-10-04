@@ -21,6 +21,7 @@ import {
   Check,
   Clock,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const AccountsView: React.FC = () => {
   const {
@@ -281,6 +282,8 @@ export const AccountsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de cuentas" />
+
           <button
             onClick={() => handleOpenTransfer()}
             disabled={accounts.length < 2}

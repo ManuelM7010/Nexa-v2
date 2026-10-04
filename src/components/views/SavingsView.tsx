@@ -68,6 +68,7 @@ import {
   Search,
   Tag,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -617,6 +618,8 @@ export const SavingsView: React.FC = () => {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de ahorros" />
+
           <button
             onClick={() => openTransferModal()}
             id="btn-savings-transfer"

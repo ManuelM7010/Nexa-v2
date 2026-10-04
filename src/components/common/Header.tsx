@@ -13,6 +13,9 @@ import {
   Bell,
   Menu,
   ArrowLeftRight,
+  Sun,
+  Moon,
+  Calculator,
 } from 'lucide-react';
 import { formatDateEs } from '../../utils/formatters';
 
@@ -30,12 +33,30 @@ export const Header: React.FC = () => {
     financialAlerts,
     activeTab,
     setActiveTab,
+    settings,
+    toggleTheme,
+    isCalculatorOpen,
+    toggleCalculator,
   } = useFinance();
 
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
   const [privacyToast, setPrivacyToast] = useState<string | null>(null);
+  const [themeToast, setThemeToast] = useState<string | null>(null);
+
+  const handleToggleTheme = async () => {
+    const isCurrentlyDark = settings.theme !== 'fintech-light';
+    await toggleTheme();
+    setThemeToast(
+      isCurrentlyDark
+        ? '☀️ Modo Claro ACTIVADO: Paleta luminosa y de alto contraste'
+        : '🌙 Modo Oscuro ACTIVADO: Paleta oscura para baja fatiga visual'
+    );
+    setTimeout(() => {
+      setThemeToast(null);
+    }, 2200);
+  };
 
   const handleTogglePrivacy = () => {
     togglePrivacyMode();
@@ -132,6 +153,47 @@ export const Header: React.FC = () => {
           >
             <ArrowLeftRight className="w-4 h-4 text-emerald-400" />
             <span className="hidden md:inline">Movs</span>
+          </button>
+
+          {/* Global Quick Calculator button */}
+          <button
+            id="btn-header-calculator"
+            data-calculator-trigger="true"
+            onClick={toggleCalculator}
+            className={`flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold cursor-pointer transition active:scale-95 ${
+              isCalculatorOpen
+                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm shadow-amber-500/10'
+                : 'bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800 hover:text-amber-300 hover:border-amber-500/40'
+            }`}
+            title="Calculadora financiera rápida (disponible en todos los módulos)"
+          >
+            <Calculator className={`w-4 h-4 ${isCalculatorOpen ? 'text-amber-400' : 'text-amber-400/90'}`} />
+            <span className="hidden lg:inline">Calc</span>
+          </button>
+
+          {/* Light / Dark Mode Toggle */}
+          <button
+            id="btn-header-theme"
+            onClick={handleToggleTheme}
+            className={`flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold cursor-pointer transition active:scale-95 ${
+              settings.theme === 'fintech-light'
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 shadow-sm'
+                : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+            }`}
+            title={
+              settings.theme === 'fintech-light'
+                ? 'Modo Claro activo. Clic para cambiar a Modo Oscuro'
+                : 'Modo Oscuro activo. Clic para cambiar a Modo Claro'
+            }
+          >
+            {settings.theme === 'fintech-light' ? (
+              <Sun className="w-4 h-4 text-amber-500 fill-amber-500/20" />
+            ) : (
+              <Moon className="w-4 h-4 text-sky-400" />
+            )}
+            <span className="hidden lg:inline">
+              {settings.theme === 'fintech-light' ? 'Claro' : 'Oscuro'}
+            </span>
           </button>
 
           {/* Universal Quick Search button */}
@@ -252,8 +314,15 @@ export const Header: React.FC = () => {
 
       {/* Floating Privacy Mode Notice Toast */}
       {privacyToast && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 px-4 py-2 rounded-full bg-slate-900/95 border border-amber-500/50 text-amber-300 text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 pointer-events-none transition">
+        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 px-4 py-2 rounded-full bg-slate-900/95 border border-amber-500/50 text-amber-300 text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 pointer-events-none transition animate-in fade-in slide-in-from-top-2">
           <span>{privacyToast}</span>
+        </div>
+      )}
+
+      {/* Floating Theme Change Toast */}
+      {themeToast && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 px-4 py-2 rounded-full bg-slate-900/95 border border-blue-500/50 text-blue-300 text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 pointer-events-none transition animate-in fade-in slide-in-from-top-2">
+          <span>{themeToast}</span>
         </div>
       )}
     </header>

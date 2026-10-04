@@ -77,6 +77,10 @@ interface FinanceContextType {
   isAlertsOpen: boolean;
   setIsAlertsOpen: (open: boolean) => void;
   financialAlerts: AlertItem[];
+  isCalculatorOpen: boolean;
+  setIsCalculatorOpen: (open: boolean) => void;
+  toggleCalculator: () => void;
+  toggleTheme: () => Promise<void>;
 
   // Entities
   accounts: Account[];
@@ -267,6 +271,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+  const toggleCalculator = useCallback(() => {
+    setIsCalculatorOpen((prev) => !prev);
+  }, []);
 
   // Storage entities
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -1723,6 +1732,37 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSettings(updated);
   };
 
+  const toggleTheme = useCallback(async () => {
+    const nextTheme = settings.theme === 'fintech-light' ? 'fintech-dark' : 'fintech-light';
+    await updateSettings({ theme: nextTheme });
+  }, [settings.theme, updateSettings]);
+
+  // Synchronize document element with theme
+  useEffect(() => {
+    const isLight = settings.theme === 'fintech-light';
+    if (typeof document !== 'undefined') {
+      if (isLight) {
+        document.documentElement.classList.add('light');
+        document.documentElement.classList.remove('dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+        try {
+          localStorage.setItem('nexa_theme', 'light');
+        } catch {
+          // ignore
+        }
+      } else {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+        document.documentElement.setAttribute('data-theme', 'dark');
+        try {
+          localStorage.setItem('nexa_theme', 'dark');
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [settings.theme]);
+
   const loadDemoData = async () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('nexa_clean_slate');
@@ -1924,6 +1964,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isAlertsOpen,
         setIsAlertsOpen,
         financialAlerts: executiveSummary.alerts || [],
+        isCalculatorOpen,
+        setIsCalculatorOpen,
+        toggleCalculator,
+        toggleTheme,
         accounts,
         creditCards,
         savingsAccounts,

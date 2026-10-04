@@ -20,6 +20,7 @@ import {
   Info,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const DailyCashFlowView: React.FC = () => {
   const {
@@ -104,6 +105,8 @@ export const DailyCashFlowView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de flujo diario" />
+
           <div className="flex items-center bg-slate-950 rounded-xl p-1 border border-slate-800 text-xs">
             <button
               onClick={() => setFilterMode('all')}

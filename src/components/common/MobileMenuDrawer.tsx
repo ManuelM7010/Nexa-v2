@@ -27,6 +27,9 @@ import {
   Bell,
   CheckCircle2,
   ChevronRight,
+  Calculator,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -52,6 +55,10 @@ export const MobileMenuDrawer: React.FC = () => {
     setIsQuickSearchOpen,
     setIsAlertsOpen,
     financialAlerts,
+    settings,
+    toggleTheme,
+    isCalculatorOpen,
+    toggleCalculator,
   } = useFinance();
 
   if (!isMobileMenuOpen) return null;
@@ -249,23 +256,56 @@ export const MobileMenuDrawer: React.FC = () => {
           </div>
 
           {/* Quick Utility Bar in Menu */}
-          <div className="px-5 py-3 bg-slate-900/60 border-b border-slate-800/80 grid grid-cols-3 gap-2">
+          <div className="px-4 py-2.5 bg-slate-900/60 border-b border-slate-800/80 grid grid-cols-4 gap-1.5">
             {/* Quick Search */}
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 setIsQuickSearchOpen(true);
               }}
-              className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700/60 text-xs font-semibold cursor-pointer"
+              className="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700/60 text-[10px] font-semibold cursor-pointer"
             >
               <Search className="w-3.5 h-3.5 text-sky-400" />
               <span>Buscar</span>
             </button>
 
+            {/* Quick Calculator */}
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                toggleCalculator();
+              }}
+              className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl border text-[10px] font-semibold cursor-pointer transition ${
+                isCalculatorOpen
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-500 dark:text-amber-300'
+                  : 'bg-slate-800 border-slate-700/60 text-slate-300 hover:text-white'
+              }`}
+            >
+              <Calculator className="w-3.5 h-3.5 text-amber-400" />
+              <span>Calc</span>
+            </button>
+
+            {/* Light / Dark Mode Toggle */}
+            <button
+              onClick={toggleTheme}
+              className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl border text-[10px] font-semibold cursor-pointer transition ${
+                settings.theme === 'fintech-light'
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-300'
+                  : 'bg-slate-800 border-slate-700/60 text-slate-300 hover:text-white'
+              }`}
+            >
+              {settings.theme === 'fintech-light' ? (
+                <Sun className="w-3.5 h-3.5 text-amber-500" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-sky-400" />
+              )}
+              <span>{settings.theme === 'fintech-light' ? 'Claro' : 'Oscuro'}</span>
+            </button>
+
             {/* Privacy Mode Toggle */}
             <button
               onClick={togglePrivacyMode}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition ${
+              className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl border text-[10px] font-semibold cursor-pointer transition ${
                 isPrivacyMode
                   ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
                   : 'bg-slate-800 border-slate-700/60 text-slate-300 hover:text-white'
@@ -281,23 +321,6 @@ export const MobileMenuDrawer: React.FC = () => {
                   <Eye className="w-3.5 h-3.5 text-slate-400" />
                   <span>Visible</span>
                 </>
-              )}
-            </button>
-
-            {/* Alerts Center */}
-            <button
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                setIsAlertsOpen(true);
-              }}
-              className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700/60 text-xs font-semibold cursor-pointer relative"
-            >
-              <Bell className="w-3.5 h-3.5 text-amber-400" />
-              <span>Alertas</span>
-              {alertCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center">
-                  {alertCount}
-                </span>
               )}
             </button>
           </div>

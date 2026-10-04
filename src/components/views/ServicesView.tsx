@@ -12,6 +12,7 @@ import {
   ArrowRight,
   TrendingUp,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const ServicesView: React.FC = () => {
   const {
@@ -143,13 +144,17 @@ export const ServicesView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={openNewModal}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white shadow-md shadow-blue-600/30 transition cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nuevo Servicio</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de servicios" />
+
+          <button
+            onClick={openNewModal}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white shadow-md shadow-blue-600/30 transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Servicio</span>
+          </button>
+        </div>
       </div>
 
       {/* Prior to start notice banner */}

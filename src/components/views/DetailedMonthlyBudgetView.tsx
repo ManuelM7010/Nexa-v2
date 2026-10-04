@@ -26,6 +26,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { NewCategoryModal } from '../common/NewCategoryModal';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const DetailedMonthlyBudgetView: React.FC = () => {
   const {
@@ -346,6 +347,8 @@ export const DetailedMonthlyBudgetView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de presupuesto detallado" />
+
           {unbudgetedTransactions.length > 0 && (
             <button
               onClick={() => setIsSuggestionsOpen(true)}

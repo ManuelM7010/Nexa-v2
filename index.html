@@ -15,6 +15,20 @@
     <meta name="apple-mobile-web-app-title" content="NEXA Finance" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem('nexa_theme');
+          if (t === 'light') {
+            document.documentElement.classList.add('light');
+            document.documentElement.setAttribute('data-theme', 'light');
+          } else {
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased selection:bg-blue-600 selection:text-white font-sans">
     <div id="root"></div>

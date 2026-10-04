@@ -15,6 +15,7 @@ import {
   Clock,
   Check,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const InstallmentsView: React.FC = () => {
   const {
@@ -111,13 +112,17 @@ export const InstallmentsView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={openNewModal}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white shadow-md shadow-blue-600/30 transition cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nueva Compra a Cuotas</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de compras a cuotas" />
+
+          <button
+            onClick={openNewModal}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-xs text-white shadow-md shadow-blue-600/30 transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva Compra a Cuotas</span>
+          </button>
+        </div>
       </div>
 
       {/* Metrics */}

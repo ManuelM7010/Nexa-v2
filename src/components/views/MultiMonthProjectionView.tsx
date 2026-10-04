@@ -54,6 +54,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 type ViewMode = 'cards' | 'table' | 'charts';
 type KpiDetailType =
@@ -374,6 +375,9 @@ export const MultiMonthProjectionView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Dropdown Quick Calculator */}
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de proyección multimes" />
+
           {/* Guide Toggle */}
           <button
             onClick={() => setShowGuide(!showGuide)}

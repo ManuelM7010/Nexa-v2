@@ -35,6 +35,7 @@ import {
   Target,
   Percent,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 import {
   ResponsiveContainer,
   PieChart,
@@ -487,6 +488,9 @@ export const ReportsView: React.FC = () => {
         </div>
 
         <div className="flex items-center flex-wrap gap-2">
+          {/* Dropdown Quick Calculator */}
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de reportes" />
+
           {/* Export to Excel / CSV */}
           <button
             onClick={handleExportMonthCSV}

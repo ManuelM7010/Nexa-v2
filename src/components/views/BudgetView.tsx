@@ -59,6 +59,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { NewCategoryModal } from '../common/NewCategoryModal';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const BudgetView: React.FC = () => {
   const {
@@ -555,13 +556,17 @@ export const BudgetView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsCategoryModalOpen(true)}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-md shadow-blue-600/20 cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nueva Categoría</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de presupuesto" />
+
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow-md shadow-blue-600/20 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva Categoría</span>
+          </button>
+        </div>
       </div>
 
       {/* Row 1: Primary Allocation & Execution Cards (4 KPI Cards) */}

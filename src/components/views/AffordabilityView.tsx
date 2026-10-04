@@ -13,6 +13,7 @@ import {
   Building2,
   Wallet,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const AffordabilityView: React.FC = () => {
   const {
@@ -72,6 +73,10 @@ export const AffordabilityView: React.FC = () => {
           <p className="text-xs text-slate-400">
             Evalúa el impacto de cualquier compra antes de gastar un solo centavo sin comprometer tus obligaciones futuras
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de simulador" />
         </div>
       </div>
 

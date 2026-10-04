@@ -26,6 +26,7 @@ import {
   ListTodo,
   Pencil,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 const CATEGORY_CONFIG: Record<
   PlanNoteCategory,
@@ -292,8 +293,10 @@ export const NotesView: React.FC = () => {
           </div>
         </div>
 
-        {/* Section Tabs Switcher */}
+        {/* Section Tabs Switcher & Calculator */}
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de notas" />
+
           <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-2xl">
             <button
               type="button"

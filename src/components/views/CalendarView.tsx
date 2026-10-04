@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const CalendarView: React.FC = () => {
   const {
@@ -57,7 +58,9 @@ export const CalendarView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de calendario" />
+
           <div className="flex items-center gap-2 text-xs">
             <span className="flex items-center gap-1 text-slate-300">
               <span className="w-2 h-2 rounded-full bg-emerald-400" /> Saludable

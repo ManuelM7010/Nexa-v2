@@ -17,6 +17,7 @@ import {
   Trash2,
   FileSpreadsheet,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const CreditCardsView: React.FC = () => {
   const {
@@ -140,6 +141,8 @@ export const CreditCardsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de tarjetas" />
+
           <button
             onClick={() => setActiveTab('estados-cuenta')}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-bold text-xs transition cursor-pointer"

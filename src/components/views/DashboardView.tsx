@@ -37,6 +37,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { QuickExpenseTemplates } from '../common/QuickExpenseTemplates';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -88,10 +89,13 @@ export const DashboardView: React.FC = () => {
           <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-400">
             Resumen Ejecutivo del Mes
           </span>
-          <span className="text-[11px] text-blue-400 flex items-center gap-1 font-medium">
-            <Zap className="w-3 h-3" />
-            Toca una tarjeta para ver su desglose
-          </span>
+          <div className="flex items-center gap-2">
+            <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de dashboard" />
+            <span className="text-[11px] text-blue-400 hidden sm:flex items-center gap-1 font-medium">
+              <Zap className="w-3 h-3" />
+              Toca una tarjeta para ver su desglose
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">

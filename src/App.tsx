@@ -11,6 +11,7 @@ import { MobileMenuDrawer } from './components/common/MobileMenuDrawer';
 import { MobileQuickExpenseFAB } from './components/common/MobileQuickExpenseFAB';
 import { QuickSearchModal } from './components/common/QuickSearchModal';
 import { FinancialAlertsModal } from './components/common/FinancialAlertsModal';
+import { DropdownCalculator } from './components/common/DropdownCalculator';
 
 import { DashboardView } from './components/views/DashboardView';
 import { DailyCashFlowView } from './components/views/DailyCashFlowView';
@@ -34,7 +35,15 @@ import { SettingsView } from './components/views/SettingsView';
 import { SavingsView } from './components/views/SavingsView';
 
 const MainAppContent: React.FC = () => {
-  const { activeTab, isLoading, isPrivacyMode } = useFinance();
+  const {
+    activeTab,
+    isLoading,
+    isPrivacyMode,
+    isCalculatorOpen,
+    setIsCalculatorOpen,
+    settings,
+    openNewTransactionModal,
+  } = useFinance();
 
   const renderActiveView = () => {
     switch (activeTab) {
@@ -118,6 +127,17 @@ const MainAppContent: React.FC = () => {
       <RenderGuideModal />
       <QuickSearchModal />
       <FinancialAlertsModal />
+
+      {/* Global Multi-Module Quick Calculator */}
+      <DropdownCalculator
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+        currencySymbol={settings.currencySymbol}
+        positionMode="fixed"
+        onUseInTransaction={(amount) => {
+          openNewTransactionModal({ amount });
+        }}
+      />
 
       {/* Mobile-Dedicated Bottom Navigation, Speed FAB & Drawer Menu */}
       <MobileBottomNav />

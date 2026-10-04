@@ -42,6 +42,7 @@ import {
   PieChart,
   ArrowLeftRight,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export const CreditCardStatementsView: React.FC = () => {
   const {
@@ -522,6 +523,8 @@ export const CreditCardStatementsView: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
+              <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de estados de cuenta" />
+
               {/* Month Selector Controls */}
               <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 text-xs">
                 <button

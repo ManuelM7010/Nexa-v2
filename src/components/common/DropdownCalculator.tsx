@@ -23,6 +23,7 @@ interface DropdownCalculatorProps {
   onClose: () => void;
   currencySymbol?: string;
   onUseInTransaction?: (amount: number) => void;
+  positionMode?: 'absolute' | 'fixed';
 }
 
 export const DropdownCalculator: React.FC<DropdownCalculatorProps> = ({
@@ -30,6 +31,7 @@ export const DropdownCalculator: React.FC<DropdownCalculatorProps> = ({
   onClose,
   currencySymbol = '$',
   onUseInTransaction,
+  positionMode = 'absolute',
 }) => {
   const [displayValue, setDisplayValue] = useState<string>('0');
   const [prevValue, setPrevValue] = useState<number | null>(null);
@@ -63,6 +65,10 @@ export const DropdownCalculator: React.FC<DropdownCalculatorProps> = ({
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest('[data-calculator-trigger]')) {
+        return;
+      }
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -285,7 +291,11 @@ export const DropdownCalculator: React.FC<DropdownCalculatorProps> = ({
   return (
     <div
       ref={popoverRef}
-      className="absolute right-0 top-full mt-2 z-50 w-72 sm:w-80 rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl shadow-slate-950/90 overflow-hidden animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md"
+      className={`${
+        positionMode === 'fixed'
+          ? 'fixed top-14 sm:top-16 right-3 sm:right-6 md:right-10 z-50'
+          : 'absolute right-0 top-full mt-2 z-50'
+      } w-72 sm:w-80 max-w-[calc(100vw-1.5rem)] rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl shadow-slate-950/90 overflow-hidden animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md`}
       role="dialog"
       aria-label="Calculadora financiera"
     >

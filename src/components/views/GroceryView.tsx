@@ -27,6 +27,7 @@ import {
   Lightbulb,
   Check,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 const GROCERY_CATEGORIES = [
   'Granos y Despensa',
@@ -393,6 +394,8 @@ export const GroceryView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <CalculatorButton label="Calculadora" title="Abrir calculadora rápida de súper y mercado" />
+
           {currentMonthItems.length > 0 && (
             <button
               onClick={handleExportWhatsApp}
