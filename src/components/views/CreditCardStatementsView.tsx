@@ -9,6 +9,9 @@ import {
   MONTH_NAMES_ES,
   formatPeriodEs,
   formatDateEs,
+  daysInMonth,
+  addDays,
+  getTodayDateStr,
 } from '../../utils/formatters';
 import {
   FileSpreadsheet,
@@ -68,14 +71,21 @@ export const CreditCardStatementsView: React.FC = () => {
   // Top view mode switcher: 'cortes' (Estados de Cuenta TDDC Oficiales) vs 'rango_calendario' (Consulta por Rango de Fechas Calendario)
   const [statementViewMode, setStatementViewMode] = useState<'cortes' | 'rango_calendario'>('cortes');
 
-  // Calendar Date Range state
+  // Dynamic date initialization based on todayStr or current real date
+  const effectiveToday = todayStr || getTodayDateStr();
+
+  // Calendar Date Range state - defaults to last 60 days to today so all recent movements appear
   const [rangeCardId, setRangeCardId] = useState<string>(
     creditCards[0]?.id || 'all'
   );
-  const [rangeStartDate, setRangeStartDate] = useState<string>('2026-08-01');
-  const [rangeEndDate, setRangeEndDate] = useState<string>(todayStr || '2026-09-27');
+  const [rangeStartDate, setRangeStartDate] = useState<string>(() => {
+    return addDays(effectiveToday, -60);
+  });
+  const [rangeEndDate, setRangeEndDate] = useState<string>(() => {
+    return effectiveToday;
+  });
   const [rangeSearch, setRangeSearch] = useState<string>('');
-  const [rangeTypeFilter, setRangeTypeFilter] = useState<'cargos' | 'abonos' | 'todos'>('cargos');
+  const [rangeTypeFilter, setRangeTypeFilter] = useState<'todos' | 'cargos' | 'abonos'>('todos');
   const [rangeStatusFilter, setRangeStatusFilter] = useState<'todos' | 'realizado' | 'planificado'>('todos');
 
   // Active Card filter (empty string = All cards overview)
@@ -102,6 +112,25 @@ export const CreditCardStatementsView: React.FC = () => {
   );
 
   const liquidityStartDate = settings.liquidityStartDate || '2026-09-15';
+
+  // Synchronize card selection between cuts and date range
+  const handleSelectCardInCortes = (cardId: string) => {
+    setSelectedCardId(cardId);
+    setRangeCardId(cardId);
+  };
+
+  const handleSelectCardInRange = (cardId: string) => {
+    setRangeCardId(cardId);
+    if (cardId !== 'all') {
+      setSelectedCardId(cardId);
+    }
+  };
+
+  const handleSwitchToRangeForCard = (cardId: string) => {
+    setRangeCardId(cardId);
+    setSelectedCardId(cardId);
+    setStatementViewMode('rango_calendario');
+  };
 
   // Generate statement for selected card and month
   const statement: CreditCardStatement | null = useMemo(() => {
@@ -145,81 +174,204 @@ export const CreditCardStatementsView: React.FC = () => {
     return Math.max(0, totalGlobalLimit - totalGlobalTDDC);
   }, [totalGlobalLimit, totalGlobalTDDC]);
 
-  // Calendar Range Filtered Transactions
-  const rangeTransactions = useMemo(() => {
-    return transactions
-      .filter((tx) => {
-        // Is credit card related
-        const isCard =
+  // 1. Gather ALL movements for the target credit card(s) strictly within [rangeStartDate, rangeEndDate]
+  // Completely independent of whatever selectedMonth / selectedYear the user is in!
+  const allCardTransactionsInRange = useMemo(() => {
+    const list: Transaction[] = [];
+
+    // Helper to determine if a transaction belongs to the requested credit card
+    const matchesTargetCard = (tx: Transaction) => {
+      if (rangeCardId === 'all') {
+        return (
           tx.paymentMethodType === 'tarjeta_credito' ||
           !!tx.creditCardId ||
           tx.type === 'pago_tarjeta' ||
-          tx.type === 'cuota_tarjeta';
+          tx.type === 'cuota_tarjeta' ||
+          (tx.origin &&
+            (tx.origin.startsWith('cuota:') ||
+              tx.origin.startsWith('pago_tarjeta:') ||
+              tx.origin.startsWith('prestamo:')))
+        );
+      }
+      // Target specific card
+      if (tx.creditCardId === rangeCardId) return true;
+      if (tx.origin === `pago_tarjeta:${rangeCardId}`) return true;
+      if (tx.origin && tx.origin.startsWith('pago_tarjeta:') && tx.origin.includes(rangeCardId)) return true;
 
-        if (!isCard) return false;
+      // Check installment origin
+      if (tx.installmentPurchaseId) {
+        const ip = installmentPurchases.find((i) => i.id === tx.installmentPurchaseId);
+        if (ip && ip.creditCardId === rangeCardId) return true;
+      }
+      if (tx.origin && tx.origin.startsWith('cuota:')) {
+        const ipId = tx.installmentPurchaseId || tx.origin.split(':')[1];
+        const ip = installmentPurchases.find((i) => i.id === ipId);
+        if (ip && ip.creditCardId === rangeCardId) return true;
+      }
 
-        // Card match
-        if (rangeCardId !== 'all') {
-          if (tx.creditCardId !== rangeCardId) return false;
+      // Check loan extrafinancing
+      if (tx.loanId) {
+        const loan = loans.find((l) => l.id === tx.loanId);
+        if (
+          loan &&
+          (loan.creditCardId === rangeCardId ||
+            (loan.paymentMethodType === 'tarjeta_credito' && loan.creditCardId === rangeCardId))
+        ) {
+          return true;
         }
+      }
 
-        // Date range match (inclusive)
-        if (rangeStartDate && tx.date < rangeStartDate) return false;
-        if (rangeEndDate && tx.date > rangeEndDate) return false;
-
-        // Type filter
-        if (rangeTypeFilter === 'cargos') {
-          // Cargos / Compras / Cuotas (not abonos/pagos)
-          if (tx.type === 'pago_tarjeta') return false;
-        } else if (rangeTypeFilter === 'abonos') {
-          // Solo abonos / pagos a la tarjeta
-          if (tx.type !== 'pago_tarjeta') return false;
-        }
-
-        // Status filter
-        if (rangeStatusFilter !== 'todos' && tx.status !== rangeStatusFilter) {
-          return false;
-        }
-
-        // Search query
-        if (rangeSearch.trim()) {
-          const q = rangeSearch.toLowerCase();
-          const matchesConcept = (tx.concept || '').toLowerCase().includes(q);
-          const matchesNotes = (tx.notes || '').toLowerCase().includes(q);
-          const cat = categories.find((c) => c.id === tx.categoryId);
-          const matchesCat = cat ? (cat.name || '').toLowerCase().includes(q) : false;
-          if (!matchesConcept && !matchesNotes && !matchesCat) return false;
-        }
-
+      // If paymentMethodType is tarjeta_credito but creditCardId is empty, and only 1 card exists
+      if (
+        tx.paymentMethodType === 'tarjeta_credito' &&
+        !tx.creditCardId &&
+        activeCards.length === 1 &&
+        activeCards[0].id === rangeCardId
+      ) {
         return true;
-      })
-      .sort((a, b) => b.date.localeCompare(a.date));
+      }
+
+      return false;
+    };
+
+    // A) Raw transactions from database/state
+    transactions.forEach((tx) => {
+      if (tx.status === 'cancelado') return;
+      if (!matchesTargetCard(tx)) return;
+
+      // Date range filter (inclusive) - takes whatever range is specified
+      if (rangeStartDate && tx.date < rangeStartDate) return;
+      if (rangeEndDate && tx.date > rangeEndDate) return;
+
+      // Ensure creditCardId is present for display if we can deduce it
+      let enrichedTx = tx;
+      if (!enrichedTx.creditCardId && rangeCardId !== 'all') {
+        enrichedTx = { ...tx, creditCardId: rangeCardId };
+      }
+      list.push(enrichedTx);
+    });
+
+    // B) Scheduled installment purchases (Cuotas) on this credit card
+    installmentPurchases.forEach((ip) => {
+      if (rangeCardId !== 'all' && ip.creditCardId !== rangeCardId) return;
+
+      const schedule = NexaFinancialEngine.getInstallmentSchedule(ip);
+      schedule.forEach((inst) => {
+        if (rangeStartDate && inst.date < rangeStartDate) return;
+        if (rangeEndDate && inst.date > rangeEndDate) return;
+
+        // Check if an explicit transaction already exists for this installment
+        const alreadyExists = list.some(
+          (t) =>
+            t.installmentPurchaseId === ip.id &&
+            (t.date === inst.date || t.origin === `cuota:${ip.id}:${inst.installmentNumber}`)
+        );
+
+        if (!alreadyExists) {
+          list.push({
+            id: `gen_inst_${ip.id}_${inst.installmentNumber}`,
+            date: inst.date,
+            expectedDate: inst.date,
+            concept: `Cuota ${inst.installmentNumber}/${inst.totalInstallments}: ${ip.concept}`,
+            type: 'gasto',
+            amount: inst.amount,
+            paymentMethodType: 'tarjeta_credito',
+            creditCardId: ip.creditCardId,
+            status: inst.date <= effectiveToday ? 'realizado' : 'planificado',
+            origin: `cuota:${ip.id}:${inst.installmentNumber}`,
+            installmentPurchaseId: ip.id,
+            categoryId: ip.categoryId || 'cat_otros',
+            notes: `Cuota a plazos (${inst.installmentNumber} de ${inst.totalInstallments})`,
+            createdAt: ip.createdAt || new Date().toISOString(),
+            updatedAt: ip.updatedAt || new Date().toISOString(),
+          });
+        }
+      });
+    });
+
+    // C) Extrafinanciamientos on this credit card (Loans charged to credit card)
+    (loans || []).forEach((loan) => {
+      const isTdc = loan.paymentMethodType === 'tarjeta_credito' || !!loan.creditCardId;
+      if (!isTdc) return;
+      if (rangeCardId !== 'all' && loan.creditCardId !== rangeCardId) return;
+
+      const schedule = NexaFinancialEngine.getLoanSchedule(loan);
+      schedule.forEach((inst) => {
+        if (rangeStartDate && inst.date < rangeStartDate) return;
+        if (rangeEndDate && inst.date > rangeEndDate) return;
+
+        const alreadyExists = list.some(
+          (t) =>
+            (t.loanId === loan.id || t.origin === `prestamo:${loan.id}:${inst.installmentNumber}`) &&
+            t.date === inst.date
+        );
+
+        if (!alreadyExists) {
+          list.push({
+            id: `gen_loan_${loan.id}_${inst.installmentNumber}`,
+            date: inst.date,
+            expectedDate: inst.date,
+            concept: `Cuota Extrafinanciamiento ${inst.installmentNumber}/${inst.totalInstallments}: ${loan.name} (${loan.lender})`,
+            type: 'cuota_prestamo',
+            amount: inst.amount,
+            paymentMethodType: 'tarjeta_credito',
+            creditCardId: loan.creditCardId,
+            loanId: loan.id,
+            status: inst.date <= effectiveToday ? 'realizado' : 'planificado',
+            origin: `prestamo:${loan.id}:${inst.installmentNumber}`,
+            createdAt: loan.createdAt || new Date().toISOString(),
+            updatedAt: loan.updatedAt || new Date().toISOString(),
+          });
+        }
+      });
+    });
+
+    // Sort descending by date (most recent first)
+    return list.sort((a, b) => b.date.localeCompare(a.date));
   }, [
     transactions,
+    installmentPurchases,
+    loans,
     rangeCardId,
     rangeStartDate,
     rangeEndDate,
-    rangeTypeFilter,
-    rangeStatusFilter,
-    rangeSearch,
-    categories,
+    effectiveToday,
+    activeCards,
   ]);
 
-  // Aggregate Metrics for Calendar Range
-  const calendarMetrics = useMemo(() => {
-    const allInRange = transactions.filter((tx) => {
-      const isCard =
-        tx.paymentMethodType === 'tarjeta_credito' ||
-        !!tx.creditCardId ||
-        tx.type === 'pago_tarjeta' ||
-        tx.type === 'cuota_tarjeta';
-      if (!isCard) return false;
-      if (rangeCardId !== 'all' && tx.creditCardId !== rangeCardId) return false;
-      if (rangeStartDate && tx.date < rangeStartDate) return false;
-      if (rangeEndDate && tx.date > rangeEndDate) return false;
+  // 2. Filtered list for UI display according to type, status, and search query
+  const rangeTransactions = useMemo(() => {
+    return allCardTransactionsInRange.filter((tx) => {
+      // Type filter
+      if (rangeTypeFilter === 'cargos') {
+        if (tx.type === 'pago_tarjeta') return false;
+      } else if (rangeTypeFilter === 'abonos') {
+        if (tx.type !== 'pago_tarjeta') return false;
+      }
+
+      // Status filter
+      if (rangeStatusFilter !== 'todos' && tx.status !== rangeStatusFilter) {
+        return false;
+      }
+
+      // Search query
+      if (rangeSearch.trim()) {
+        const q = rangeSearch.toLowerCase();
+        const matchesConcept = (tx.concept || '').toLowerCase().includes(q);
+        const matchesNotes = (tx.notes || '').toLowerCase().includes(q);
+        const cat = categories.find((c) => c.id === tx.categoryId);
+        const matchesCat = cat ? (cat.name || '').toLowerCase().includes(q) : false;
+        const card = activeCards.find((c) => c.id === tx.creditCardId);
+        const matchesCard = card ? (card.name + ' ' + card.bank).toLowerCase().includes(q) : false;
+        if (!matchesConcept && !matchesNotes && !matchesCat && !matchesCard) return false;
+      }
+
       return true;
     });
+  }, [allCardTransactionsInRange, rangeTypeFilter, rangeStatusFilter, rangeSearch, categories, activeCards]);
 
+  // 3. Aggregate Metrics for Calendar Range (both overall range and filtered table)
+  const calendarMetrics = useMemo(() => {
     let totalCargosCents = 0;
     let totalAbonosCents = 0;
     let cargosCount = 0;
@@ -227,7 +379,8 @@ export const CreditCardStatementsView: React.FC = () => {
     let maxCargoTx: Transaction | null = null;
     const catMap = new Map<string, { id: string; name: string; color: string; totalCents: number; count: number }>();
 
-    allInRange.forEach((tx) => {
+    // Calculate over ALL movements in range
+    allCardTransactionsInRange.forEach((tx) => {
       if (tx.type === 'pago_tarjeta') {
         totalAbonosCents += tx.amount;
         abonosCount += 1;
@@ -250,8 +403,20 @@ export const CreditCardStatementsView: React.FC = () => {
       }
     });
 
+    // Subtotals of currently filtered table on screen
+    let filteredCargosCents = 0;
+    let filteredAbonosCents = 0;
+    rangeTransactions.forEach((tx) => {
+      if (tx.type === 'pago_tarjeta') {
+        filteredAbonosCents += tx.amount;
+      } else {
+        filteredCargosCents += tx.amount;
+      }
+    });
+
     const avgCargoCents = cargosCount > 0 ? Math.round(totalCargosCents / cargosCount) : 0;
     const netVariationCents = totalCargosCents - totalAbonosCents;
+    const filteredNetCents = filteredCargosCents - filteredAbonosCents;
     const categoryList = Array.from(catMap.values()).sort((a, b) => b.totalCents - a.totalCents);
 
     return {
@@ -260,11 +425,85 @@ export const CreditCardStatementsView: React.FC = () => {
       netVariationCents,
       cargosCount,
       abonosCount,
+      totalCount: allCardTransactionsInRange.length,
       avgCargoCents,
       maxCargoTx,
       categoryList,
+      filteredCargosCents,
+      filteredAbonosCents,
+      filteredNetCents,
     };
-  }, [transactions, rangeCardId, rangeStartDate, rangeEndDate, categories]);
+  }, [allCardTransactionsInRange, rangeTransactions, categories]);
+
+  // Dynamic date range presets
+  const rangePresets = useMemo(() => {
+    const today = effectiveToday;
+    const [yStr, mStr] = today.split('-');
+    const curY = parseInt(yStr, 10) || 2026;
+    const curM = parseInt(mStr, 10) || 10;
+
+    // Mes actual completo
+    const curMonthStart = `${curY}-${String(curM).padStart(2, '0')}-01`;
+    const curMonthEnd = `${curY}-${String(curM).padStart(2, '0')}-${daysInMonth(curY, curM)}`;
+
+    // Mes anterior completo
+    const prevM = curM === 1 ? 12 : curM - 1;
+    const prevY = curM === 1 ? curY - 1 : curY;
+    const prevMonthStart = `${prevY}-${String(prevM).padStart(2, '0')}-01`;
+    const prevMonthEnd = `${prevY}-${String(prevM).padStart(2, '0')}-${daysInMonth(prevY, prevM)}`;
+
+    // Mes en navegación (selectedMonth / selectedYear)
+    const navMonthStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const navMonthEnd = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${daysInMonth(selectedYear, selectedMonth)}`;
+
+    return [
+      {
+        label: `Mes Actual (${MONTH_NAMES_ES[curM - 1]})`,
+        start: curMonthStart,
+        end: curMonthEnd,
+      },
+      {
+        label: `Mes a Hoy`,
+        start: curMonthStart,
+        end: today,
+      },
+      {
+        label: `Mes Anterior (${MONTH_NAMES_ES[prevM - 1]})`,
+        start: prevMonthStart,
+        end: prevMonthEnd,
+      },
+      {
+        label: `Últimos 30 días`,
+        start: addDays(today, -30),
+        end: today,
+      },
+      {
+        label: `Últimos 60 días`,
+        start: addDays(today, -60),
+        end: today,
+      },
+      {
+        label: `Últimos 90 días`,
+        start: addDays(today, -90),
+        end: today,
+      },
+      {
+        label: `Mes Navegado (${MONTH_NAMES_ES[selectedMonth - 1]} ${selectedYear})`,
+        start: navMonthStart,
+        end: navMonthEnd,
+      },
+      {
+        label: `Todo ${curY}`,
+        start: `${curY}-01-01`,
+        end: `${curY}-12-31`,
+      },
+      {
+        label: `Histórico Completo`,
+        start: '2024-01-01',
+        end: `${curY + 1}-12-31`,
+      },
+    ];
+  }, [effectiveToday, selectedYear, selectedMonth]);
 
   // Export CSV for Calendar Date Range
   const handleExportRangeCSV = () => {
@@ -277,7 +516,7 @@ export const CreditCardStatementsView: React.FC = () => {
       'Banco',
       'Concepto / Comercio',
       'Categoría',
-      'Tipo de Cargo',
+      'Tipo de Movimiento',
       'Monto ($)',
       'Estado',
       'Notas',
@@ -301,12 +540,12 @@ export const CreditCardStatementsView: React.FC = () => {
     });
 
     const summaryLines = [
-      ['REPORTE DE CARGOS A TARJETA DE CREDITO POR RANGO CALENDARIO'],
+      ['REPORTE DE MOVIMIENTOS DE TARJETA DE CREDITO POR RANGO DE FECHAS'],
       ['Tarjeta / Alcance', cardTitle],
-      ['Rango de Fechas Calendario', `${rangeStartDate} al ${rangeEndDate}`],
+      ['Rango de Fechas', `${rangeStartDate} al ${rangeEndDate}`],
       ['Total Cargos / Compras ($)', centsToDollars(calendarMetrics.totalCargosCents).toFixed(2)],
       ['Total Abonos / Pagos ($)', centsToDollars(calendarMetrics.totalAbonosCents).toFixed(2)],
-      ['Variación Neta ($)', centsToDollars(calendarMetrics.netVariationCents).toFixed(2)],
+      ['Saldo Neto / Variación del Rango ($)', centsToDollars(calendarMetrics.netVariationCents).toFixed(2)],
       ['Transacciones Listadas', rangeTransactions.length.toString()],
       [],
       headers,
@@ -324,7 +563,7 @@ export const CreditCardStatementsView: React.FC = () => {
     const filenameCard = targetCardObj ? targetCardObj.name.replace(/\s+/g, '_') : 'Todas_TDC';
     link.setAttribute(
       'download',
-      `Cargos_TDC_${filenameCard}_${rangeStartDate}_al_${rangeEndDate}.csv`
+      `Movimientos_TDC_${filenameCard}_${rangeStartDate}_al_${rangeEndDate}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -494,14 +733,14 @@ export const CreditCardStatementsView: React.FC = () => {
           onClick={() => setStatementViewMode('rango_calendario')}
           className={`flex-1 flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-xs font-bold transition cursor-pointer ${
             statementViewMode === 'rango_calendario'
-              ? 'bg-blue-600/20 text-blue-300 border border-blue-500/40 shadow-sm shadow-blue-500/10'
+              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm shadow-sky-500/10'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850 border border-transparent'
           }`}
         >
           <CalendarRange className="w-4 h-4 text-sky-400" />
-          <span>Consulta de Cargos por Rango Calendario</span>
-          <span className="px-1.5 py-0.5 rounded text-[9px] bg-sky-500/20 text-sky-300 border border-sky-500/30 uppercase font-black">
-            Sin Cortes
+          <span>Movimientos de TDC por Rango de Fechas</span>
+          <span className="px-2 py-0.5 rounded-full text-[9px] bg-sky-500/20 text-sky-300 border border-sky-500/30 uppercase font-black tracking-wider">
+            Cualquier Fecha / Sin Cortes
           </span>
         </button>
       </div>
@@ -618,7 +857,7 @@ export const CreditCardStatementsView: React.FC = () => {
           return (
             <button
               key={card.id}
-              onClick={() => setSelectedCardId(card.id)}
+              onClick={() => handleSelectCardInCortes(card.id)}
               className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
                 isSelected
                   ? 'bg-rose-500/15 text-rose-300 border-rose-500/50 shadow-sm'
@@ -796,7 +1035,7 @@ export const CreditCardStatementsView: React.FC = () => {
 
             {/* Itemized Transactions Section (Detalle de Gastos) */}
             <div className="p-5 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
                     <Receipt className="w-4 h-4 text-blue-400" />
@@ -807,21 +1046,38 @@ export const CreditCardStatementsView: React.FC = () => {
                     <strong className="text-slate-300">{statement.cycleEndDate}</strong> (desde el día siguiente al corte anterior hasta la fecha de corte)
                   </p>
                 </div>
-                <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300">
-                  {statement.transactions.length} movimientos
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300">
+                    {statement.transactions.length} movimientos
+                  </span>
+                  <button
+                    onClick={() => handleSwitchToRangeForCard(currentCard.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-xs font-bold transition cursor-pointer"
+                    title={`Ver todos los movimientos de ${currentCard.name} por rango de fechas`}
+                  >
+                    <CalendarRange className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Ver por Rango de Fechas</span>
+                  </button>
+                </div>
               </div>
 
               {statement.transactions.length === 0 ? (
-                <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/80 space-y-2">
+                <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/80 space-y-3">
                   <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
                   <p className="text-xs font-semibold text-white">
                     No se registraron consumos en este ciclo de facturación
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-400 max-w-md mx-auto">
                     Todos los gastos que registres con método "Tarjeta de Crédito ({statement.cardName})" dentro
                     del periodo del corte aparecerán automáticamente aquí.
                   </p>
+                  <button
+                    onClick={() => handleSwitchToRangeForCard(currentCard.id)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/40 text-xs font-bold transition cursor-pointer"
+                  >
+                    <CalendarRange className="w-4 h-4 text-sky-400" />
+                    <span>Consultar Movimientos de {currentCard.name} por Rango de Fechas</span>
+                  </button>
                 </div>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-slate-800">
@@ -1044,7 +1300,7 @@ export const CreditCardStatementsView: React.FC = () => {
             </label>
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
               <button
-                onClick={() => setRangeCardId('all')}
+                onClick={() => handleSelectCardInRange('all')}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
                   rangeCardId === 'all'
                     ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm'
@@ -1060,7 +1316,7 @@ export const CreditCardStatementsView: React.FC = () => {
                 return (
                   <button
                     key={card.id}
-                    onClick={() => setRangeCardId(card.id)}
+                    onClick={() => handleSelectCardInRange(card.id)}
                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
                       isSelected
                         ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm'
@@ -1083,99 +1339,34 @@ export const CreditCardStatementsView: React.FC = () => {
           <div className="pt-2 border-t border-slate-800/80">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                2. Rango de Fechas Calendario:
+                2. Rango de Fechas Calendario (Sin Restricción de Mes):
               </label>
 
-              {/* Exact user examples and quick presets */}
+              {/* Dynamic quick presets */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
                 <span className="text-[10px] text-slate-400 font-semibold mr-1 shrink-0">
                   Acceso Rápido:
                 </span>
-                <button
-                  onClick={() => {
-                    setRangeStartDate('2026-08-01');
-                    setRangeEndDate('2026-09-15');
-                  }}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeStartDate === '2026-08-01' && rangeEndDate === '2026-09-15'
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
-                  }`}
-                  title="Ejemplo explícito: 01 de Agosto al 15 de Septiembre"
-                >
-                  📌 01 Ago - 15 Sep
-                </button>
-
-                <button
-                  onClick={() => {
-                    setRangeStartDate('2026-08-01');
-                    setRangeEndDate(todayStr || '2026-09-27');
-                  }}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeStartDate === '2026-08-01' && rangeEndDate === (todayStr || '2026-09-27')
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
-                  }`}
-                  title="Ejemplo explícito: 01 de Agosto hasta hoy (27 de Septiembre)"
-                >
-                  ⚡ 01 Ago - 27 Sep (Hoy)
-                </button>
-
-                <button
-                  onClick={() => {
-                    setRangeStartDate('2026-09-01');
-                    setRangeEndDate(todayStr || '2026-09-27');
-                  }}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeStartDate === '2026-09-01' && rangeEndDate === (todayStr || '2026-09-27')
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
-                  }`}
-                >
-                  Mes a Hoy (01-27 Sep)
-                </button>
-
-                <button
-                  onClick={() => {
-                    setRangeStartDate('2026-09-01');
-                    setRangeEndDate('2026-09-30');
-                  }}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeStartDate === '2026-09-01' && rangeEndDate === '2026-09-30'
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
-                  }`}
-                >
-                  Septiembre Completo
-                </button>
-
-                <button
-                  onClick={() => {
-                    setRangeStartDate('2026-08-01');
-                    setRangeEndDate('2026-08-31');
-                  }}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeStartDate === '2026-08-01' && rangeEndDate === '2026-08-31'
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
-                  }`}
-                >
-                  Agosto Completo
-                </button>
-
-                <button
-                  onClick={() => {
-                    setRangeStartDate('2026-01-01');
-                    setRangeEndDate('2026-12-31');
-                  }}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
-                    rangeStartDate === '2026-01-01' && rangeEndDate === '2026-12-31'
-                      ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                      : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
-                  }`}
-                >
-                  Todo 2026
-                </button>
+                {rangePresets.map((preset) => {
+                  const isActive = rangeStartDate === preset.start && rangeEndDate === preset.end;
+                  return (
+                    <button
+                      key={preset.label}
+                      onClick={() => {
+                        setRangeStartDate(preset.start);
+                        setRangeEndDate(preset.end);
+                      }}
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap transition cursor-pointer ${
+                        isActive
+                          ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
+                          : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
+                      }`}
+                      title={`${preset.label}: del ${preset.start} al ${preset.end}`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1387,6 +1578,16 @@ export const CreditCardStatementsView: React.FC = () => {
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-0.5 text-xs">
                 <button
+                  onClick={() => setRangeTypeFilter('todos')}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                    rangeTypeFilter === 'todos'
+                      ? 'bg-sky-500/20 text-sky-300 font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Todos ({allCardTransactionsInRange.length})
+                </button>
+                <button
                   onClick={() => setRangeTypeFilter('cargos')}
                   className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
                     rangeTypeFilter === 'cargos'
@@ -1394,7 +1595,7 @@ export const CreditCardStatementsView: React.FC = () => {
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Solo Cargos
+                  Solo Cargos ({calendarMetrics.cargosCount})
                 </button>
                 <button
                   onClick={() => setRangeTypeFilter('abonos')}
@@ -1404,17 +1605,7 @@ export const CreditCardStatementsView: React.FC = () => {
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  Solo Abonos
-                </button>
-                <button
-                  onClick={() => setRangeTypeFilter('todos')}
-                  className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
-                    rangeTypeFilter === 'todos'
-                      ? 'bg-sky-500/20 text-sky-300 font-bold'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Todos ({rangeTransactions.length})
+                  Solo Abonos ({calendarMetrics.abonosCount})
                 </button>
               </div>
 
@@ -1427,6 +1618,49 @@ export const CreditCardStatementsView: React.FC = () => {
                 <option value="realizado">Solo Confirmados</option>
                 <option value="planificado">Solo Planificados</option>
               </select>
+            </div>
+          </div>
+
+          {/* Active Range Summary Bar */}
+          <div className="px-5 py-3 bg-slate-950/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-slate-400 font-medium">
+                Movimientos del <strong className="text-white font-mono">{rangeStartDate}</strong> al{' '}
+                <strong className="text-white font-mono">{rangeEndDate}</strong>:
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-semibold text-[11px]">
+                {rangeCardId === 'all'
+                  ? `Todas las Tarjetas (${activeCards.length})`
+                  : activeCards.find((c) => c.id === rangeCardId)?.name || 'Tarjeta Seleccionada'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap font-mono font-bold text-xs">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold">Cargos:</span>
+                <span>+{formatMoney(calendarMetrics.totalCargosCents, settings.currencySymbol)}</span>
+              </div>
+
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold">Abonos:</span>
+                <span>-{formatMoney(calendarMetrics.totalAbonosCents, settings.currencySymbol)}</span>
+              </div>
+
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-white shadow-sm">
+                <span className="text-[10px] text-sky-300 uppercase font-sans font-bold">TOTAL NETO DEL RANGO:</span>
+                <span
+                  className={
+                    calendarMetrics.netVariationCents > 0
+                      ? 'text-amber-300'
+                      : calendarMetrics.netVariationCents < 0
+                      ? 'text-emerald-400'
+                      : 'text-white'
+                  }
+                >
+                  {calendarMetrics.netVariationCents > 0 ? '+' : ''}
+                  {formatMoney(calendarMetrics.netVariationCents, settings.currencySymbol)}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1447,14 +1681,14 @@ export const CreditCardStatementsView: React.FC = () => {
               <div className="flex items-center justify-center gap-2 pt-2">
                 <button
                   onClick={() => {
-                    setRangeStartDate('2026-08-01');
-                    setRangeEndDate(todayStr || '2026-09-27');
+                    setRangeStartDate(addDays(effectiveToday, -60));
+                    setRangeEndDate(effectiveToday);
                     setRangeCardId('all');
                     setRangeSearch('');
                   }}
                   className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer"
                 >
-                  Restablecer a 01 Ago - Hoy
+                  Restablecer a Últimos 60 Días
                 </button>
                 <button
                   onClick={() => openNewTransactionModal({ type: 'gasto', categoryId: 'cat_alimentacion' })}
@@ -1614,21 +1848,48 @@ export const CreditCardStatementsView: React.FC = () => {
               </table>
 
               {/* Table Summary Footer */}
-              <div className="p-4 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-                <span className="text-slate-400">
-                  Mostrando <strong className="text-white">{rangeTransactions.length}</strong> movimientos en el rango del{' '}
-                  <strong className="text-white">{rangeStartDate}</strong> al{' '}
-                  <strong className="text-white">{rangeEndDate}</strong>
-                </span>
+              <div className="p-4 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div className="text-slate-400">
+                  Mostrando <strong className="text-white font-mono">{rangeTransactions.length}</strong> movimientos en el rango del{' '}
+                  <strong className="text-white font-mono">{rangeStartDate}</strong> al{' '}
+                  <strong className="text-white font-mono">{rangeEndDate}</strong>
+                  {rangeTransactions.length < allCardTransactionsInRange.length && (
+                    <span className="text-slate-500 ml-1">
+                      (de {allCardTransactionsInRange.length} totales en este rango)
+                    </span>
+                  )}
+                </div>
 
-                <div className="flex items-center gap-4 text-xs font-mono font-bold">
-                  <div>
-                    <span className="text-slate-400 font-sans font-normal mr-1.5">Total en Pantalla:</span>
+                <div className="flex items-center gap-3 flex-wrap font-mono font-bold text-xs">
+                  <div className="text-slate-300">
+                    <span className="text-slate-400 font-sans font-normal mr-1">Cargos:</span>
                     <span className="text-rose-400">
-                      {formatMoney(
-                        rangeTransactions.reduce((acc, t) => acc + (t.type === 'pago_tarjeta' ? -t.amount : t.amount), 0),
-                        settings.currencySymbol
-                      )}
+                      +{formatMoney(calendarMetrics.filteredCargosCents, settings.currencySymbol)}
+                    </span>
+                  </div>
+
+                  <div className="text-slate-300">
+                    <span className="text-slate-400 font-sans font-normal mr-1">Abonos:</span>
+                    <span className="text-emerald-400">
+                      -{formatMoney(calendarMetrics.filteredAbonosCents, settings.currencySymbol)}
+                    </span>
+                  </div>
+
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
+                    <span className="text-slate-400 font-sans font-semibold text-[11px]">
+                      TOTAL DEL RANGO:
+                    </span>
+                    <span
+                      className={`text-sm ${
+                        calendarMetrics.filteredNetCents > 0
+                          ? 'text-amber-300'
+                          : calendarMetrics.filteredNetCents < 0
+                          ? 'text-emerald-400'
+                          : 'text-white'
+                      }`}
+                    >
+                      {calendarMetrics.filteredNetCents > 0 ? '+' : ''}
+                      {formatMoney(calendarMetrics.filteredNetCents, settings.currencySymbol)}
                     </span>
                   </div>
                 </div>
