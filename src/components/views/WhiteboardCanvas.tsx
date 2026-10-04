@@ -23,6 +23,7 @@ import {
   Calculator,
   RotateCcw,
 } from 'lucide-react';
+import { CalculatorButton } from '../common/CalculatorButton';
 
 export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'text' | 'rect' | 'circle' | 'arrow' | 'line';
 export type BoardTheme = 'dark-grid' | 'dark-dots' | 'dark-plain' | 'light-grid' | 'light-plain';
@@ -740,6 +741,9 @@ export const WhiteboardCanvas: React.FC = () => {
             <StickyNote className="w-3.5 h-3.5" />
             <span>+ Nota Post-it</span>
           </button>
+
+          {/* Quick Calculator in Whiteboard */}
+          <CalculatorButton label="Calc" title="Abrir calculadora rápida para cuentas en la pizarra" />
 
           <div className="h-4 w-px bg-slate-800 mx-0.5" />
 
