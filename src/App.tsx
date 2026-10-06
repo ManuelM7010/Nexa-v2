@@ -117,7 +117,7 @@ const MainAppContent: React.FC = () => {
           <div className="flex flex-col items-center justify-center min-h-[400px] space-y-3">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
             <span className="text-xs text-slate-400 font-medium">
-              Iniciando motor financiero NEXA en almacenamiento local...
+              Iniciando motor financiero VALORA en almacenamiento local...
             </span>
           </div>
         ) : (
@@ -152,9 +152,9 @@ const MainAppContent: React.FC = () => {
       <footer className="border-t border-slate-900 bg-slate-950/80 py-6 px-4 text-center text-xs text-slate-400 mb-16 md:mb-0">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-white tracking-wider">NEXA FINANCE</span>
+            <span className="font-bold text-white tracking-wider">VALORA FINANZAS</span>
             <span>•</span>
-            <span>Motor de Proyección Diaria de Liquidez</span>
+            <span>Inteligencia Financiera & Flujo Diario de Caja</span>
           </div>
           <div>
             100% Local-First en IndexedDB • Sin costos recurrentes • Listo para Render.com

@@ -124,7 +124,7 @@ export const SettingsView: React.FC = () => {
         if (ok) {
           showNotification('¡Datos importados con éxito! La app se ha actualizado.');
         } else {
-          alert('El archivo seleccionado no tiene un formato válido de respaldo de NEXA Finance.');
+          alert('El archivo seleccionado no tiene un formato válido de respaldo de VALORA Finanzas.');
         }
       }
     };
@@ -352,7 +352,7 @@ export const SettingsView: React.FC = () => {
               Arquitectura Local-First de Confidencialidad Total
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed">
-              NEXA Finance fue diseñada para funcionar <strong>100% en tu dispositivo</strong> sin costos recurrentes, sin servidores centrales que almacenen tus datos y sin telemetría ni analítica invasiva. Tus estados de cuenta y transacciones no salen de tu máquina.
+              VALORA Finanzas fue diseñada para funcionar <strong>100% en tu dispositivo</strong> sin costos recurrentes, sin servidores centrales que almacenen tus datos y sin telemetría ni analítica invasiva. Tus estados de cuenta y transacciones no salen de tu máquina.
             </p>
           </div>
         </div>

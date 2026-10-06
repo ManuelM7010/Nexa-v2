@@ -16,7 +16,7 @@ export const PWAInstallButton: React.FC = () => {
         id="btn-install-pwa"
         onClick={install}
         className="flex items-center gap-1.5 rounded-lg bg-blue-600/20 border border-blue-500/40 px-3 py-1.5 text-xs font-semibold text-blue-300 shadow-sm hover:bg-blue-600/30 hover:text-white transition cursor-pointer"
-        title="Instalar NEXA Finance como PWA en tu dispositivo"
+        title="Instalar VALORA Finanzas como PWA en tu dispositivo"
       >
         <Download className="w-3.5 h-3.5 text-blue-400" />
         <span>Instalar App</span>
@@ -52,7 +52,7 @@ export const PWAInstallButton: React.FC = () => {
                 </button>
               </div>
               <p className="text-sm text-slate-300 mb-4 leading-relaxed">
-                Para disfrutar de NEXA Finance a pantalla completa y sin conexión a internet:
+                Para disfrutar de VALORA Finanzas a pantalla completa y sin conexión a internet:
               </p>
               <ol className="space-y-3 text-xs text-slate-300 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
                 <li className="flex items-start gap-2">

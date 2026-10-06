@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { PWAInstallButton } from './PWAInstallButton';
+import { BrandLogo } from './BrandLogo';
 import {
   Plus,
   Server,
@@ -92,41 +93,25 @@ export const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
         {/* Brand identity */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-400 p-0.5 shadow-lg shadow-blue-500/20 flex-shrink-0">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <span className="text-base sm:text-lg font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">
-                NX
-              </span>
-            </div>
-          </div>
+          <BrandLogo size="md" />
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-1 truncate">
-                NEXA <span className="text-blue-400 font-light">FINANCE</span>
-              </h1>
-              {isOnline ? (
-                <span
-                  title="Modo local-first sincronizado"
-                  className="hidden sm:inline-flex text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 items-center gap-1 flex-shrink-0"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>Offline Ready</span>
-                </span>
-              ) : (
-                <span
-                  title="Modo 100% Offline: Datos en almacenamiento local"
-                  className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 flex-shrink-0"
-                >
-                  <WifiOff className="w-3 h-3 text-amber-400" />
-                  <span className="hidden sm:inline">Offline</span>
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate hidden xs:block">
-              Daily Cash Flow & Ahorros
-            </p>
-          </div>
+          {isOnline ? (
+            <span
+              title="Modo local-first sincronizado"
+              className="hidden xl:inline-flex text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 items-center gap-1 flex-shrink-0"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Offline Ready</span>
+            </span>
+          ) : (
+            <span
+              title="Modo 100% Offline: Datos en almacenamiento local"
+              className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 flex-shrink-0"
+            >
+              <WifiOff className="w-3 h-3 text-amber-400" />
+              <span className="hidden sm:inline">Offline</span>
+            </span>
+          )}
         </div>
 
         {/* Center: Today's date banner (hidden on small mobile to give room to actions) */}

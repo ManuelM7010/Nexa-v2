@@ -167,7 +167,7 @@ export const ReportsView: React.FC = () => {
     const summaryHeaders = [
       '',
       '',
-      `"REPORTE MENSUAL NEXA FINANCE - ${monthName.toUpperCase()} ${selectedYear}"`,
+      `"REPORTE MENSUAL VALORA FINANZAS - ${monthName.toUpperCase()} ${selectedYear}"`,
       '',
       '',
       '',

@@ -20,6 +20,7 @@ import {
   Pin,
   Maximize2,
   Minimize2,
+  Calendar,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
 
@@ -30,6 +31,7 @@ export const TransactionsView: React.FC = () => {
     accounts,
     creditCards,
     settings,
+    todayStr,
     setIsNewTxOpen,
     setEditingTransaction,
     openNewTransactionModal,
@@ -43,10 +45,20 @@ export const TransactionsView: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<string>('all');
+  const [filterOnlyToday, setFilterOnlyToday] = useState(false);
   const [isTableScrollFixed, setIsTableScrollFixed] = useState(true);
+
+  // Count movements specifically on today's real date
+  const todayCount = useMemo(() => {
+    return allMonthTransactions.filter((tx) => tx.date === todayStr).length;
+  }, [allMonthTransactions, todayStr]);
 
   const filteredTransactions = useMemo(() => {
     return allMonthTransactions.filter((tx) => {
+      // Filter only today
+      if (filterOnlyToday && tx.date !== todayStr) {
+        return false;
+      }
       // Search
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
@@ -91,7 +103,7 @@ export const TransactionsView: React.FC = () => {
       }
       return true;
     });
-  }, [allMonthTransactions, searchTerm, filterType, filterCategory, filterStatus, filterPayment]);
+  }, [allMonthTransactions, searchTerm, filterType, filterCategory, filterStatus, filterPayment, filterOnlyToday, todayStr]);
 
   // Quick stats of filtered transactions
   const filteredStats = useMemo(() => {
@@ -436,11 +448,38 @@ export const TransactionsView: React.FC = () => {
             )}
           </select>
 
+          {/* Filter specifically by today's movements */}
+          <button
+            type="button"
+            onClick={() => setFilterOnlyToday(!filterOnlyToday)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer border ${
+              filterOnlyToday
+                ? 'bg-sky-500 text-slate-950 border-sky-400 font-extrabold shadow-sm shadow-sky-500/25 ring-1 ring-sky-300'
+                : 'bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-800'
+            }`}
+            title={`Filtrar para ver únicamente los movimientos del día de hoy (${formatDateEs(todayStr, { withDayName: true })})`}
+          >
+            <Calendar className={`w-3.5 h-3.5 ${filterOnlyToday ? 'text-slate-950' : 'text-sky-400'}`} />
+            <span>Solo Hoy</span>
+            {todayCount > 0 && (
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  filterOnlyToday
+                    ? 'bg-slate-950 text-sky-400'
+                    : 'bg-sky-500/20 text-sky-300 border border-sky-400/30'
+                }`}
+              >
+                {todayCount}
+              </span>
+            )}
+          </button>
+
           {(searchTerm ||
             filterType !== 'all' ||
             filterCategory !== 'all' ||
             filterStatus !== 'all' ||
-            filterPayment !== 'all') && (
+            filterPayment !== 'all' ||
+            filterOnlyToday) && (
             <button
               onClick={() => {
                 setSearchTerm('');
@@ -448,6 +487,7 @@ export const TransactionsView: React.FC = () => {
                 setFilterCategory('all');
                 setFilterStatus('all');
                 setFilterPayment('all');
+                setFilterOnlyToday(false);
               }}
               className="text-blue-400 hover:underline ml-auto font-medium cursor-pointer"
             >
@@ -554,12 +594,17 @@ export const TransactionsView: React.FC = () => {
                 filteredTransactions.map((tx) => {
                   const isIncome = tx.type === 'ingreso';
                   const isCardPayment = tx.type === 'pago_tarjeta';
+                  const isToday = tx.date === todayStr;
 
                   return (
                     <tr
                       key={tx.id}
-                      className={`hover:bg-slate-850/60 transition ${
-                        tx.status === 'realizado' ? 'bg-slate-900/40' : ''
+                      className={`transition ${
+                        isToday
+                          ? 'bg-sky-950/60 hover:bg-sky-900/60 border-l-4 border-l-sky-400 ring-1 ring-sky-500/30 font-semibold'
+                          : tx.status === 'realizado'
+                          ? 'bg-slate-900/40 hover:bg-slate-850/60'
+                          : 'hover:bg-slate-850/60'
                       }`}
                     >
                       {/* Status Toggle Button */}
@@ -578,15 +623,33 @@ export const TransactionsView: React.FC = () => {
                         </button>
                       </td>
 
-                      {/* Date */}
+                      {/* Date with Today highlight badge */}
                       <td className="py-3 px-3 whitespace-nowrap text-slate-300">
-                        {formatDateEs(tx.date, { withDayName: false })}
+                        <div className="flex items-center gap-1.5">
+                          {isToday && (
+                            <span
+                              title={`Movimiento de la fecha de hoy (${formatDateEs(todayStr, { withDayName: true })})`}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-sky-500 text-slate-950 shadow-sm shadow-sky-500/25 ring-1 ring-sky-300 flex-shrink-0 animate-pulse"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-950"></span>
+                              HOY
+                            </span>
+                          )}
+                          <span className={isToday ? 'font-bold text-sky-400' : ''}>
+                            {formatDateEs(tx.date, { withDayName: false })}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Concept */}
                       <td className="py-3 px-4">
-                        <div className="font-bold text-white flex items-center gap-1.5">
-                          <span>{tx.concept}</span>
+                        <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
+                          <span className={isToday ? 'text-sky-100' : ''}>{tx.concept}</span>
+                          {isToday && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 border border-sky-400/40">
+                              Hoy
+                            </span>
+                          )}
                           {tx.origin?.startsWith('sub:') && (
                             <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                               Suscripción
@@ -644,6 +707,8 @@ export const TransactionsView: React.FC = () => {
                               ? 'text-emerald-400'
                               : isCardPayment
                               ? 'text-sky-400'
+                              : isToday
+                              ? 'text-sky-300 font-extrabold'
                               : 'text-slate-100'
                           }
                         >

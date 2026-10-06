@@ -140,7 +140,7 @@ export const WhiteboardCanvas: React.FC = () => {
             x: 620,
             y: 50,
             color: '#fef08a',
-            text: '💡 Pizarra Libre NEXA:\n• Dibuja flechas y diagramas\n• Escribe ideas de gastos\n• Agrega tablas financieras\n• Todo se guarda automáticamente',
+            text: '💡 Pizarra Libre VALORA:\n• Dibuja flechas y diagramas\n• Escribe ideas de gastos\n• Agrega tablas financieras\n• Todo se guarda automáticamente',
           },
         ]);
       }

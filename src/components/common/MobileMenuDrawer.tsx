@@ -1,5 +1,6 @@
 import React from 'react';
 import { useFinance } from '../../context/FinanceContext';
+import { BrandLogo } from './BrandLogo';
 import {
   LayoutDashboard,
   PiggyBank,
@@ -241,12 +242,7 @@ export const MobileMenuDrawer: React.FC = () => {
 
           {/* Drawer Header */}
           <div className="px-5 pb-3 border-b border-slate-800 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                Menú de Navegación
-              </h2>
-              <p className="text-xs text-slate-400">Todos los módulos financieros</p>
-            </div>
+            <BrandLogo size="sm" />
             <button
               onClick={() => setIsMobileMenuOpen(false)}
               className="p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white border border-slate-800 cursor-pointer"

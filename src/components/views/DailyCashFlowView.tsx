@@ -736,7 +736,7 @@ export const DailyCashFlowView: React.FC = () => {
                   <div className="space-y-3">
                     <p className="text-slate-300 leading-relaxed">
                       {isStartMonth
-                        ? 'Septiembre de 2026 marca el punto oficial de inicio de tu sistema financiero en NEXA. Los saldos de tus cuentas bancarias y efectivo quedan registrados con fecha 15 de Septiembre.'
+                        ? 'Septiembre de 2026 marca el punto oficial de inicio de tu sistema financiero en VALORA Finanzas. Los saldos de tus cuentas bancarias y efectivo quedan registrados con fecha 15 de Septiembre.'
                         : 'El saldo de apertura de este mes coincide exactamente con el saldo de cierre del mes anterior, garantizando continuidad matemática absoluta en tu tesorería.'}
                     </p>
                     <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">

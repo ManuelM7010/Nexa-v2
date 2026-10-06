@@ -50,7 +50,7 @@ export const RenderGuideModal: React.FC = () => {
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Paso a paso exacto para alojar NEXA Finance como PWA estática sin costos recurrentes
+                Paso a paso exacto para alojar VALORA Finanzas como PWA estática sin costos recurrentes
               </p>
             </div>
           </div>
@@ -115,9 +115,9 @@ export const RenderGuideModal: React.FC = () => {
                 <div className="bg-slate-900 p-2.5 rounded-lg font-mono text-[11px] text-slate-300 space-y-1">
                   <div>git init</div>
                   <div>git add .</div>
-                  <div>git commit -m "feat: NEXA Finance complete PWA"</div>
+                  <div>git commit -m "feat: VALORA Finanzas complete PWA"</div>
                   <div>git branch -M main</div>
-                  <div>git remote add origin https://github.com/TU_USUARIO/nexa-finance.git</div>
+                  <div>git remote add origin https://github.com/TU_USUARIO/valora-finanzas.git</div>
                   <div>git push -u origin main</div>
                 </div>
               </div>

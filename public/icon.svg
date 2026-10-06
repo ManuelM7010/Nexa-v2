@@ -8,19 +8,19 @@
       <stop offset="100%" stop-color="#020617"/>
     </radialGradient>
 
-    <!-- Metallic electric cyan / emerald fintech gradient -->
-    <linearGradient id="cyberNeon" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#2563eb"/>
-      <stop offset="45%" stop-color="#0284c7"/>
-      <stop offset="80%" stop-color="#06b6d4"/>
+    <!-- Metallic electric cobalt / sky fintech gradient -->
+    <linearGradient id="valoraPrimary" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="45%" stop-color="#2563eb"/>
+      <stop offset="80%" stop-color="#0284c7"/>
       <stop offset="100%" stop-color="#38bdf8"/>
     </linearGradient>
 
     <!-- Emerald success glow accent -->
-    <linearGradient id="emeraldGrowth" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#059669"/>
-      <stop offset="50%" stop-color="#10b981"/>
-      <stop offset="100%" stop-color="#34d399"/>
+    <linearGradient id="valoraAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#10b981"/>
     </linearGradient>
 
     <!-- Premium glass / silver highlights -->
@@ -72,37 +72,20 @@
   <!-- Ambient background glow under the emblem -->
   <circle cx="256" cy="256" r="140" fill="#0284c7" opacity="0.16" filter="url(#ultraGlow)"/>
 
-  <!-- Growth trajectory line (Cash Flow curve) behind the NEXA Monogram -->
-  <path d="M 92 372 C 160 372, 190 280, 260 270 C 320 260, 360 170, 420 120" 
-        fill="none" 
-        stroke="url(#emeraldGrowth)" 
-        stroke-width="10" 
-        stroke-linecap="round" 
-        opacity="0.35" 
-        filter="url(#ultraGlow)"/>
+  <!-- Geometric Vault Diamond Foundation -->
+  <rect x="110" y="110" width="292" height="292" rx="72" transform="rotate(45 256 256)" fill="#0f172a" stroke="#1e293b" stroke-width="4" filter="url(#softShadow)"/>
+  <rect x="116" y="116" width="280" height="280" rx="66" transform="rotate(45 256 256)" fill="none" stroke="url(#rimLight)" stroke-width="2" opacity="0.5"/>
 
-  <!-- NEXA ICON EMBLEM (Centered, mathematically proportioned) -->
+  <!-- VALORA EMBLEM: Interlocking Ascendant 'V' Precision Wings -->
   <g filter="url(#softShadow)">
-    <!-- Left Pillar of 'N' -->
-    <path d="M 124 148 C 124 139.16 131.16 132 140 132 L 184 132 C 192.84 132 200 139.16 200 148 L 200 364 C 200 372.84 192.84 380 184 380 L 140 380 C 131.16 380 124 372.84 124 364 Z" 
-          fill="url(#cyberNeon)"/>
+    <!-- Left Ascending Wing -->
+    <path d="M 170 170 L 250 370 C 253 376 259 376 262 370 L 290 310 L 220 140 C 215 130 196 132 188 144 Z" fill="url(#valoraPrimary)"/>
 
-    <!-- Right Pillar of 'N' with Arrow Extension -->
-    <path d="M 312 188 C 312 179.16 319.16 172 328 172 L 372 172 C 380.84 172 388 179.16 388 188 L 388 364 C 388 372.84 380.84 380 372 380 L 328 380 C 319.16 380 312 372.84 312 364 Z" 
-          fill="url(#cyberNeon)"/>
+    <!-- Right Ascending Emerald-Cyan Apex Wing -->
+    <path d="M 342 170 L 262 370 C 259 376 253 376 250 370 L 222 310 L 292 140 C 297 130 316 132 324 144 Z" fill="url(#valoraAccent)"/>
 
-    <!-- Main Diagonal Futuristic Bridge Ribbon -->
-    <path d="M 172 136 L 340 376 C 344.2 382 352.8 382 357 376 L 380 344 C 383.5 339 382.5 332 377.5 325 L 210 88 C 205.8 82 197.2 82 193 88 L 170 120 C 166.5 125 167.5 132 172 136 Z" 
-          fill="url(#glassRibbon)"/>
-
-    <!-- Upward FinTech Vector Arrow (Growth) -->
-    <g transform="translate(350, 102)">
-      <polygon points="0,-16 28,24 -28,24" fill="#38bdf8" filter="url(#ultraGlow)"/>
-      <polygon points="0,-10 20,20 -20,20" fill="#ffffff"/>
-    </g>
-
-    <!-- Cashflow Liquidity Quantum Node (Pulse dot) -->
-    <circle cx="260" cy="270" r="14" fill="#10b981" filter="url(#ultraGlow)"/>
-    <circle cx="260" cy="270" r="7" fill="#ffffff"/>
+    <!-- Core Vault Node (Wealth Nucleus) -->
+    <circle cx="256" cy="260" r="22" fill="#38bdf8" filter="url(#ultraGlow)"/>
+    <circle cx="256" cy="260" r="11" fill="#ffffff"/>
   </g>
 </svg>

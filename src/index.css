@@ -43,7 +43,7 @@ html {
 }
 
 /* =========================================================
-   CONFIGURACIÓN 1: MODO OSCURO FINTECH
+   CONFIGURACIÓN 1: MODO OSCURO FINTECH (Profundo, Sin Fugas de Blanco)
    ========================================================= */
 :root,
 [data-theme="dark"],
@@ -51,6 +51,64 @@ html.dark,
 body.dark,
 .theme-dark {
   color-scheme: dark;
+}
+
+/* Enforce dark backgrounds and eliminate browser default white leaks */
+[data-theme="dark"],
+html.dark,
+body.dark,
+.theme-dark {
+  background-color: #020617;
+  color: #f1f5f9;
+}
+
+/* Selects, dropdowns y optgroups en modo oscuro */
+[data-theme="dark"] select,
+[data-theme="dark"] select option,
+[data-theme="dark"] optgroup,
+.theme-dark select,
+.theme-dark select option,
+.theme-dark optgroup,
+:root select option,
+html.dark select option {
+  background-color: #0b0f19 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Datepickers y calendar icons en modo oscuro */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator,
+.theme-dark input[type="date"]::-webkit-calendar-picker-indicator,
+.theme-dark input[type="month"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.88);
+  cursor: pointer;
+}
+
+/* Evitar que autofill de Chrome vuelva blancos los campos en modo oscuro */
+[data-theme="dark"] input:-webkit-autofill,
+[data-theme="dark"] input:-webkit-autofill:hover,
+[data-theme="dark"] input:-webkit-autofill:focus,
+.theme-dark input:-webkit-autofill,
+.theme-dark input:-webkit-autofill:hover,
+.theme-dark input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc !important;
+  -webkit-box-shadow: 0 0 0px 1000px #090d16 inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Scrollbars oscuros ejecutivos */
+[data-theme="dark"] ::-webkit-scrollbar-track,
+.theme-dark ::-webkit-scrollbar-track {
+  background: #020617;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb,
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover,
+.theme-dark ::-webkit-scrollbar-thumb:hover {
+  background: #334155;
 }
 
 /* =========================================================

@@ -210,7 +210,7 @@ export const QuickSearchModal: React.FC = () => {
             {!q && (
               <div className="py-8 text-center text-slate-400">
                 <Search className="w-8 h-8 mx-auto text-slate-600 mb-2" />
-                <p className="text-sm font-semibold text-slate-300">Búsqueda rápida en NEXA</p>
+                <p className="text-sm font-semibold text-slate-300">Búsqueda rápida en VALORA</p>
                 <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1">
                   Escribe un concepto (ej. "Salario", "Uber", "Super"), una tarjeta, una meta o el nombre de una vista.
                 </p>
@@ -400,7 +400,7 @@ export const QuickSearchModal: React.FC = () => {
           {/* Footer note */}
           <div className="px-4 py-2 bg-slate-950/60 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
             <span>Presiona ESC para cerrar</span>
-            <span>NEXA Fast Search</span>
+            <span>VALORA Fast Search</span>
           </div>
         </motion.div>
       </div>

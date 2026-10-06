@@ -273,7 +273,7 @@ class NexaStorageService {
 
     const backup: NexaFullBackup = {
       version: 6,
-      appName: 'NEXA Finance',
+      appName: 'VALORA Finanzas',
       exportDate: new Date().toISOString(),
       data: {
         accounts,
@@ -312,8 +312,8 @@ class NexaStorageService {
   }
 
   async importFullBackup(backup: NexaFullBackup): Promise<boolean> {
-    if (!backup || !backup.data || backup.appName !== 'NEXA Finance') {
-      throw new Error('El archivo de respaldo no es válido para NEXA Finance');
+    if (!backup || !backup.data || (backup.appName !== 'VALORA Finanzas' && backup.appName !== 'NEXA Finance')) {
+      throw new Error('El archivo de respaldo no es válido para VALORA Finanzas');
     }
 
     // Create automatic safety snapshot in localStorage before importing
