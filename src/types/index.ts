@@ -71,6 +71,11 @@ export interface CreditCard {
   paymentDueDay: number; // 1-31
   usualPaymentDay?: number; // 1-31
   color?: string;
+  bankLogoKey?: string; // Preset bank key (e.g. 'santander', 'bbva', 'bac', 'nu', 'chase', 'bofa', etc.)
+  bankLogoUrl?: string; // Optional custom bank logo URL
+  network?: 'visa' | 'mastercard' | 'amex' | 'generic'; // Card payment network
+  cardDesignPreset?: string; // Visual card style / gradient preset
+  last4Digits?: string; // e.g. '8842'
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

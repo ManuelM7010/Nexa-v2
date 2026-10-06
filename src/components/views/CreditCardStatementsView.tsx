@@ -46,6 +46,11 @@ import {
   ArrowLeftRight,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
+import {
+  BankLogoBadge,
+  DigitalCardMiniBanner,
+  getBankPreset,
+} from '../common/DigitalCreditCard';
 
 export const CreditCardStatementsView: React.FC = () => {
   const {
@@ -858,16 +863,19 @@ export const CreditCardStatementsView: React.FC = () => {
             <button
               key={card.id}
               onClick={() => handleSelectCardInCortes(card.id)}
-              className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
+              className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
                 isSelected
-                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/50 shadow-sm'
+                  ? 'bg-rose-500/15 text-rose-300 border-rose-500/50 shadow-sm ring-1 ring-rose-500/30'
                   : 'bg-slate-900 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
               }`}
             >
-              <CreditCardIcon className="w-4 h-4 text-rose-400" />
-              <span>{card.name}</span>
+              <BankLogoBadge card={card} size="sm" />
+              <div className="text-left leading-tight">
+                <span className="block font-bold">{card.name}</span>
+                <span className="block text-[10px] text-slate-400 font-normal">{card.bank}</span>
+              </div>
               <span
-                className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md ${
+                className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md ml-1 ${
                   isFullyPaid
                     ? 'bg-emerald-500/20 text-emerald-400'
                     : isSelected
@@ -887,46 +895,40 @@ export const CreditCardStatementsView: React.FC = () => {
         <div className="space-y-6">
           {/* Statement Document Card */}
           <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-2xl">
-            {/* Statement Header */}
-            <div className="bg-slate-900 border-b border-slate-800 p-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
-                    <Receipt className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-lg font-black text-white">{statement.cardName}</h3>
-                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                        {statement.bank}
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                          statement.status === 'pagado'
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                            : statement.status === 'parcial'
-                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                            : statement.status === 'cortado'
-                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                            : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                        }`}
-                      >
-                        {statement.status === 'pagado'
-                          ? '✓ Liquidado / Sin Saldo'
-                          : statement.status === 'parcial'
-                          ? `⚡ Abono Parcial (${formatMoney(statement.totalPayments || 0, settings.currencySymbol)} abonado)`
-                          : statement.status === 'cortado'
-                          ? '● Cortado (Pendiente de Pago)'
-                          : '⚡ Ciclo en Curso'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Periodo del corte: <strong className="text-slate-100">{formatPeriodEs(statement.cycleStartDate, statement.cycleEndDate)}</strong>{' '}
-                      <span className="text-slate-500">({statement.cycleStartDate} al {statement.cycleEndDate})</span>
-                      <span className="ml-2 text-slate-400">· Corte: día {statement.cutOffDay}</span>
-                    </p>
-                  </div>
-                </div>
+            {/* Statement Header with Authentic Digital Bank Card Visual */}
+            <div className="bg-slate-900/90 border-b border-slate-800 p-5 sm:p-6 space-y-4">
+              <DigitalCardMiniBanner
+                card={currentCard}
+                statusBadge={
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                      statement.status === 'pagado'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : statement.status === 'parcial'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        : statement.status === 'cortado'
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                        : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                    }`}
+                  >
+                    {statement.status === 'pagado'
+                      ? '✓ Liquidado / Sin Saldo'
+                      : statement.status === 'parcial'
+                      ? `⚡ Abono Parcial (${formatMoney(statement.totalPayments || 0, settings.currencySymbol)} abonado)`
+                      : statement.status === 'cortado'
+                      ? '● Cortado (Pendiente de Pago)'
+                      : '⚡ Ciclo en Curso'}
+                  </span>
+                }
+              />
+
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs pt-1">
+                <p className="text-slate-400">
+                  Periodo del corte: <strong className="text-slate-100">{formatPeriodEs(statement.cycleStartDate, statement.cycleEndDate)}</strong>{' '}
+                  <span className="text-slate-500">({statement.cycleStartDate} al {statement.cycleEndDate})</span>
+                  <span className="ml-2 text-slate-400">· Corte: día {statement.cutOffDay}</span>
+                  <span className="ml-2 text-slate-400">· Pago límite: día {currentCard.paymentDueDay}</span>
+                </p>
 
                 <div className="flex items-center gap-2 no-print">
                   <button
@@ -1319,16 +1321,13 @@ export const CreditCardStatementsView: React.FC = () => {
                     onClick={() => handleSelectCardInRange(card.id)}
                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
                       isSelected
-                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm'
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm ring-1 ring-rose-500/30'
                         : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:bg-slate-850'
                     }`}
                   >
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: card.color || '#ef4444' }}
-                    />
+                    <BankLogoBadge card={card} size="sm" />
                     <span>{card.name}</span>
-                    <span className="text-[10px] text-slate-400">({card.bank})</span>
+                    <span className="text-[10px] text-slate-400 font-normal">({card.bank})</span>
                   </button>
                 );
               })}
@@ -1628,10 +1627,19 @@ export const CreditCardStatementsView: React.FC = () => {
                 Movimientos del <strong className="text-white font-mono">{rangeStartDate}</strong> al{' '}
                 <strong className="text-white font-mono">{rangeEndDate}</strong>:
               </span>
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-semibold text-[11px]">
-                {rangeCardId === 'all'
-                  ? `Todas las Tarjetas (${activeCards.length})`
-                  : activeCards.find((c) => c.id === rangeCardId)?.name || 'Tarjeta Seleccionada'}
+              <span className="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 font-semibold text-[11px] flex items-center gap-1.5 border border-slate-700/60">
+                {rangeCardId === 'all' ? (
+                  <>
+                    <CreditCardIcon className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Todas las Tarjetas ({activeCards.length})</span>
+                  </>
+                ) : (
+                  <>
+                    <BankLogoBadge card={activeCards.find((c) => c.id === rangeCardId)} size="sm" />
+                    <span>{activeCards.find((c) => c.id === rangeCardId)?.name}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">({activeCards.find((c) => c.id === rangeCardId)?.bank})</span>
+                  </>
+                )}
               </span>
             </div>
 

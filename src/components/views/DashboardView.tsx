@@ -38,6 +38,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { QuickExpenseTemplates } from '../common/QuickExpenseTemplates';
 import { CalculatorButton } from '../common/CalculatorButton';
+import { BankLogoBadge } from '../common/DigitalCreditCard';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -778,9 +779,12 @@ export const DashboardView: React.FC = () => {
                           const usedPercent = c.limit > 0 ? Math.round((c.initialUsedBalance / c.limit) * 100) : 0;
                           return (
                             <div key={c.id} className="flex justify-between items-center p-2 rounded-lg bg-slate-950/60 border border-slate-800/80 text-[11px]">
-                              <div>
-                                <span className="font-bold text-white block">{c.name}</span>
-                                <span className="text-slate-500 text-[10px]">Uso: {usedPercent}%</span>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <BankLogoBadge card={c} size="sm" />
+                                <div className="truncate">
+                                  <span className="font-bold text-white block truncate">{c.name}</span>
+                                  <span className="text-slate-500 text-[10px]">{c.bank} · Uso: {usedPercent}%</span>
+                                </div>
                               </div>
                               <div className="text-right">
                                 <span className="font-mono font-bold text-rose-400">{formatMoney(c.initialUsedBalance, settings.currencySymbol)}</span>

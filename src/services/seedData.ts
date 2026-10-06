@@ -304,6 +304,9 @@ export function generateDemoSeedData(): {
       id: 'card_bac',
       name: 'BAC Visa Signature',
       bank: 'BAC Credomatic',
+      bankLogoKey: 'bac',
+      network: 'visa',
+      last4Digits: '8842',
       limit: 200000, // $2,000.00
       initialUsedBalance: 42000, // $420.00 used
       cutOffDay: 20,
@@ -318,6 +321,9 @@ export function generateDemoSeedData(): {
       id: 'card_x',
       name: 'Mastercard Black Agrícola',
       bank: 'Banco Agrícola',
+      bankLogoKey: 'agricola',
+      network: 'mastercard',
+      last4Digits: '3190',
       limit: 150000, // $1,500.00
       initialUsedBalance: 15000, // $150.00 used
       cutOffDay: 15,
