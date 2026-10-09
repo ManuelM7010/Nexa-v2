@@ -25,8 +25,13 @@ import {
   BANK_PRESETS,
   BANK_REGIONS,
   BankRegion,
+  CARD_DESIGN_PRESETS,
+  CardDesignPreset,
+  EL_SALVADOR_CARD_TEMPLATES,
+  ElSalvadorCardTemplate,
   getBankPreset,
   getInternetBankLogoUrl,
+  resolveCardDesign,
 } from '../common/DigitalCreditCard';
 
 export const CreditCardsView: React.FC = () => {
@@ -48,9 +53,10 @@ export const CreditCardsView: React.FC = () => {
   // Form state
   const [name, setName] = useState('');
   const [bank, setBank] = useState('');
-  const [bankLogoKey, setBankLogoKey] = useState<string>('bac');
+  const [bankLogoKey, setBankLogoKey] = useState<string>('cuscatlan');
   const [bankLogoUrl, setBankLogoUrl] = useState<string>('');
-  const [bankFilterRegion, setBankFilterRegion] = useState<BankRegion>('todos');
+  const [cardDesignPreset, setCardDesignPreset] = useState<string>('premia_gold');
+  const [bankFilterRegion, setBankFilterRegion] = useState<BankRegion>('el_salvador');
   const [bankSearchQuery, setBankSearchQuery] = useState<string>('');
   const [network, setNetwork] = useState<'visa' | 'mastercard' | 'amex'>('visa');
   const [last4Digits, setLast4Digits] = useState<string>('');
@@ -59,6 +65,20 @@ export const CreditCardsView: React.FC = () => {
   const [cutOffDay, setCutOffDay] = useState(20);
   const [paymentDueDay, setPaymentDueDay] = useState(5);
   const [usualPaymentDay, setUsualPaymentDay] = useState(4);
+  const [templateFilterTag, setTemplateFilterTag] = useState<string>('todas');
+  const [designFilterCategory, setDesignFilterCategory] = useState<string>('todas');
+
+  // Filtered Salvadoran card templates
+  const filteredTemplates = useMemo(() => {
+    if (templateFilterTag === 'todas') return EL_SALVADOR_CARD_TEMPLATES;
+    return EL_SALVADOR_CARD_TEMPLATES.filter((t) => t.typeTag === templateFilterTag);
+  }, [templateFilterTag]);
+
+  // Filtered card design presets
+  const filteredCardDesigns = useMemo(() => {
+    if (designFilterCategory === 'todas') return CARD_DESIGN_PRESETS;
+    return CARD_DESIGN_PRESETS.filter((d) => d.category === designFilterCategory);
+  }, [designFilterCategory]);
 
   // Filtered bank presets for selection
   const filteredBankPresets = useMemo(() => {
@@ -81,15 +101,16 @@ export const CreditCardsView: React.FC = () => {
 
   const openNewCardModal = () => {
     setEditingCard(null);
-    setName('Visa Signature');
-    setBank('BAC Credomatic');
-    setBankLogoKey('bac');
+    setName('Cuscatlán Premia Gold');
+    setBank('Banco Cuscatlán');
+    setBankLogoKey('cuscatlan');
+    setCardDesignPreset('premia_gold');
     setBankLogoUrl('');
-    setBankFilterRegion('todos');
+    setBankFilterRegion('el_salvador');
     setBankSearchQuery('');
     setNetwork('visa');
-    setLast4Digits('8842');
-    setLimitStr('1500');
+    setLast4Digits('4589');
+    setLimitStr('3000');
     setUsedStr('0');
     setCutOffDay(15);
     setPaymentDueDay(30);
@@ -103,7 +124,8 @@ export const CreditCardsView: React.FC = () => {
     setBank(card.bank);
     setBankLogoKey(card.bankLogoKey || getBankPreset(card.bank).id);
     setBankLogoUrl(card.bankLogoUrl || '');
-    setBankFilterRegion('todos');
+    setCardDesignPreset(card.cardDesignPreset || resolveCardDesign(card).id);
+    setBankFilterRegion('el_salvador');
     setBankSearchQuery('');
     setNetwork(card.network || 'visa');
     setLast4Digits(card.last4Digits || '');
@@ -113,6 +135,18 @@ export const CreditCardsView: React.FC = () => {
     setPaymentDueDay(card.paymentDueDay);
     setUsualPaymentDay(card.usualPaymentDay || card.paymentDueDay - 1);
     setIsModalOpen(true);
+  };
+
+  const handleSelectTemplate = (tmpl: ElSalvadorCardTemplate) => {
+    setName(tmpl.name);
+    setBank(tmpl.bank);
+    setBankLogoKey(tmpl.bankLogoKey);
+    setCardDesignPreset(tmpl.designPreset);
+    setNetwork(tmpl.network);
+    setLimitStr(centsToDollars(tmpl.typicalLimit).toFixed(2));
+    setCutOffDay(tmpl.cutOffDay);
+    setPaymentDueDay(tmpl.paymentDueDay);
+    setUsualPaymentDay(tmpl.paymentDueDay - 1);
   };
 
   const handleSelectBankPreset = (presetId: string) => {
@@ -145,6 +179,7 @@ export const CreditCardsView: React.FC = () => {
       bank: bank.trim() || 'Banco',
       bankLogoKey,
       bankLogoUrl: bankLogoUrl.trim() || undefined,
+      cardDesignPreset,
       network,
       last4Digits: last4Digits.trim() || undefined,
       limit: dollarsToCents(limitStr),
@@ -440,9 +475,14 @@ export const CreditCardsView: React.FC = () => {
 
             {/* LIVE DIGITAL CARD PREVIEW */}
             <div>
-              <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Vista Previa de Tarjeta Digital
-              </span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Vista Previa de Tarjeta Digital
+                </span>
+                <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                  {CARD_DESIGN_PRESETS.find((p) => p.id === cardDesignPreset)?.name || 'Estilo Institucional'}
+                </span>
+              </div>
               <DigitalCreditCard
                 card={{
                   id: editingCard?.id || 'preview_card',
@@ -450,6 +490,7 @@ export const CreditCardsView: React.FC = () => {
                   bank: bank.trim() || 'Banco Emisor',
                   bankLogoKey,
                   bankLogoUrl: bankLogoUrl.trim() || undefined,
+                  cardDesignPreset,
                   network,
                   last4Digits: last4Digits.trim() || '4589',
                   limit: dollarsToCents(limitStr || 0),
@@ -464,6 +505,145 @@ export const CreditCardsView: React.FC = () => {
                 compact
                 currencySymbol={settings.currencySymbol}
               />
+            </div>
+
+            {/* SECCIÓN 1: PLANTILLAS POPULARES DE EL SALVADOR (1 CLIC) */}
+            <div className="space-y-2 p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/50 via-slate-900 to-amber-950/40 border border-blue-500/30 shadow-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span className="text-base">🇸🇻</span>
+                  <span>Tarjetas Populares de El Salvador en 1 Clic ({filteredTemplates.length})</span>
+                </span>
+                {/* Category filter pills */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+                  {[
+                    { id: 'todas', label: 'Todas' },
+                    { id: 'premia', label: '🥇 Premia Gold' },
+                    { id: 'dorada', label: '👑 Doradas' },
+                    { id: 'super', label: '🛒 Walmart & Súper' },
+                    { id: 'azul', label: '💙 Las Azules' },
+                    { id: 'viaje', label: '✈️ LifeMiles / Club' },
+                    { id: 'black', label: '💎 Black & Platino' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setTemplateFilterTag(tab.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap transition cursor-pointer ${
+                        templateFilterTag === tab.id
+                          ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/50'
+                          : 'bg-slate-900/90 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {filteredTemplates.map((tmpl) => {
+                  const isMatch = name === tmpl.name && bank === tmpl.bank;
+                  return (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => handleSelectTemplate(tmpl)}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 flex items-center gap-2 ${
+                        isMatch
+                          ? 'bg-blue-600/30 text-white border-cyan-400 ring-1 ring-cyan-400/50 shadow-md'
+                          : 'bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-800'
+                      }`}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: tmpl.accent }}
+                      />
+                      <span>{tmpl.name}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/40 text-slate-400 font-mono">
+                        {tmpl.badgeTitle}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* SECCIÓN 2: ESTILO / TIPO VISUAL DE TARJETA (Premia Gold, Dorada, Walmart, Selectos, Azul...) */}
+            <div className="space-y-2.5 p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="text-slate-200 font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Estilo y Tipo Visual de Tarjeta ({filteredCardDesigns.length})</span>
+                </label>
+                {/* Category tabs for card designs */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+                  {[
+                    { id: 'todas', label: 'Todos' },
+                    { id: 'premia_oro', label: '🥇 Premia Gold & Doradas' },
+                    { id: 'super', label: '🛒 Walmart & Súper' },
+                    { id: 'azul', label: '💙 Las Azules' },
+                    { id: 'premium', label: '💎 Platino & Black' },
+                    { id: 'cobranded', label: '✈️ Co-Branded & Viajes' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setDesignFilterCategory(tab.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap transition cursor-pointer ${
+                        designFilterCategory === tab.id
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                          : 'bg-slate-900/90 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 max-h-40 overflow-y-auto p-1 bg-slate-900/40 rounded-xl border border-slate-800/60">
+                {filteredCardDesigns.map((dp) => {
+                  const isSelected = cardDesignPreset === dp.id;
+                  return (
+                    <button
+                      key={dp.id}
+                      type="button"
+                      onClick={() => setCardDesignPreset(dp.id)}
+                      className={`p-2.5 rounded-xl border flex flex-col items-start justify-between gap-1.5 transition cursor-pointer text-left relative overflow-hidden ${
+                        isSelected
+                          ? 'border-cyan-400 ring-1 ring-cyan-400/60 shadow-lg'
+                          : 'border-slate-800 hover:border-slate-700'
+                      }`}
+                      style={{
+                        background: isSelected
+                          ? 'linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(15, 23, 42, 0.9) 100%)'
+                          : '#0f172a',
+                      }}
+                      title={dp.description}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div
+                          className={`w-4 h-4 rounded-full border border-white/30 bg-gradient-to-tr ${dp.gradient} shrink-0 shadow-sm`}
+                        />
+                        {isSelected && (
+                          <div className="w-3.5 h-3.5 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold block text-white leading-tight">
+                          {dp.name}
+                        </span>
+                        <span className="text-[8px] text-slate-400 block truncate font-mono">
+                          {dp.categoryLabel}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <form onSubmit={handleSaveCard} className="space-y-4 text-xs">

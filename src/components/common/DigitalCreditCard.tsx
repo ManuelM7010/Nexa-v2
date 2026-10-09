@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { CreditCard } from '../../types';
 import { formatMoney } from '../../utils/formatters';
 
-export type BankRegion = 'todos' | 'mexico' | 'centroamerica' | 'sudamerica' | 'global' | 'fintech';
+export type BankRegion = 'todos' | 'el_salvador' | 'mexico' | 'centroamerica' | 'sudamerica' | 'global' | 'fintech';
 
 export interface BankPreset {
   id: string;
   name: string;
   aliases: string[];
   country: string;
-  region: 'mexico' | 'centroamerica' | 'sudamerica' | 'global' | 'fintech';
+  region: BankRegion;
   gradient: string;
   textColor: string;
   accentColor: string;
@@ -22,6 +22,7 @@ export interface BankPreset {
 
 export const BANK_REGIONS: { id: BankRegion; name: string }[] = [
   { id: 'todos', name: 'Todos los Bancos' },
+  { id: 'el_salvador', name: '🇸🇻 El Salvador' },
   { id: 'mexico', name: 'México' },
   { id: 'centroamerica', name: 'Centroamérica' },
   { id: 'sudamerica', name: 'Sudamérica' },
@@ -38,9 +39,1196 @@ export function getInternetBankLogoUrl(domainOrName: string): string {
 }
 
 // -------------------------------------------------------------
-// Authentic Bank Logos (Vector SVG) & Card Presets
+// Card Design Presets & Visual Tiers (Azules, Doradas, Walmart, Super Selectos, Premia Gold...)
+// -------------------------------------------------------------
+export type CardDesignCategory = 'premia_oro' | 'super' | 'azul' | 'premium' | 'cobranded';
+
+export interface CardDesignPreset {
+  id: string;
+  name: string;
+  category: CardDesignCategory;
+  categoryLabel: string;
+  description: string;
+  badgeLabel: string;
+  gradient: string;
+  borderColor: string;
+  chipColor: 'gold' | 'silver';
+  textColor: string;
+  accentColor: string;
+  isGoldFoil?: boolean;
+}
+
+export const CARD_DESIGN_PRESETS: CardDesignPreset[] = [
+  // --- 🥇 PREMIA GOLD & DORADAS ---
+  {
+    id: 'premia_gold',
+    name: 'Premia Gold Prestige',
+    category: 'premia_oro',
+    categoryLabel: 'Premia Gold',
+    description: 'Lingote de oro cepillado de alto gramaje con filigrana guilloché de seguridad bancaria y sello 3D grabado',
+    badgeLabel: 'PREMIA GOLD',
+    gradient: 'from-[#fef08a] via-[#eab308] via-[#ca8a04] to-[#713f12]',
+    borderColor: 'border-amber-300/80',
+    chipColor: 'gold',
+    textColor: 'text-amber-950',
+    accentColor: '#ca8a04',
+    isGoldFoil: true,
+  },
+  {
+    id: 'gold',
+    name: 'Dorada / Gold Clásica',
+    category: 'premia_oro',
+    categoryLabel: 'Dorada / Gold',
+    description: 'Oro noble reflectante con destellos champagne y microcircuitos grabados en oro puro',
+    badgeLabel: 'GOLD / ORO',
+    gradient: 'from-[#fef9c3] via-[#facc15] via-[#ca8a04] to-[#78350f]',
+    borderColor: 'border-yellow-400/70',
+    chipColor: 'gold',
+    textColor: 'text-amber-950',
+    accentColor: '#f59e0b',
+    isGoldFoil: true,
+  },
+  {
+    id: 'rose_gold',
+    name: 'Oro Rosado / Rose Gold',
+    category: 'premia_oro',
+    categoryLabel: 'Rose Gold',
+    description: 'Aleación de oro rosa sedoso con reflejos cobrizos y brillo nacarado de alta gama',
+    badgeLabel: 'ROSE GOLD',
+    gradient: 'from-[#fecdd3] via-[#fb7185] via-[#e11d48] to-[#4c0519]',
+    borderColor: 'border-rose-300/70',
+    chipColor: 'gold',
+    textColor: 'text-rose-950',
+    accentColor: '#f43f5e',
+    isGoldFoil: true,
+  },
+  {
+    id: 'millas_gold',
+    name: 'Millas Plus / Viajero Gold',
+    category: 'premia_oro',
+    categoryLabel: 'Millas Gold',
+    description: 'Oro ámbar con brújula de navegación y alas de aviación para acumulación de millas',
+    badgeLabel: 'MILLAS GOLD',
+    gradient: 'from-[#fef08a] via-[#d97706] to-[#451a03]',
+    borderColor: 'border-amber-400/80',
+    chipColor: 'gold',
+    textColor: 'text-amber-950',
+    accentColor: '#d97706',
+    isGoldFoil: true,
+  },
+  {
+    id: 'puntos_oro',
+    name: 'Puntos Oro El Salvador',
+    category: 'premia_oro',
+    categoryLabel: 'Puntos Oro',
+    description: 'Dorado intenso con constelación de recompensas y chip de oro brillante',
+    badgeLabel: 'PUNTOS ORO',
+    gradient: 'from-[#fde047] via-[#ca8a04] to-[#422006]',
+    borderColor: 'border-yellow-300/80',
+    chipColor: 'gold',
+    textColor: 'text-yellow-950',
+    accentColor: '#eab308',
+    isGoldFoil: true,
+  },
+
+  // --- 🛒 WALMART & SUPERMERCADOS ---
+  {
+    id: 'walmart',
+    name: 'Walmart Mastercard Oficial',
+    category: 'super',
+    categoryLabel: 'Walmart & Super',
+    description: 'Azul rey Walmart oficial con la chispa amarilla Spark de 6 destellos, Maxi Despensa y Despensa de Don Juan',
+    badgeLabel: 'WALMART CASHBACK',
+    gradient: 'from-[#0071dc] via-[#004c91] to-[#001d3d]',
+    borderColor: 'border-yellow-400/70',
+    chipColor: 'silver',
+    textColor: 'text-white',
+    accentColor: '#ffc220',
+  },
+  {
+    id: 'walmart_black',
+    name: 'Walmart Rewards Black / Elite',
+    category: 'super',
+    categoryLabel: 'Walmart Black',
+    description: 'Negro grafito mate de alta gama con la chispa luminiscente dorada Spark de Walmart',
+    badgeLabel: 'WALMART ELITE',
+    gradient: 'from-[#1f2937] via-[#111827] to-[#030712]',
+    borderColor: 'border-yellow-400/80',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#ffc220',
+  },
+  {
+    id: 'super_selectos',
+    name: 'Súper Selectos Oficial',
+    category: 'super',
+    categoryLabel: 'Súper Selectos',
+    description: 'Verde esmeralda y oro cálido oficial de Súper Selectos El Salvador con monograma grabado',
+    badgeLabel: 'SELECTOS CLUB',
+    gradient: 'from-[#047857] via-[#064e3b] to-[#022c22]',
+    borderColor: 'border-amber-400/60',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#facc15',
+  },
+  {
+    id: 'super_selectos_oro',
+    name: 'Súper Selectos Gold',
+    category: 'super',
+    categoryLabel: 'Selectos Gold',
+    description: 'Dorado champagne con laurel verde y membresía especial en compras de supermercado',
+    badgeLabel: 'SELECTOS GOLD',
+    gradient: 'from-[#fef08a] via-[#15803d] to-[#052e16]',
+    borderColor: 'border-yellow-300/80',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#84cc16',
+  },
+  {
+    id: 'pricesmart',
+    name: 'PriceSmart Diamond Club',
+    category: 'super',
+    categoryLabel: 'PriceSmart',
+    description: 'Rojo carmesí y azul medianoche con sello de membresía para compras mayoristas de club',
+    badgeLabel: 'PRICESMART CLUB',
+    gradient: 'from-[#b91c1c] via-[#1e3a8a] to-[#091026]',
+    borderColor: 'border-red-400/50',
+    chipColor: 'silver',
+    textColor: 'text-white',
+    accentColor: '#f87171',
+  },
+  {
+    id: 'super_cashback',
+    name: 'Supermercados CashBack',
+    category: 'super',
+    categoryLabel: 'Super CashBack',
+    description: 'Rojo rubí a naranja ámbar con devolución especial en compras de víveres y abarrotes',
+    badgeLabel: 'SUPER CASHBACK',
+    gradient: 'from-[#e11d48] via-[#ea580c] to-[#431407]',
+    borderColor: 'border-orange-400/60',
+    chipColor: 'silver',
+    textColor: 'text-white',
+    accentColor: '#fb923c',
+  },
+
+  // --- 💙 LAS AZULES ---
+  {
+    id: 'blue_clasica',
+    name: 'Azul / Clásica Rewards',
+    category: 'azul',
+    categoryLabel: 'Las Azules',
+    description: 'Azul cobalto y real con ondas dinámicas de fidelidad',
+    badgeLabel: 'CLÁSICA / AZUL',
+    gradient: 'from-[#1d4ed8] via-[#1e3a8a] to-[#0b132b]',
+    borderColor: 'border-blue-400/50',
+    chipColor: 'silver',
+    textColor: 'text-white',
+    accentColor: '#60a5fa',
+  },
+  {
+    id: 'blue_zafiro',
+    name: 'Azul Zafiro / El Salvador',
+    category: 'azul',
+    categoryLabel: 'Las Azules',
+    description: 'Azul eléctrico vibrante y cyan zafiro con facetas reflectantes (inspirado en Banco Azul y Visa Zafiro)',
+    badgeLabel: 'AZUL ZAFIRO',
+    gradient: 'from-[#0284c7] via-[#0369a1] to-[#082f49]',
+    borderColor: 'border-sky-400/60',
+    chipColor: 'silver',
+    textColor: 'text-white',
+    accentColor: '#38bdf8',
+  },
+  {
+    id: 'blue_navy',
+    name: 'Azul Marino Ejecutivo',
+    category: 'azul',
+    categoryLabel: 'Las Azules',
+    description: 'Deep Navy y azul medianoche con filamentos plata (estilo Cuscatlán MultiPremios y BAC Conecta)',
+    badgeLabel: 'NAVY EJECUTIVA',
+    gradient: 'from-[#172554] via-[#0f172a] to-[#020617]',
+    borderColor: 'border-blue-500/40',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#93c5fd',
+  },
+  {
+    id: 'blue_cashback',
+    name: 'Azul CashBack / Conecta',
+    category: 'azul',
+    categoryLabel: 'Las Azules',
+    description: 'Azul aguamarina a azul profundo con ondas de reembolso inteligente y compras en línea',
+    badgeLabel: 'CONECTA AZUL',
+    gradient: 'from-[#0284c7] via-[#1d4ed8] to-[#0f172a]',
+    borderColor: 'border-cyan-400/50',
+    chipColor: 'silver',
+    textColor: 'text-white',
+    accentColor: '#22d3ee',
+  },
+
+  // --- 💎 ALTA GAMA PLATINO & OBSIDIANA ---
+  {
+    id: 'platinum',
+    name: 'Platino / Platinum Metal',
+    category: 'premium',
+    categoryLabel: 'Alta Gama Platino',
+    description: 'Plata mercurio cepillado con reflejos de titanio y chip plata pulida',
+    badgeLabel: 'PLATINUM',
+    gradient: 'from-[#f8fafc] via-[#cbd5e1] via-[#94a3b8] to-[#334155]',
+    borderColor: 'border-slate-300/60',
+    chipColor: 'silver',
+    textColor: 'text-slate-900',
+    accentColor: '#e2e8f0',
+  },
+  {
+    id: 'black_infinite',
+    name: 'Black / Infinite Obsidiana',
+    category: 'premium',
+    categoryLabel: 'Obsidiana Black',
+    description: 'Negro obsidiana mate de máxima exclusividad con bisel en oro y logo lustroso',
+    badgeLabel: 'INFINITE BLACK',
+    gradient: 'from-[#18181b] via-[#09090b] to-[#000000]',
+    borderColor: 'border-amber-400/50',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#fbbf24',
+  },
+  {
+    id: 'premia_platinum',
+    name: 'Premia Platinum',
+    category: 'premium',
+    categoryLabel: 'Premia Platinum',
+    description: 'Titanio cepillado con guilloché plateado y sello 3D Premia Platinum de alto nivel',
+    badgeLabel: 'PREMIA PLATINUM',
+    gradient: 'from-[#e2e8f0] via-[#94a3b8] to-[#1e293b]',
+    borderColor: 'border-slate-300/80',
+    chipColor: 'silver',
+    textColor: 'text-slate-900',
+    accentColor: '#cbd5e1',
+  },
+
+  // --- ✈️ VIAJES & CO-BRANDED ---
+  {
+    id: 'lifemiles_avianca',
+    name: 'LifeMiles Avianca',
+    category: 'cobranded',
+    categoryLabel: 'Viajes & Avianca',
+    description: 'Rojo rubí Avianca y plata cepillada con plumaje aerodinámico (Agrícola y Cuscatlán)',
+    badgeLabel: 'LIFEMILES AVIANCA',
+    gradient: 'from-[#dc2626] via-[#991b1b] to-[#450a0a]',
+    borderColor: 'border-red-400/60',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#fca5a5',
+  },
+  {
+    id: 'real_madrid_cuscatlan',
+    name: 'Cuscatlán Real Madrid',
+    category: 'cobranded',
+    categoryLabel: 'Deportiva Oficial',
+    description: 'Blanco perla y azul real con corona dorada y detalles de afición deportiva exclusiva',
+    badgeLabel: 'REAL MADRID',
+    gradient: 'from-[#ffffff] via-[#e2e8f0] via-[#1e3a8a] to-[#0f172a]',
+    borderColor: 'border-amber-400/60',
+    chipColor: 'gold',
+    textColor: 'text-slate-900',
+    accentColor: '#f59e0b',
+  },
+
+  // --- 🏛️ INSTITUCIONAL POR DEFECTO ---
+  {
+    id: 'bank_default',
+    name: 'Color Institucional del Banco',
+    category: 'azul',
+    categoryLabel: 'Color del Banco',
+    description: 'Utiliza el degradado y colores corporativos oficiales del banco emisor seleccionado',
+    badgeLabel: 'DIGITAL',
+    gradient: 'from-[#1e293b] via-[#0f172a] to-[#020617]',
+    borderColor: 'border-slate-700/60',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#38bdf8',
+  },
+];
+
+export function getCardDesignPreset(id?: string): CardDesignPreset {
+  if (id) {
+    const found = CARD_DESIGN_PRESETS.find((p) => p.id === id);
+    if (found) return found;
+  }
+  return CARD_DESIGN_PRESETS[CARD_DESIGN_PRESETS.length - 1]; // bank_default
+}
+
+// Resolver design based on explicit preset or card title heuristics
+export function resolveCardDesign(card?: Partial<CreditCard>): CardDesignPreset {
+  if (!card) return getCardDesignPreset('bank_default');
+
+  if (card.cardDesignPreset && card.cardDesignPreset !== 'bank_default') {
+    const found = CARD_DESIGN_PRESETS.find((p) => p.id === card.cardDesignPreset);
+    if (found) return found;
+  }
+
+  const name = (card.name || '').toLowerCase();
+  if (name.includes('walmart black') || (name.includes('walmart') && (name.includes('black') || name.includes('elite')))) {
+    return getCardDesignPreset('walmart_black');
+  }
+  if (name.includes('walmart')) return getCardDesignPreset('walmart');
+  if (name.includes('selectos oro') || name.includes('selectos gold')) return getCardDesignPreset('super_selectos_oro');
+  if (name.includes('selectos')) return getCardDesignPreset('super_selectos');
+  if (name.includes('pricesmart')) return getCardDesignPreset('pricesmart');
+  if (name.includes('super cashback') || (name.includes('super') && name.includes('cashback'))) return getCardDesignPreset('super_cashback');
+  if (name.includes('premia platinum') || name.includes('premia plat')) return getCardDesignPreset('premia_platinum');
+  if (name.includes('premia gold') || (name.includes('premia') && (name.includes('oro') || name.includes('gold')))) {
+    return getCardDesignPreset('premia_gold');
+  }
+  if (name.includes('premia')) return getCardDesignPreset('premia_gold');
+  if (name.includes('rose gold') || name.includes('oro rosa')) return getCardDesignPreset('rose_gold');
+  if (name.includes('millas gold') || name.includes('millas plus gold') || name.includes('viajero gold')) return getCardDesignPreset('millas_gold');
+  if (name.includes('puntos oro')) return getCardDesignPreset('puntos_oro');
+  if (name.includes('gold') || name.includes('oro') || name.includes('dorada')) {
+    return getCardDesignPreset('gold');
+  }
+  if (name.includes('zafiro') || name.includes('banco azul')) return getCardDesignPreset('blue_zafiro');
+  if (name.includes('navy') || name.includes('multipremios azul')) return getCardDesignPreset('blue_navy');
+  if (name.includes('conecta') || name.includes('cashback azul')) return getCardDesignPreset('blue_cashback');
+  if (name.includes('azul') || name.includes('blue') || name.includes('economía') || name.includes('economia') || name.includes('clásica') || name.includes('clasica')) {
+    return getCardDesignPreset('blue_clasica');
+  }
+  if (name.includes('lifemiles') || name.includes('avianca')) return getCardDesignPreset('lifemiles_avianca');
+  if (name.includes('real madrid')) return getCardDesignPreset('real_madrid_cuscatlan');
+  if (name.includes('platinum') || name.includes('platino')) return getCardDesignPreset('platinum');
+  if (name.includes('black') || name.includes('infinite') || name.includes('obsidian') || name.includes('titanio')) {
+    return getCardDesignPreset('black_infinite');
+  }
+
+  return getCardDesignPreset('bank_default');
+}
+
+// -------------------------------------------------------------
+// Plantillas Populares de Tarjetas de El Salvador (1 Clic)
+// -------------------------------------------------------------
+export interface ElSalvadorCardTemplate {
+  id: string;
+  name: string;
+  bank: string;
+  bankLogoKey: string;
+  designPreset: string;
+  network: 'visa' | 'mastercard' | 'amex';
+  badgeTitle: string;
+  typeTag: 'premia' | 'dorada' | 'azul' | 'super' | 'black' | 'viaje';
+  typicalLimit: number;
+  cutOffDay: number;
+  paymentDueDay: number;
+  accent: string;
+}
+
+export const EL_SALVADOR_CARD_TEMPLATES: ElSalvadorCardTemplate[] = [
+  // --- PREMIA GOLD ---
+  {
+    id: 'tmpl_cuscatlan_premia_gold',
+    name: 'Cuscatlán Premia Gold',
+    bank: 'Banco Cuscatlán',
+    bankLogoKey: 'cuscatlan',
+    designPreset: 'premia_gold',
+    network: 'visa',
+    badgeTitle: 'Premia Gold',
+    typeTag: 'premia',
+    typicalLimit: 300000,
+    cutOffDay: 15,
+    paymentDueDay: 30,
+    accent: '#f59e0b',
+  },
+  {
+    id: 'tmpl_promerica_premia_gold',
+    name: 'Promerica Premia Gold',
+    bank: 'Banco Promerica',
+    bankLogoKey: 'promerica',
+    designPreset: 'premia_gold',
+    network: 'visa',
+    badgeTitle: 'Premia Gold SV',
+    typeTag: 'premia',
+    typicalLimit: 250000,
+    cutOffDay: 16,
+    paymentDueDay: 31,
+    accent: '#10b981',
+  },
+  {
+    id: 'tmpl_bac_premia_gold',
+    name: 'BAC Premia Gold',
+    bank: 'BAC Credomatic',
+    bankLogoKey: 'bac',
+    designPreset: 'premia_gold',
+    network: 'mastercard',
+    badgeTitle: 'Premia Gold BAC',
+    typeTag: 'premia',
+    typicalLimit: 280000,
+    cutOffDay: 14,
+    paymentDueDay: 29,
+    accent: '#eab308',
+  },
+
+  // --- WALMART & SUPERMERCADOS ---
+  {
+    id: 'tmpl_bac_walmart',
+    name: 'BAC Walmart Mastercard',
+    bank: 'BAC Credomatic',
+    bankLogoKey: 'bac',
+    designPreset: 'walmart',
+    network: 'mastercard',
+    badgeTitle: 'Walmart Spark',
+    typeTag: 'super',
+    typicalLimit: 150000,
+    cutOffDay: 20,
+    paymentDueDay: 5,
+    accent: '#0071dc',
+  },
+  {
+    id: 'tmpl_bac_walmart_black',
+    name: 'BAC Walmart Black Elite',
+    bank: 'BAC Credomatic',
+    bankLogoKey: 'bac',
+    designPreset: 'walmart_black',
+    network: 'mastercard',
+    badgeTitle: 'Walmart Elite',
+    typeTag: 'super',
+    typicalLimit: 350000,
+    cutOffDay: 20,
+    paymentDueDay: 5,
+    accent: '#facc15',
+  },
+  {
+    id: 'tmpl_cuscatlan_selectos',
+    name: 'Cuscatlán Super Selectos',
+    bank: 'Banco Cuscatlán',
+    bankLogoKey: 'cuscatlan',
+    designPreset: 'super_selectos',
+    network: 'visa',
+    badgeTitle: 'Súper Selectos',
+    typeTag: 'super',
+    typicalLimit: 180000,
+    cutOffDay: 18,
+    paymentDueDay: 3,
+    accent: '#059669',
+  },
+  {
+    id: 'tmpl_agricola_selectos',
+    name: 'Agrícola Súper Selectos',
+    bank: 'Banco Agrícola',
+    bankLogoKey: 'agricola',
+    designPreset: 'super_selectos',
+    network: 'visa',
+    badgeTitle: 'Selectos Club',
+    typeTag: 'super',
+    typicalLimit: 180000,
+    cutOffDay: 20,
+    paymentDueDay: 5,
+    accent: '#10b981',
+  },
+  {
+    id: 'tmpl_bac_pricesmart',
+    name: 'BAC PriceSmart Diamond',
+    bank: 'BAC Credomatic',
+    bankLogoKey: 'bac',
+    designPreset: 'pricesmart',
+    network: 'visa',
+    badgeTitle: 'PriceSmart Club',
+    typeTag: 'super',
+    typicalLimit: 200000,
+    cutOffDay: 25,
+    paymentDueDay: 10,
+    accent: '#dc2626',
+  },
+
+  // --- LAS AZULES ---
+  {
+    id: 'tmpl_agricola_azul',
+    name: 'Agrícola Visa Clásica Azul',
+    bank: 'Banco Agrícola',
+    bankLogoKey: 'agricola',
+    designPreset: 'blue_clasica',
+    network: 'visa',
+    badgeTitle: 'Clásica Azul',
+    typeTag: 'azul',
+    typicalLimit: 120000,
+    cutOffDay: 22,
+    paymentDueDay: 7,
+    accent: '#2563eb',
+  },
+  {
+    id: 'tmpl_bac_economia_azul',
+    name: 'BAC Conecta / Economía Azul',
+    bank: 'BAC Credomatic',
+    bankLogoKey: 'bac',
+    designPreset: 'blue_cashback',
+    network: 'visa',
+    badgeTitle: 'Conecta Azul',
+    typeTag: 'azul',
+    typicalLimit: 100000,
+    cutOffDay: 16,
+    paymentDueDay: 1,
+    accent: '#1d4ed8',
+  },
+  {
+    id: 'tmpl_cuscatlan_multipremios_azul',
+    name: 'Cuscatlán MultiPremios Azul',
+    bank: 'Banco Cuscatlán',
+    bankLogoKey: 'cuscatlan',
+    designPreset: 'blue_navy',
+    network: 'visa',
+    badgeTitle: 'MultiPremios Azul',
+    typeTag: 'azul',
+    typicalLimit: 150000,
+    cutOffDay: 15,
+    paymentDueDay: 30,
+    accent: '#0284c7',
+  },
+  {
+    id: 'tmpl_banco_azul_clasica',
+    name: 'Banco Azul Clásica Zafiro',
+    bank: 'Banco Azul de El Salvador',
+    bankLogoKey: 'banco_azul',
+    designPreset: 'blue_zafiro',
+    network: 'visa',
+    badgeTitle: 'Azul Zafiro',
+    typeTag: 'azul',
+    typicalLimit: 100000,
+    cutOffDay: 19,
+    paymentDueDay: 4,
+    accent: '#0284c7',
+  },
+  {
+    id: 'tmpl_fedecredito_azul',
+    name: 'FEDECRÉDITO Visa Clásica',
+    bank: 'Sistema FEDECRÉDITO',
+    bankLogoKey: 'fedecredito',
+    designPreset: 'blue_clasica',
+    network: 'visa',
+    badgeTitle: 'FEDECRÉDITO Azul',
+    typeTag: 'azul',
+    typicalLimit: 80000,
+    cutOffDay: 20,
+    paymentDueDay: 5,
+    accent: '#1e40af',
+  },
+  {
+    id: 'tmpl_hipotecario_azul',
+    name: 'Hipotecario Visa Clásica Azul',
+    bank: 'Banco Hipotecario',
+    bankLogoKey: 'hipotecario',
+    designPreset: 'blue_clasica',
+    network: 'visa',
+    badgeTitle: 'Hipotecario Azul',
+    typeTag: 'azul',
+    typicalLimit: 90000,
+    cutOffDay: 18,
+    paymentDueDay: 3,
+    accent: '#0284c7',
+  },
+  {
+    id: 'tmpl_atlantida_azul',
+    name: 'Atlántida Visa Clásica',
+    bank: 'Banco Atlántida El Salvador',
+    bankLogoKey: 'atlantida',
+    designPreset: 'blue_clasica',
+    network: 'visa',
+    badgeTitle: 'Atlántida Azul',
+    typeTag: 'azul',
+    typicalLimit: 85000,
+    cutOffDay: 17,
+    paymentDueDay: 2,
+    accent: '#be123c',
+  },
+
+  // --- LAS DORADAS / GOLD ---
+  {
+    id: 'tmpl_bac_millas_gold',
+    name: 'BAC Millas Plus Gold',
+    bank: 'BAC Credomatic',
+    bankLogoKey: 'bac',
+    designPreset: 'millas_gold',
+    network: 'mastercard',
+    badgeTitle: 'Millas Plus Gold',
+    typeTag: 'dorada',
+    typicalLimit: 250000,
+    cutOffDay: 12,
+    paymentDueDay: 27,
+    accent: '#eab308',
+  },
+  {
+    id: 'tmpl_agricola_puntos_oro',
+    name: 'Agrícola Puntos Oro',
+    bank: 'Banco Agrícola',
+    bankLogoKey: 'agricola',
+    designPreset: 'puntos_oro',
+    network: 'visa',
+    badgeTitle: 'Puntos Oro',
+    typeTag: 'dorada',
+    typicalLimit: 260000,
+    cutOffDay: 15,
+    paymentDueDay: 30,
+    accent: '#eab308',
+  },
+  {
+    id: 'tmpl_cuscatlan_multipremios_oro',
+    name: 'Cuscatlán MultiPremios Oro',
+    bank: 'Banco Cuscatlán',
+    bankLogoKey: 'cuscatlan',
+    designPreset: 'gold',
+    network: 'visa',
+    badgeTitle: 'MultiPremios Oro',
+    typeTag: 'dorada',
+    typicalLimit: 220000,
+    cutOffDay: 15,
+    paymentDueDay: 30,
+    accent: '#d97706',
+  },
+  {
+    id: 'tmpl_davivienda_dorada',
+    name: 'Davivienda Dorada Gold',
+    bank: 'Banco Davivienda',
+    bankLogoKey: 'davivienda',
+    designPreset: 'gold',
+    network: 'mastercard',
+    badgeTitle: 'Davivienda Gold',
+    typeTag: 'dorada',
+    typicalLimit: 220000,
+    cutOffDay: 14,
+    paymentDueDay: 29,
+    accent: '#ca8a04',
+  },
+  {
+    id: 'tmpl_fedecredito_oro',
+    name: 'FEDECRÉDITO Visa Oro',
+    bank: 'Sistema FEDECRÉDITO',
+    bankLogoKey: 'fedecredito',
+    designPreset: 'gold',
+    network: 'visa',
+    badgeTitle: 'FEDECRÉDITO Oro',
+    typeTag: 'dorada',
+    typicalLimit: 200000,
+    cutOffDay: 20,
+    paymentDueDay: 5,
+    accent: '#eab308',
+  },
+
+  // --- VIAJES & CO-BRANDED ---
+  {
+    id: 'tmpl_agricola_lifemiles',
+    name: 'Agrícola Avianca LifeMiles',
+    bank: 'Banco Agrícola',
+    bankLogoKey: 'agricola',
+    designPreset: 'lifemiles_avianca',
+    network: 'visa',
+    badgeTitle: 'LifeMiles Avianca',
+    typeTag: 'viaje',
+    typicalLimit: 300000,
+    cutOffDay: 20,
+    paymentDueDay: 5,
+    accent: '#dc2626',
+  },
+  {
+    id: 'tmpl_cuscatlan_lifemiles',
+    name: 'Cuscatlán Avianca LifeMiles',
+    bank: 'Banco Cuscatlán',
+    bankLogoKey: 'cuscatlan',
+    designPreset: 'lifemiles_avianca',
+    network: 'mastercard',
+    badgeTitle: 'LifeMiles Cuscatlán',
+    typeTag: 'viaje',
+    typicalLimit: 320000,
+    cutOffDay: 15,
+    paymentDueDay: 30,
+    accent: '#dc2626',
+  },
+  {
+    id: 'tmpl_cuscatlan_real_madrid',
+    name: 'Cuscatlán Real Madrid',
+    bank: 'Banco Cuscatlán',
+    bankLogoKey: 'cuscatlan',
+    designPreset: 'real_madrid_cuscatlan',
+    network: 'visa',
+    badgeTitle: 'Real Madrid SV',
+    typeTag: 'viaje',
+    typicalLimit: 250000,
+    cutOffDay: 15,
+    paymentDueDay: 30,
+    accent: '#f59e0b',
+  },
+
+  // --- BLACK & PLATINO ---
+  {
+    id: 'tmpl_cuscatlan_infinite_black',
+    name: 'Cuscatlán Infinite Black',
+    bank: 'Banco Cuscatlán',
+    bankLogoKey: 'cuscatlan',
+    designPreset: 'black_infinite',
+    network: 'visa',
+    badgeTitle: 'Infinite Black',
+    typeTag: 'black',
+    typicalLimit: 500000,
+    cutOffDay: 28,
+    paymentDueDay: 13,
+    accent: '#f59e0b',
+  },
+  {
+    id: 'tmpl_bac_mastercard_black',
+    name: 'BAC Mastercard Black',
+    bank: 'BAC Credomatic',
+    bankLogoKey: 'bac',
+    designPreset: 'black_infinite',
+    network: 'mastercard',
+    badgeTitle: 'Mastercard Black',
+    typeTag: 'black',
+    typicalLimit: 600000,
+    cutOffDay: 25,
+    paymentDueDay: 10,
+    accent: '#ef4444',
+  },
+  {
+    id: 'tmpl_agricola_platinum',
+    name: 'Agrícola Visa Platinum',
+    bank: 'Banco Agrícola',
+    bankLogoKey: 'agricola',
+    designPreset: 'platinum',
+    network: 'visa',
+    badgeTitle: 'Visa Platinum',
+    typeTag: 'black',
+    typicalLimit: 400000,
+    cutOffDay: 22,
+    paymentDueDay: 7,
+    accent: '#cbd5e1',
+  },
+];
+
+// -------------------------------------------------------------
+// Vector SVG Emblems for Co-Branded Cards & Textures
+// -------------------------------------------------------------
+
+// Walmart Official Spark Emblem (6 bursts) & typography
+export const WalmartSparkEmblem: React.FC<{ className?: string; showText?: boolean }> = ({
+  className = 'h-7',
+  showText = true,
+}) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    {/* Walmart Yellow Spark */}
+    <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-[#ffc220] drop-shadow-sm">
+      <path d="M 50 14 C 52 14, 54 28, 54 36 C 54 40, 52 42, 50 42 C 48 42, 46 40, 46 36 C 46 28, 48 14, 50 14 Z" />
+      <path d="M 50 86 C 48 86, 46 72, 46 64 C 46 60, 48 58, 50 58 C 52 58, 54 60, 54 64 C 54 72, 52 86, 50 86 Z" />
+      <path d="M 19 32 C 20 31, 32 38, 39 42 C 43 44, 44 46, 43 48 C 42 50, 40 50, 36 48 C 30 44, 18 33, 19 32 Z" />
+      <path d="M 81 68 C 80 69, 68 62, 61 58 C 57 56, 56 54, 57 52 C 58 50, 60 50, 64 52 C 70 56, 82 67, 81 68 Z" />
+      <path d="M 19 68 C 18 67, 30 56, 36 52 C 40 50, 42 50, 43 52 C 44 54, 43 56, 39 58 C 32 62, 20 69, 19 68 Z" />
+      <path d="M 81 32 C 82 33, 70 44, 64 48 C 60 50, 58 50, 57 48 C 56 46, 57 44, 61 42 C 68 38, 80 31, 81 32 Z" />
+      <circle cx="50" cy="50" r="5" fill="#ffc220" />
+    </svg>
+    {showText && (
+      <span className="font-black text-sm tracking-tight text-white font-sans">
+        Walmart<span className="text-[#ffc220] font-black text-xs ml-0.5">✦</span>
+      </span>
+    )}
+  </div>
+);
+
+// Super Selectos Official Leaf / Cart Emblem
+export const SuperSelectosEmblem: React.FC<{ className?: string }> = ({ className = 'h-7' }) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-[#005a2b] to-[#10b981] border border-amber-300/60 flex items-center justify-center shrink-0 shadow-sm">
+      <span className="text-amber-300 font-black text-xs leading-none">S</span>
+    </div>
+    <div className="leading-tight text-left">
+      <span className="block text-[8px] font-black tracking-widest text-amber-300 uppercase">SÚPER</span>
+      <span className="block text-[11px] font-black tracking-tight text-white uppercase drop-shadow-sm">
+        SELECTOS
+      </span>
+    </div>
+  </div>
+);
+
+// PriceSmart Club Emblem
+export const PriceSmartEmblem: React.FC<{ className?: string }> = ({ className = 'h-7' }) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    <div className="bg-[#b91c1c] text-white px-1.5 py-0.5 rounded font-black text-[9px] tracking-tight border border-red-300/40">
+      CLUB
+    </div>
+    <span className="font-black text-xs text-white tracking-tight uppercase">PriceSmart</span>
+  </div>
+);
+
+// Premia Gold 3D Relief Emblem
+export const PremiaGoldEmblem: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/40 border border-amber-300/70 backdrop-blur-md shadow-md ${className}`}>
+    <div className="w-2.5 h-2.5 bg-gradient-to-tr from-amber-400 to-amber-200 transform rotate-45 rounded-xs shrink-0 shadow-sm" />
+    <span className="font-black text-[10px] tracking-widest text-amber-300 uppercase font-sans drop-shadow-sm">
+      PREMIA GOLD
+    </span>
+  </div>
+);
+
+// Premia Platinum 3D Relief Emblem
+export const PremiaPlatinumEmblem: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/45 border border-slate-300/70 backdrop-blur-md shadow-md ${className}`}>
+    <div className="w-2.5 h-2.5 bg-gradient-to-tr from-slate-200 to-slate-400 transform rotate-45 rounded-xs shrink-0 shadow-sm" />
+    <span className="font-black text-[10px] tracking-widest text-slate-200 uppercase font-sans drop-shadow-sm">
+      PREMIA PLATINUM
+    </span>
+  </div>
+);
+
+// Avianca LifeMiles Emblem
+export const LifeMilesEmblem: React.FC<{ className?: string }> = ({ className = 'h-7' }) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-red-500 drop-shadow-sm">
+      <path d="M 10 50 C 30 20, 70 20, 90 40 C 70 45, 50 60, 30 80 C 25 70, 15 60, 10 50 Z" />
+    </svg>
+    <div className="leading-tight text-left">
+      <span className="block text-[8px] font-bold text-red-300 tracking-wider uppercase">AVIANCA</span>
+      <span className="block text-[11px] font-black text-white tracking-tight uppercase">LifeMiles</span>
+    </div>
+  </div>
+);
+
+// Real Madrid Heráldica / Emblem
+export const RealMadridEmblem: React.FC<{ className?: string }> = ({ className = 'h-7' }) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-amber-400 drop-shadow-sm">
+      <path d="M 20 40 L 35 60 L 50 30 L 65 60 L 80 40 L 75 75 L 25 75 Z" />
+      <circle cx="20" cy="35" r="4" />
+      <circle cx="50" cy="25" r="4" />
+      <circle cx="80" cy="35" r="4" />
+    </svg>
+    <span className="font-black text-xs text-white tracking-tight uppercase font-sans">
+      REAL MADRID
+    </span>
+  </div>
+);
+
+// Millas Plus Golden Compass
+export const MillasCompassEmblem: React.FC<{ className?: string }> = ({ className = 'h-7' }) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-amber-300 drop-shadow-sm">
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#facc15" strokeWidth="6" />
+      <polygon points="50,15 60,45 90,50 60,55 50,85 40,55 10,50 40,45" />
+    </svg>
+    <span className="font-black text-xs text-amber-300 tracking-widest uppercase font-mono">
+      MILLAS+
+    </span>
+  </div>
+);
+
+// Guilloché Security Wave Pattern SVG
+export const GuillocheSecurityPattern: React.FC<{ opacity?: number }> = ({ opacity = 0.15 }) => (
+  <svg
+    viewBox="0 0 400 240"
+    className="absolute inset-0 w-full h-full pointer-events-none"
+    style={{ opacity }}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M -20 40 Q 60 120 160 40 T 340 40 T 520 40"
+      stroke="#ffffff"
+      strokeWidth="1.2"
+      strokeDasharray="4 2"
+    />
+    <path
+      d="M -20 70 Q 70 150 170 70 T 350 70 T 530 70"
+      stroke="#ffffff"
+      strokeWidth="1"
+    />
+    <path
+      d="M -20 100 Q 80 180 180 100 T 360 100 T 540 100"
+      stroke="#facc15"
+      strokeWidth="1.2"
+    />
+    <path
+      d="M -20 130 Q 90 210 190 130 T 370 130 T 550 130"
+      stroke="#ffffff"
+      strokeWidth="0.8"
+      strokeDasharray="3 3"
+    />
+    <path
+      d="M -20 160 Q 100 240 200 160 T 380 160 T 560 160"
+      stroke="#facc15"
+      strokeWidth="1"
+    />
+    <circle cx="200" cy="120" r="70" stroke="#facc15" strokeWidth="0.8" strokeDasharray="6 3" />
+    <circle cx="200" cy="120" r="95" stroke="#ffffff" strokeWidth="0.6" strokeDasharray="4 4" />
+  </svg>
+);
+
+// Sapphire Facet Pattern for Blue Zafiro
+export const SapphireFacetPattern: React.FC<{ opacity?: number }> = ({ opacity = 0.18 }) => (
+  <svg
+    viewBox="0 0 400 240"
+    className="absolute inset-0 w-full h-full pointer-events-none"
+    style={{ opacity }}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M 0 0 L 200 120 L 400 0" stroke="#38bdf8" strokeWidth="1" />
+    <path d="M 0 240 L 200 120 L 400 240" stroke="#38bdf8" strokeWidth="1" />
+    <polygon points="120,40 280,40 340,120 280,200 120,200 60,120" stroke="#7dd3fc" strokeWidth="1.2" />
+    <polygon points="160,70 240,70 280,120 240,170 160,170 120,120" stroke="#bae6fd" strokeWidth="0.8" strokeDasharray="4 2" />
+    <line x1="60" y1="120" x2="340" y2="120" stroke="#38bdf8" strokeWidth="0.8" />
+  </svg>
+);
+
+// -------------------------------------------------------------
+// Authentic Bank Logos (Vector SVG) & Presets (Con Especial Énfasis en El Salvador)
 // -------------------------------------------------------------
 export const BANK_PRESETS: BankPreset[] = [
+  // --- EL SALVADOR ---
+  {
+    id: 'cuscatlan',
+    name: 'Banco Cuscatlán',
+    aliases: ['cuscatlan', 'cuscatlán', 'banco cuscatlan', 'premia', 'selectos', 'banco de cuscatlan', 'tarjeta cuscatlan'],
+    country: 'El Salvador',
+    region: 'el_salvador',
+    gradient: 'from-[#1a365d] via-[#102a43] to-[#0b1c2d]',
+    textColor: 'text-white',
+    accentColor: '#f59e0b',
+    borderColor: 'border-amber-400/50',
+    chipColor: 'gold',
+    defaultNetwork: 'visa',
+    webDomain: 'bancocuscatlan.com',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        {/* Pirámide Solar Cuscatlán */}
+        <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-amber-400 drop-shadow-sm">
+          <polygon points="50,15 70,35 30,35" />
+          <polygon points="50,38 80,62 20,62" opacity="0.85" />
+          <polygon points="50,65 92,90 8,90" opacity="0.7" />
+        </svg>
+        <span className="font-black text-xs text-white tracking-wider uppercase font-sans">
+          CUSCATLAN
+        </span>
+      </div>
+    ),
+  },
+  {
+    id: 'bac',
+    name: 'BAC Credomatic',
+    aliases: ['bac', 'credomatic', 'bac credomatic', 'bac el salvador', 'walmart', 'pricesmart', 'bac san salvador'],
+    country: 'El Salvador / Centroamérica',
+    region: 'el_salvador',
+    gradient: 'from-[#a8001d] via-[#850016] to-[#45000b]',
+    textColor: 'text-white',
+    accentColor: '#f87171',
+    borderColor: 'border-red-500/50',
+    chipColor: 'gold',
+    defaultNetwork: 'visa',
+    webDomain: 'baccredomatic.com',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        {/* Lion emblem */}
+        <svg viewBox="0 0 100 100" className="w-6 h-6 shrink-0 fill-current text-white drop-shadow">
+          <circle cx="50" cy="50" r="46" fill="#ffffff" fillOpacity="0.15" />
+          <path
+            d="M 28 36 C 30 24, 45 20, 56 22 C 68 24, 76 34, 73 45 C 70 54, 62 60, 58 66 C 54 72, 49 78, 42 78 C 36 78, 30 73, 27 66 C 24 58, 26 48, 28 36 Z"
+            fill="#ffffff"
+          />
+          <circle cx="48" cy="38" r="4" fill="#a8001d" />
+          <path d="M 40 48 Q 50 56 60 48" stroke="#a8001d" strokeWidth="3" fill="none" strokeLinecap="round" />
+        </svg>
+        <span className="font-black tracking-tighter text-white text-base">BAC</span>
+      </div>
+    ),
+  },
+  {
+    id: 'agricola',
+    name: 'Banco Agrícola',
+    aliases: ['agricola', 'agrícola', 'banco agricola', 'banco agrícola', 'bancolombia el salvador'],
+    country: 'El Salvador',
+    region: 'el_salvador',
+    gradient: 'from-[#0f3d75] via-[#092b57] to-[#04162e]',
+    textColor: 'text-white',
+    accentColor: '#60a5fa',
+    borderColor: 'border-blue-400/50',
+    chipColor: 'gold',
+    defaultNetwork: 'visa',
+    webDomain: 'bancoagricola.com',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-blue-300">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="#60a5fa" strokeWidth="8" />
+          <path d="M 30 65 L 50 25 L 70 65 Z" fill="#60a5fa" />
+        </svg>
+        <div className="leading-none text-left">
+          <span className="block text-[8px] font-bold tracking-widest text-blue-200 uppercase">BANCO</span>
+          <span className="block text-xs font-black tracking-wider text-white">AGRÍCOLA</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: 'davivienda',
+    name: 'Banco Davivienda',
+    aliases: ['davivienda', 'davivienda el salvador', 'banco salvadoreño', 'banco davivienda'],
+    country: 'El Salvador / Colombia',
+    region: 'el_salvador',
+    gradient: 'from-[#ed1c24] via-[#b51016] to-[#6e0509]',
+    textColor: 'text-white',
+    accentColor: '#fca5a5',
+    borderColor: 'border-red-400/50',
+    chipColor: 'gold',
+    defaultNetwork: 'mastercard',
+    webDomain: 'davivienda.com.sv',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-white">
+          <polygon points="50,15 90,48 80,48 80,85 20,85 20,48 10,48" />
+          <rect x="40" y="55" width="20" height="30" fill="#ed1c24" />
+        </svg>
+        <span className="font-black text-xs text-white tracking-tight uppercase">Davivienda</span>
+      </div>
+    ),
+  },
+  {
+    id: 'promerica',
+    name: 'Banco Promerica',
+    aliases: ['promerica', 'promerica el salvador', 'banco promerica', 'club promerica'],
+    country: 'El Salvador / Centroamérica',
+    region: 'el_salvador',
+    gradient: 'from-[#006341] via-[#004a31] to-[#002e1e]',
+    textColor: 'text-white',
+    accentColor: '#4ade80',
+    borderColor: 'border-emerald-400/50',
+    chipColor: 'gold',
+    defaultNetwork: 'visa',
+    webDomain: 'promerica.com.sv',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        <span className="font-black text-xs text-white tracking-tight uppercase">Promerica</span>
+      </div>
+    ),
+  },
+  {
+    id: 'banco_azul',
+    name: 'Banco Azul de El Salvador',
+    aliases: ['banco azul', 'azul', 'banco azul el salvador', 'azul salvador'],
+    country: 'El Salvador',
+    region: 'el_salvador',
+    gradient: 'from-[#0284c7] via-[#0369a1] to-[#082f49]',
+    textColor: 'text-white',
+    accentColor: '#38bdf8',
+    borderColor: 'border-sky-400/50',
+    chipColor: 'silver',
+    defaultNetwork: 'visa',
+    webDomain: 'bancoazul.com',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        {/* Símbolo Ola / Ave Banco Azul */}
+        <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-white">
+          <path d="M 15 70 C 35 25, 75 35, 88 55 C 65 50, 45 60, 30 75 Z" />
+        </svg>
+        <div className="leading-tight text-left">
+          <span className="block text-[8px] font-bold text-sky-200 tracking-widest uppercase">BANCO</span>
+          <span className="block text-xs font-black text-white tracking-tight uppercase">AZUL</span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: 'fedecredito',
+    name: 'Sistema FEDECRÉDITO',
+    aliases: ['fedecredito', 'fedecrédito', 'caja de credito', 'sistema fedecredito', 'banco de los trabajadores', 'cajas de credito'],
+    country: 'El Salvador',
+    region: 'el_salvador',
+    gradient: 'from-[#003882] via-[#00255c] to-[#001338]',
+    textColor: 'text-white',
+    accentColor: '#facc15',
+    borderColor: 'border-yellow-400/50',
+    chipColor: 'gold',
+    defaultNetwork: 'visa',
+    webDomain: 'fedecredito.com.sv',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        <div className="w-4 h-4 rounded-full bg-[#facc15] flex items-center justify-center font-black text-[9px] text-[#003882]">
+          F
+        </div>
+        <span className="font-black text-xs text-white tracking-tight uppercase">
+          FEDECRÉDITO
+        </span>
+      </div>
+    ),
+  },
+  {
+    id: 'industrial',
+    name: 'Banco Industrial (Bi)',
+    aliases: ['banco industrial', 'bi', 'industrial el salvador', 'industrial guatemala'],
+    country: 'El Salvador / Guatemala',
+    region: 'el_salvador',
+    gradient: 'from-[#002f6c] via-[#001e47] to-[#001129]',
+    textColor: 'text-white',
+    accentColor: '#facc15',
+    borderColor: 'border-yellow-400/40',
+    chipColor: 'gold',
+    defaultNetwork: 'visa',
+    webDomain: 'bi.com.sv',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        <span className="font-black text-sm text-yellow-400">Bi</span>
+        <span className="font-bold text-xs text-white tracking-tight">Banco Industrial</span>
+      </div>
+    ),
+  },
+  {
+    id: 'abank',
+    name: 'Abank El Salvador',
+    aliases: ['abank', 'banco abank', 'procredit el salvador'],
+    country: 'El Salvador',
+    region: 'el_salvador',
+    gradient: 'from-[#0d9488] via-[#0f766e] to-[#115e59]',
+    textColor: 'text-white',
+    accentColor: '#5eead4',
+    borderColor: 'border-teal-400/40',
+    chipColor: 'silver',
+    defaultNetwork: 'mastercard',
+    webDomain: 'abank.com.sv',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        <span className="font-black text-sm text-white tracking-tight lowercase">abank</span>
+      </div>
+    ),
+  },
+  {
+    id: 'atlantida',
+    name: 'Banco Atlántida El Salvador',
+    aliases: ['atlantida', 'atlántida', 'banco atlantida', 'atlantida sv'],
+    country: 'El Salvador / Honduras',
+    region: 'el_salvador',
+    gradient: 'from-[#be123c] via-[#9f1239] to-[#4c0519]',
+    textColor: 'text-white',
+    accentColor: '#fda4af',
+    borderColor: 'border-rose-400/40',
+    chipColor: 'gold',
+    defaultNetwork: 'visa',
+    webDomain: 'bancoatlantida.com.sv',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        <span className="font-black text-xs text-white tracking-tight uppercase">Atlántida</span>
+      </div>
+    ),
+  },
+  {
+    id: 'hipotecario',
+    name: 'Banco Hipotecario',
+    aliases: ['hipotecario', 'banco hipotecario', 'bh el salvador'],
+    country: 'El Salvador',
+    region: 'el_salvador',
+    gradient: 'from-[#004e92] via-[#00386e] to-[#001c3d]',
+    textColor: 'text-white',
+    accentColor: '#facc15',
+    borderColor: 'border-amber-400/40',
+    chipColor: 'gold',
+    defaultNetwork: 'visa',
+    webDomain: 'bancohipotecario.com.sv',
+    renderLogo: (className = 'h-7') => (
+      <div className={`flex items-center gap-1.5 ${className}`}>
+        <span className="font-black text-xs text-amber-400">BH</span>
+        <span className="font-bold text-xs text-white tracking-tight">Hipotecario</span>
+      </div>
+    ),
+  },
+
   // --- MÉXICO ---
   {
     id: 'bbva',
@@ -78,7 +1266,6 @@ export const BANK_PRESETS: BankPreset[] = [
     webDomain: 'santander.com.mx',
     renderLogo: (className = 'h-7') => (
       <div className={`flex items-center gap-1.5 ${className}`}>
-        {/* Santander Flame */}
         <svg viewBox="0 0 100 100" className="w-6 h-6 shrink-0 fill-white drop-shadow">
           <path d="M 50 14 C 44 26, 32 38, 32 54 C 32 68, 40 78, 50 82 C 60 78, 68 68, 68 54 C 68 38, 56 26, 50 14 Z M 50 36 C 54 44, 58 52, 58 60 C 58 66, 54 70, 50 72 C 46 70, 42 66, 42 60 C 42 52, 46 44, 50 36 Z" />
         </svg>
@@ -101,7 +1288,6 @@ export const BANK_PRESETS: BankPreset[] = [
     webDomain: 'banorte.com',
     renderLogo: (className = 'h-7') => (
       <div className={`flex items-center gap-1.5 ${className}`}>
-        {/* Banorte Eagle Wings Emblem */}
         <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-white">
           <path d="M 10 35 L 50 15 L 90 35 L 50 55 Z" />
           <path d="M 20 50 L 50 65 L 80 50 L 50 35 Z" opacity="0.8" />
@@ -197,7 +1383,6 @@ export const BANK_PRESETS: BankPreset[] = [
     webDomain: 'mercadopago.com',
     renderLogo: (className = 'h-7') => (
       <div className={`flex items-center gap-1.5 ${className}`}>
-        {/* Handshake icon */}
         <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white shrink-0 drop-shadow">
           <path d="M10.5 3a2.5 2.5 0 0 0-2.5 2.5v1.2a2.5 2.5 0 0 0 1.2 2.1l1.8 1.1-1.6 1.6a2.5 2.5 0 0 0 0 3.5l4 4a2.5 2.5 0 0 0 3.5 0l4-4a2.5 2.5 0 0 0 0-3.5l-1.6-1.6 1.8-1.1A2.5 2.5 0 0 0 23 6.7V5.5A2.5 2.5 0 0 0 20.5 3h-10z" />
         </svg>
@@ -225,159 +1410,8 @@ export const BANK_PRESETS: BankPreset[] = [
       </div>
     ),
   },
-  {
-    id: 'uala',
-    name: 'Ualá',
-    aliases: ['uala', 'ualá'],
-    country: 'Argentina / México / Colombia',
-    region: 'fintech',
-    gradient: 'from-[#e11d48] via-[#be123c] to-[#4c0519]',
-    textColor: 'text-white',
-    accentColor: '#fda4af',
-    borderColor: 'border-rose-400/50',
-    chipColor: 'silver',
-    defaultNetwork: 'mastercard',
-    webDomain: 'uala.com.ar',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <span className="font-black text-base text-white tracking-tight lowercase">ualá</span>
-      </div>
-    ),
-  },
-  {
-    id: 'klar',
-    name: 'Klar',
-    aliases: ['klar', 'klar credito', 'klar tarjeta'],
-    country: 'México',
-    region: 'fintech',
-    gradient: 'from-[#0f172a] via-[#1e293b] to-[#0284c7]',
-    textColor: 'text-white',
-    accentColor: '#38bdf8',
-    borderColor: 'border-sky-400/40',
-    chipColor: 'silver',
-    defaultNetwork: 'mastercard',
-    webDomain: 'klar.mx',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1 ${className}`}>
-        <span className="font-black text-base text-sky-400 tracking-tight">klar</span>
-      </div>
-    ),
-  },
-  {
-    id: 'stori',
-    name: 'Stori',
-    aliases: ['stori', 'stori card', 'stori credito'],
-    country: 'México',
-    region: 'fintech',
-    gradient: 'from-[#059669] via-[#047857] to-[#064e3b]',
-    textColor: 'text-white',
-    accentColor: '#34d399',
-    borderColor: 'border-emerald-400/40',
-    chipColor: 'gold',
-    defaultNetwork: 'mastercard',
-    webDomain: 'storicard.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1 ${className}`}>
-        <span className="font-black text-base text-white tracking-tight">stori</span>
-      </div>
-    ),
-  },
 
-  // --- CENTROAMÉRICA ---
-  {
-    id: 'bac',
-    name: 'BAC Credomatic',
-    aliases: ['bac', 'credomatic', 'bac credomatic', 'bac san salvador', 'bac panama', 'bac costa rica', 'bac honduras', 'bac guatemala'],
-    country: 'Centroamérica',
-    region: 'centroamerica',
-    gradient: 'from-[#a8001d] via-[#850016] to-[#45000b]',
-    textColor: 'text-white',
-    accentColor: '#f87171',
-    borderColor: 'border-red-500/40',
-    chipColor: 'gold',
-    defaultNetwork: 'visa',
-    webDomain: 'baccredomatic.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        {/* Lion emblem */}
-        <svg viewBox="0 0 100 100" className="w-6 h-6 shrink-0 fill-current text-white drop-shadow">
-          <circle cx="50" cy="50" r="46" fill="#ffffff" fillOpacity="0.15" />
-          <path
-            d="M 28 36 C 30 24, 45 20, 56 22 C 68 24, 76 34, 73 45 C 70 54, 62 60, 58 66 C 54 72, 49 78, 42 78 C 36 78, 30 73, 27 66 C 24 58, 26 48, 28 36 Z"
-            fill="#ffffff"
-          />
-          <circle cx="48" cy="38" r="4" fill="#a8001d" />
-          <path d="M 40 48 Q 50 56 60 48" stroke="#a8001d" strokeWidth="3" fill="none" strokeLinecap="round" />
-        </svg>
-        <span className="font-black tracking-tighter text-white text-base">BAC</span>
-      </div>
-    ),
-  },
-  {
-    id: 'agricola',
-    name: 'Banco Agrícola',
-    aliases: ['agricola', 'agrícola', 'banco agricola', 'banco agrícola'],
-    country: 'El Salvador',
-    region: 'centroamerica',
-    gradient: 'from-[#0f3d75] via-[#092b57] to-[#04162e]',
-    textColor: 'text-white',
-    accentColor: '#60a5fa',
-    borderColor: 'border-blue-400/40',
-    chipColor: 'gold',
-    defaultNetwork: 'mastercard',
-    webDomain: 'bancoagricola.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-blue-300">
-          <circle cx="50" cy="50" r="42" fill="none" stroke="#60a5fa" strokeWidth="8" />
-          <path d="M 30 65 L 50 25 L 70 65 Z" fill="#60a5fa" />
-        </svg>
-        <div className="leading-none text-left">
-          <span className="block text-[8px] font-bold tracking-widest text-blue-200 uppercase">BANCO</span>
-          <span className="block text-xs font-black tracking-wider text-white">AGRÍCOLA</span>
-        </div>
-      </div>
-    ),
-  },
-  {
-    id: 'cuscatlan',
-    name: 'Banco Cuscatlán',
-    aliases: ['cuscatlan', 'cuscatlán', 'banco cuscatlan'],
-    country: 'El Salvador / Honduras',
-    region: 'centroamerica',
-    gradient: 'from-[#1a365d] via-[#102a43] to-[#0b1c2d]',
-    textColor: 'text-white',
-    accentColor: '#f59e0b',
-    borderColor: 'border-amber-400/40',
-    chipColor: 'gold',
-    defaultNetwork: 'visa',
-    webDomain: 'bancocuscatlan.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <div className="w-4 h-4 bg-amber-400 rounded-sm transform rotate-45 shrink-0" />
-        <span className="font-black text-xs text-white tracking-wider uppercase">CUSCATLAN</span>
-      </div>
-    ),
-  },
-  {
-    id: 'promerica',
-    name: 'Banco Promerica',
-    aliases: ['promerica', 'banco promerica', 'promerica cr', 'promerica sv', 'promerica gt'],
-    country: 'Centroamérica / Caribe',
-    region: 'centroamerica',
-    gradient: 'from-[#006341] via-[#004a31] to-[#002e1e]',
-    textColor: 'text-white',
-    accentColor: '#4ade80',
-    borderColor: 'border-emerald-400/40',
-    chipColor: 'gold',
-    defaultNetwork: 'visa',
-    webDomain: 'promerica.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <span className="font-black text-xs text-white tracking-tight uppercase">Promerica</span>
-      </div>
-    ),
-  },
+  // --- CENTROAMÉRICA RESTANTE ---
   {
     id: 'banco_general',
     name: 'Banco General',
@@ -404,7 +1438,7 @@ export const BANK_PRESETS: BankPreset[] = [
     id: 'ficohsa',
     name: 'Ficohsa',
     aliases: ['ficohsa', 'banco ficohsa'],
-    country: 'Honduras / Guatemala / Nicaragua / Panamá',
+    country: 'Honduras / Nicaragua / Panamá',
     region: 'centroamerica',
     gradient: 'from-[#0b2f64] via-[#061d40] to-[#020e21]',
     textColor: 'text-white',
@@ -416,26 +1450,6 @@ export const BANK_PRESETS: BankPreset[] = [
     renderLogo: (className = 'h-7') => (
       <div className={`flex items-center gap-1.5 ${className}`}>
         <span className="font-black text-xs text-white tracking-tight uppercase">Ficohsa</span>
-      </div>
-    ),
-  },
-  {
-    id: 'industrial',
-    name: 'Banco Industrial (BI)',
-    aliases: ['banco industrial', 'bi', 'industrial guatemala'],
-    country: 'Guatemala / El Salvador / Panamá',
-    region: 'centroamerica',
-    gradient: 'from-[#002f6c] via-[#001e47] to-[#001129]',
-    textColor: 'text-white',
-    accentColor: '#facc15',
-    borderColor: 'border-yellow-400/40',
-    chipColor: 'gold',
-    defaultNetwork: 'visa',
-    webDomain: 'corporacionbi.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <span className="font-black text-sm text-yellow-400">Bi</span>
-        <span className="font-bold text-xs text-white tracking-tight">Banco Industrial</span>
       </div>
     ),
   },
@@ -466,29 +1480,6 @@ export const BANK_PRESETS: BankPreset[] = [
     ),
   },
   {
-    id: 'davivienda',
-    name: 'Davivienda',
-    aliases: ['davivienda'],
-    country: 'Colombia / Centroamérica',
-    region: 'sudamerica',
-    gradient: 'from-[#ed1c24] via-[#b51016] to-[#6e0509]',
-    textColor: 'text-white',
-    accentColor: '#fca5a5',
-    borderColor: 'border-red-400/40',
-    chipColor: 'gold',
-    defaultNetwork: 'mastercard',
-    webDomain: 'davivienda.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-white">
-          <polygon points="50,15 90,48 80,48 80,85 20,85 20,48 10,48" />
-          <rect x="40" y="55" width="20" height="30" fill="#ed1c24" />
-        </svg>
-        <span className="font-black text-xs text-white tracking-tight uppercase">Davivienda</span>
-      </div>
-    ),
-  },
-  {
     id: 'bcp',
     name: 'BCP (Banco de Crédito)',
     aliases: ['bcp', 'banco de credito', 'banco de crédito'],
@@ -505,28 +1496,6 @@ export const BANK_PRESETS: BankPreset[] = [
       <div className={`flex items-center gap-1.5 ${className}`}>
         <span className="font-black text-base text-white tracking-tight">BCP</span>
         <span className="w-2.5 h-2.5 bg-[#ff7800] rounded-full shrink-0" />
-      </div>
-    ),
-  },
-  {
-    id: 'interbank',
-    name: 'Interbank',
-    aliases: ['interbank'],
-    country: 'Perú',
-    region: 'sudamerica',
-    gradient: 'from-[#009b3a] via-[#00702a] to-[#004218]',
-    textColor: 'text-white',
-    accentColor: '#86efac',
-    borderColor: 'border-emerald-400/40',
-    chipColor: 'silver',
-    defaultNetwork: 'visa',
-    webDomain: 'interbank.pe',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <span className="w-3.5 h-3.5 rounded-full bg-white flex items-center justify-center font-black text-[9px] text-[#009b3a]">
-          i
-        </span>
-        <span className="font-black text-xs text-white tracking-tight">Interbank</span>
       </div>
     ),
   },
@@ -549,132 +1518,8 @@ export const BANK_PRESETS: BankPreset[] = [
       </div>
     ),
   },
-  {
-    id: 'bci',
-    name: 'BCI',
-    aliases: ['bci', 'banco de credito e inversiones'],
-    country: 'Chile',
-    region: 'sudamerica',
-    gradient: 'from-[#004691] via-[#003166] to-[#001c3d]',
-    textColor: 'text-white',
-    accentColor: '#38bdf8',
-    borderColor: 'border-blue-400/40',
-    chipColor: 'silver',
-    defaultNetwork: 'visa',
-    webDomain: 'bci.cl',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <span className="font-black text-sm text-white tracking-wider">Bci</span>
-      </div>
-    ),
-  },
-  {
-    id: 'pichincha',
-    name: 'Banco Pichincha',
-    aliases: ['pichincha', 'banco pichincha'],
-    country: 'Ecuador / Colombia / España',
-    region: 'sudamerica',
-    gradient: 'from-[#0f2042] via-[#08152e] to-[#030917]',
-    textColor: 'text-white',
-    accentColor: '#facc15',
-    borderColor: 'border-yellow-400/40',
-    chipColor: 'gold',
-    defaultNetwork: 'visa',
-    webDomain: 'pichincha.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <span className="w-4 h-4 bg-[#ffdd00] rounded-sm transform rotate-45 shrink-0" />
-        <span className="font-black text-xs tracking-tight text-white uppercase">Pichincha</span>
-      </div>
-    ),
-  },
-  {
-    id: 'mercantil',
-    name: 'Mercantil',
-    aliases: ['mercantil', 'banco mercantil'],
-    country: 'Venezuela / Panamá / USA',
-    region: 'sudamerica',
-    gradient: 'from-[#003f7a] via-[#002a54] to-[#001730]',
-    textColor: 'text-white',
-    accentColor: '#fb923c',
-    borderColor: 'border-blue-400/40',
-    chipColor: 'gold',
-    defaultNetwork: 'mastercard',
-    webDomain: 'mercantilbanco.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <span className="font-black text-xs text-white tracking-tight uppercase">Mercantil</span>
-      </div>
-    ),
-  },
-  {
-    id: 'banesco',
-    name: 'Banesco',
-    aliases: ['banesco'],
-    country: 'Venezuela / Panamá / Rep. Dominicana',
-    region: 'sudamerica',
-    gradient: 'from-[#00824b] via-[#005e36] to-[#003820]',
-    textColor: 'text-white',
-    accentColor: '#86efac',
-    borderColor: 'border-emerald-400/40',
-    chipColor: 'silver',
-    defaultNetwork: 'visa',
-    webDomain: 'banesco.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <span className="font-black text-xs text-white tracking-tight uppercase">Banesco</span>
-      </div>
-    ),
-  },
 
   // --- USA & GLOBAL ---
-  {
-    id: 'hsbc',
-    name: 'HSBC',
-    aliases: ['hsbc', 'banco hsbc', 'hsbc premier'],
-    country: 'Global / Latam / UK',
-    region: 'global',
-    gradient: 'from-[#db0011] via-[#94000b] to-[#450005]',
-    textColor: 'text-white',
-    accentColor: '#fca5a5',
-    borderColor: 'border-red-400/40',
-    chipColor: 'silver',
-    defaultNetwork: 'mastercard',
-    webDomain: 'hsbc.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        {/* HSBC Hexagonal Hourglass */}
-        <svg viewBox="0 0 100 100" className="w-5 h-5 shrink-0 fill-white">
-          <polygon points="50,10 90,50 50,90 10,50" fill="#ffffff" />
-          <polygon points="50,10 50,50 10,50" fill="#db0011" />
-          <polygon points="50,90 50,50 90,50" fill="#db0011" />
-        </svg>
-        <span className="font-black text-xs text-white tracking-widest uppercase">HSBC</span>
-      </div>
-    ),
-  },
-  {
-    id: 'scotiabank',
-    name: 'Scotiabank',
-    aliases: ['scotiabank', 'scotia', 'inverlat'],
-    country: 'Canadá / Latam / Global',
-    region: 'global',
-    gradient: 'from-[#ed111a] via-[#ab0c13] to-[#590408]',
-    textColor: 'text-white',
-    accentColor: '#fca5a5',
-    borderColor: 'border-red-400/40',
-    chipColor: 'silver',
-    defaultNetwork: 'visa',
-    webDomain: 'scotiabank.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <span className="w-5 h-5 rounded-full bg-white text-[#ed111a] font-black flex items-center justify-center text-xs">
-          S
-        </span>
-        <span className="font-black text-xs tracking-tight text-white">Scotiabank</span>
-      </div>
-    ),
-  },
   {
     id: 'chase',
     name: 'Chase (JPMorgan)',
@@ -695,57 +1540,6 @@ export const BANK_PRESETS: BankPreset[] = [
           <rect x="36" y="36" width="28" height="28" fill="#ffffff" />
         </svg>
         <span className="font-black text-sm tracking-widest text-white uppercase">CHASE</span>
-      </div>
-    ),
-  },
-  {
-    id: 'bofa',
-    name: 'Bank of America',
-    aliases: ['bank of america', 'bofa', 'bofa us'],
-    country: 'USA',
-    region: 'global',
-    gradient: 'from-[#002868] via-[#011c47] to-[#00102b]',
-    textColor: 'text-white',
-    accentColor: '#ef4444',
-    borderColor: 'border-red-500/30',
-    chipColor: 'gold',
-    defaultNetwork: 'visa',
-    webDomain: 'bankofamerica.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <div className="grid grid-cols-3 gap-0.5 w-4 h-4 shrink-0">
-          <span className="bg-[#bf0a30]" />
-          <span className="bg-white" />
-          <span className="bg-[#002868]" />
-          <span className="bg-white" />
-          <span className="bg-[#bf0a30]" />
-          <span className="bg-white" />
-        </div>
-        <span className="font-extrabold text-[11px] tracking-tight text-white uppercase leading-none">
-          Bank of America
-        </span>
-      </div>
-    ),
-  },
-  {
-    id: 'wellsfargo',
-    name: 'Wells Fargo',
-    aliases: ['wells fargo', 'wells', 'wellsfargo'],
-    country: 'USA',
-    region: 'global',
-    gradient: 'from-[#9e1b32] via-[#741324] to-[#400611]',
-    textColor: 'text-white',
-    accentColor: '#fbbf24',
-    borderColor: 'border-amber-400/40',
-    chipColor: 'gold',
-    defaultNetwork: 'visa',
-    webDomain: 'wellsfargo.com',
-    renderLogo: (className = 'h-7') => (
-      <div className={`flex items-center gap-1.5 ${className}`}>
-        <div className="bg-[#d41c2c] text-[#ffdd00] px-1.5 py-0.5 rounded font-black text-[10px] tracking-tighter">
-          WELLS
-        </div>
-        <span className="font-black text-xs text-white uppercase tracking-tight">FARGO</span>
       </div>
     ),
   },
@@ -800,13 +1594,11 @@ export function getBankPreset(bankName?: string, bankLogoKey?: string): BankPres
 
   if (bankName) {
     const clean = bankName.toLowerCase().trim();
-    // 1. Exact or alias match
     for (const preset of BANK_PRESETS) {
       if (preset.name.toLowerCase() === clean || preset.aliases.includes(clean)) {
         return preset;
       }
     }
-    // 2. Substring match
     for (const preset of BANK_PRESETS) {
       if (clean.includes(preset.id)) return preset;
       for (const alias of preset.aliases) {
@@ -815,7 +1607,7 @@ export function getBankPreset(bankName?: string, bankLogoKey?: string): BankPres
     }
   }
 
-  // Default elegant style: BBVA as premier baseline
+  // Default to Banco Cuscatlán (predominante en El Salvador)
   return BANK_PRESETS[0];
 }
 
@@ -873,7 +1665,7 @@ export const MetallicChip: React.FC<{ color?: 'gold' | 'silver'; className?: str
     <div
       className={`w-10 h-7 rounded-md relative overflow-hidden border ${
         isGold
-          ? 'bg-gradient-to-tr from-[#d4af37] via-[#f9e79f] to-[#aa8010] border-[#8a6808] shadow-inner'
+          ? 'bg-gradient-to-tr from-[#d4af37] via-[#fef08a] to-[#aa8010] border-[#8a6808] shadow-inner'
           : 'bg-gradient-to-tr from-[#cbd5e1] via-[#f1f5f9] to-[#94a3b8] border-[#64748b] shadow-inner'
       } ${className}`}
     >
@@ -913,6 +1705,7 @@ export const BankLogoBadge: React.FC<{
   const finalKey = bankLogoKey || card?.bankLogoKey;
   const finalUrl = bankLogoUrl || card?.bankLogoUrl;
   const preset = getBankPreset(finalBank, finalKey);
+  const design = resolveCardDesign(card);
 
   const dims = {
     sm: 'w-6 h-6 text-xs',
@@ -936,10 +1729,14 @@ export const BankLogoBadge: React.FC<{
     );
   }
 
+  // Use card design background if available
+  const bgGradient = design.id !== 'bank_default' ? design.gradient : preset.gradient;
+  const borderColor = design.id !== 'bank_default' ? design.borderColor : preset.borderColor;
+
   return (
     <div
-      className={`${dims} rounded-lg overflow-hidden border ${preset.borderColor} bg-gradient-to-br ${preset.gradient} shrink-0 flex items-center justify-center p-1 shadow-sm ${className}`}
-      title={preset.name}
+      className={`${dims} rounded-lg overflow-hidden border ${borderColor} bg-gradient-to-br ${bgGradient} shrink-0 flex items-center justify-center p-1 shadow-sm ${className}`}
+      title={`${preset.name} (${design.name})`}
     >
       <div className="scale-75 origin-center">{preset.renderLogo()}</div>
     </div>
@@ -956,13 +1753,20 @@ export const DigitalCardMiniBanner: React.FC<{
 }> = ({ card, statusBadge, className = '' }) => {
   const [imgError, setImgError] = useState(false);
   const preset = getBankPreset(card.bank, card.bankLogoKey);
+  const design = resolveCardDesign(card);
   const network = card.network || preset.defaultNetwork;
   const digits = card.last4Digits || card.id.slice(-4).padStart(4, '0');
 
+  const bgGradient = design.id !== 'bank_default' ? design.gradient : preset.gradient;
+  const borderColor = design.id !== 'bank_default' ? design.borderColor : preset.borderColor;
+
   return (
     <div
-      className={`rounded-2xl p-4 sm:p-5 border bg-gradient-to-br ${preset.gradient} ${preset.borderColor} shadow-xl relative overflow-hidden select-none text-white ${className}`}
+      className={`rounded-2xl p-4 sm:p-5 border bg-gradient-to-br ${bgGradient} ${borderColor} shadow-xl relative overflow-hidden select-none text-white ${className}`}
     >
+      {/* Guilloché security lines if Premia Gold or Gold */}
+      {(design.id === 'premia_gold' || design.id === 'gold') && <GuillocheSecurityPattern opacity={0.18} />}
+
       {/* Foil light overlay */}
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none" />
 
@@ -988,6 +1792,52 @@ export const DigitalCardMiniBanner: React.FC<{
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/15 border border-white/20 uppercase tracking-wider">
                 {card.bank}
               </span>
+              {/* Co-branded badge */}
+              {(design.id === 'walmart' || design.id === 'walmart_black') && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#0071dc] border border-yellow-400 text-yellow-300">
+                  Walmart✦
+                </span>
+              )}
+              {(design.id === 'super_selectos' || design.id === 'super_selectos_oro') && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#005a2b] border border-amber-300 text-amber-300">
+                  Súper Selectos
+                </span>
+              )}
+              {design.id === 'pricesmart' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#b91c1c] border border-red-300 text-white">
+                  PriceSmart
+                </span>
+              )}
+              {design.id === 'super_cashback' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-orange-600 border border-orange-300 text-white font-mono">
+                  SÚPER %
+                </span>
+              )}
+              {design.id === 'premia_gold' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/40 border border-amber-300 text-amber-300 font-mono">
+                  PREMIA GOLD
+                </span>
+              )}
+              {design.id === 'premia_platinum' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/40 border border-slate-300 text-slate-200 font-mono">
+                  PREMIA PLATINUM
+                </span>
+              )}
+              {design.id === 'lifemiles_avianca' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-800 border border-red-400 text-white font-sans">
+                  LifeMiles
+                </span>
+              )}
+              {design.id === 'real_madrid_cuscatlan' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-900 border border-amber-400 text-amber-300 font-sans">
+                  REAL MADRID
+                </span>
+              )}
+              {design.id === 'blue_zafiro' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-900 border border-sky-400 text-sky-200 font-sans">
+                  AZUL ZAFIRO
+                </span>
+              )}
               {statusBadge}
             </div>
             <div className="flex items-center gap-3 mt-1 text-xs text-white/80 font-mono">
@@ -1010,7 +1860,7 @@ export const DigitalCardMiniBanner: React.FC<{
 };
 
 // -------------------------------------------------------------
-// Full Digital Credit Card Visual Component
+// Full Digital Credit Card Visual Component (Ultra-Realistic FinTech Card)
 // -------------------------------------------------------------
 export interface DigitalCreditCardProps {
   card: CreditCard;
@@ -1033,29 +1883,71 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
 }) => {
   const [imgError, setImgError] = useState(false);
   const preset = getBankPreset(card.bank, card.bankLogoKey);
+  const design = resolveCardDesign(card);
   const network = card.network || preset.defaultNetwork;
   const digits = card.last4Digits || card.id.slice(-4).padStart(4, '0');
 
+  // Colors & backgrounds
+  const bgGradient = design.id !== 'bank_default' ? design.gradient : preset.gradient;
+  const borderColor = design.id !== 'bank_default' ? design.borderColor : preset.borderColor;
+  const chipColor = design.id !== 'bank_default' ? design.chipColor : preset.chipColor;
+
   return (
     <div
-      className={`relative rounded-2xl md:rounded-3xl p-5 md:p-6 overflow-hidden border bg-gradient-to-br ${preset.gradient} ${preset.borderColor} shadow-2xl transition-all duration-300 hover:shadow-cyan-900/20 group select-none ${
+      className={`relative rounded-2xl md:rounded-3xl p-5 md:p-6 overflow-hidden border bg-gradient-to-br ${bgGradient} ${borderColor} shadow-2xl transition-all duration-300 hover:shadow-cyan-900/20 group select-none ${
         compact ? 'max-w-md' : 'w-full'
       } ${className}`}
       style={{
         aspectRatio: '1.62 / 1',
-        minHeight: compact ? '190px' : '210px',
+        minHeight: compact ? '195px' : '215px',
       }}
     >
-      {/* 1. Foil Light Reflection Overlay */}
+      {/* 1. Guilloché Security Wave Pattern for Premia Gold, Gold, Puntos Oro */}
+      {(design.id === 'premia_gold' || design.id === 'gold' || design.id === 'puntos_oro' || design.id === 'millas_gold' || design.id === 'premia_platinum') && (
+        <GuillocheSecurityPattern opacity={0.22} />
+      )}
+
+      {/* 2. Walmart Background Spark Watermark */}
+      {(design.id === 'walmart' || design.id === 'walmart_black') && (
+        <div className="absolute -right-8 -top-8 w-44 h-44 opacity-20 pointer-events-none transform rotate-12">
+          <WalmartSparkEmblem className="w-full h-full" showText={false} />
+        </div>
+      )}
+
+      {/* 3. Super Selectos Background Watermark */}
+      {(design.id === 'super_selectos' || design.id === 'super_selectos_oro') && (
+        <div className="absolute -right-10 -bottom-10 w-44 h-44 opacity-15 pointer-events-none">
+          <div className="w-full h-full rounded-full border-8 border-amber-300 flex items-center justify-center font-black text-7xl text-amber-300">
+            S
+          </div>
+        </div>
+      )}
+
+      {/* 4. Sapphire Facets for Blue Zafiro */}
+      {design.id === 'blue_zafiro' && <SapphireFacetPattern opacity={0.25} />}
+
+      {/* 5. Blue Clásica & Conecta Dynamic Waves */}
+      {(design.id === 'blue_clasica' || design.id === 'blue_cashback' || design.id === 'blue_navy') && (
+        <svg
+          viewBox="0 0 300 200"
+          className="absolute inset-0 w-full h-full pointer-events-none opacity-20"
+          fill="none"
+        >
+          <path d="M 0 100 Q 75 40 150 100 T 300 100 L 300 200 L 0 200 Z" fill="#60a5fa" />
+          <path d="M 0 140 Q 75 80 150 140 T 300 140 L 300 200 L 0 200 Z" fill="#3b82f6" opacity="0.6" />
+        </svg>
+      )}
+
+      {/* 6. Foil Light Reflection Overlay */}
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none" />
 
-      {/* 2. Abstract Geometric Hologram Ribbons */}
+      {/* 7. Abstract Hologram Ribbons */}
       <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full bg-white/5 blur-2xl pointer-events-none" />
       <div className="absolute -left-12 -bottom-12 w-48 h-48 rounded-full bg-black/30 blur-xl pointer-events-none" />
 
       {/* Micro-texture Lines */}
       <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        className="absolute inset-0 opacity-[0.035] pointer-events-none"
         style={{
           backgroundImage: 'radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0)',
           backgroundSize: '16px 16px',
@@ -1064,7 +1956,7 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
 
       {/* Card Content Layout */}
       <div className="relative z-10 flex flex-col justify-between h-full text-white">
-        {/* Top Row: Bank Brand Logo & Contactless */}
+        {/* Top Row: Bank Brand Logo & Co-Branding & Contactless */}
         <div className="flex items-start justify-between gap-3">
           {/* Bank Logo / Image */}
           <div className="flex items-center gap-2">
@@ -1080,30 +1972,39 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
             ) : (
               <div className="drop-shadow-md">{preset.renderLogo('h-7')}</div>
             )}
-            <span className="text-[10px] tracking-wider uppercase font-semibold text-white/70 hidden sm:inline">
+            <span className="text-[10px] tracking-wider uppercase font-semibold text-white/80 hidden sm:inline">
               {card.bank}
             </span>
           </div>
 
-          {/* Contactless Wave & Digital Card Tag */}
+          {/* Top-Right: Co-Branded Retail Badge or Contactless Wave */}
           <div className="flex items-center gap-2">
-            <ContactlessIcon className="w-4 h-4 text-white/80 drop-shadow" />
-            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-black/30 border border-white/20 backdrop-blur-sm">
+            {(design.id === 'walmart' || design.id === 'walmart_black') && <WalmartSparkEmblem className="h-6" />}
+            {(design.id === 'super_selectos' || design.id === 'super_selectos_oro') && <SuperSelectosEmblem className="h-6" />}
+            {design.id === 'pricesmart' && <PriceSmartEmblem className="h-6" />}
+            {design.id === 'premia_gold' && <PremiaGoldEmblem />}
+            {design.id === 'premia_platinum' && <PremiaPlatinumEmblem />}
+            {design.id === 'lifemiles_avianca' && <LifeMilesEmblem className="h-6" />}
+            {design.id === 'real_madrid_cuscatlan' && <RealMadridEmblem className="h-6" />}
+            {design.id === 'millas_gold' && <MillasCompassEmblem className="h-6" />}
+
+            <ContactlessIcon className="w-4 h-4 text-white/90 drop-shadow" />
+            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-black/35 border border-white/20 backdrop-blur-sm">
               DIGITAL
             </span>
           </div>
         </div>
 
-        {/* Middle Row: EMV Metallic Chip & Card Concept */}
+        {/* Middle Row: EMV Metallic Chip & Card Name / Subtitle */}
         <div className="my-auto flex items-center justify-between pt-2">
           <div className="flex items-center gap-3">
-            <MetallicChip color={preset.chipColor} />
+            <MetallicChip color={chipColor} />
             <div className="text-left">
               <h3 className="text-base sm:text-lg font-black tracking-tight drop-shadow-md text-white truncate max-w-[200px] sm:max-w-xs">
                 {card.name}
               </h3>
-              <span className="text-[10px] font-mono tracking-widest text-white/70 block uppercase">
-                CRÉDITO REVOLVENTE
+              <span className="text-[10px] font-mono tracking-widest text-white/80 block uppercase font-semibold">
+                {design.badgeLabel || 'CRÉDITO REVOLVENTE'}
               </span>
             </div>
           </div>
@@ -1113,26 +2014,26 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
         <div className="space-y-2 pt-2">
           {/* Card Number Mask */}
           <div className="flex items-center justify-between">
-            <div className="font-mono text-xs sm:text-sm tracking-[0.25em] text-white/90 drop-shadow font-bold">
+            <div className="font-mono text-xs sm:text-sm tracking-[0.25em] text-white/95 drop-shadow font-bold">
               •••• •••• •••• {digits}
             </div>
 
-            <div className="flex items-center gap-3 text-[10px] text-white/80">
+            <div className="flex items-center gap-3 text-[10px] text-white/85">
               <div className="text-right">
-                <span className="block text-[8px] uppercase tracking-wider text-white/60">CORTE</span>
+                <span className="block text-[8px] uppercase tracking-wider text-white/70 font-semibold">CORTE</span>
                 <span className="font-mono font-bold">DÍA {card.cutOffDay}</span>
               </div>
               <div className="text-right">
-                <span className="block text-[8px] uppercase tracking-wider text-white/60">LÍMITE</span>
+                <span className="block text-[8px] uppercase tracking-wider text-white/70 font-semibold">LÍMITE</span>
                 <span className="font-mono font-bold">DÍA {card.paymentDueDay}</span>
               </div>
             </div>
           </div>
 
           {/* Cardholder Name & Payment Network */}
-          <div className="flex items-end justify-between pt-1 border-t border-white/15">
+          <div className="flex items-end justify-between pt-1 border-t border-white/20">
             <div className="truncate pr-2">
-              <span className="block text-[8px] uppercase tracking-widest text-white/60 font-semibold">
+              <span className="block text-[8px] uppercase tracking-widest text-white/70 font-semibold">
                 LÍMITE ASIGNADO
               </span>
               <span className="text-xs font-mono font-black tracking-wide text-white drop-shadow">
@@ -1151,7 +2052,7 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
       {/* Optional Top Floating Status Pill */}
       {showBalancePills && balance !== undefined && available !== undefined && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-          <div className="px-3 py-1 rounded-full bg-black/80 backdrop-blur-md border border-white/20 text-[10px] font-mono text-white flex items-center gap-2 shadow-xl whitespace-nowrap">
+          <div className="px-3 py-1 rounded-full bg-black/85 backdrop-blur-md border border-white/25 text-[10px] font-mono text-white flex items-center gap-2 shadow-2xl whitespace-nowrap">
             <span>Deuda: <strong className="text-rose-400">{formatMoney(balance, currencySymbol)}</strong></span>
             <span>•</span>
             <span>Disp: <strong className="text-sky-400">{formatMoney(available, currencySymbol)}</strong></span>
