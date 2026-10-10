@@ -59,7 +59,35 @@ export interface CardDesignPreset {
 }
 
 export const CARD_DESIGN_PRESETS: CardDesignPreset[] = [
-  // --- 🥇 PREMIA GOLD & DORADAS ---
+  // --- 🥇 PREMIA GOLD & DORADAS (FOTOGRAFÍAS REALES DE EL SALVADOR) ---
+  {
+    id: 'agricola_dorada_nueva',
+    name: 'Agrícola Crédito Dorada (Nueva Identidad)',
+    category: 'premia_oro',
+    categoryLabel: 'Agrícola Dorada',
+    description: 'Oro satinado oficial de Banco Agrícola con los arcos multicolor dinámicos y trazos de marca',
+    badgeLabel: 'CRÉDITO DORADA',
+    gradient: 'from-[#dcc075] via-[#c4a35a] via-[#ab8a42] to-[#73581e]',
+    borderColor: 'border-amber-400/80',
+    chipColor: 'gold',
+    textColor: 'text-neutral-900',
+    accentColor: '#10b981',
+    isGoldFoil: true,
+  },
+  {
+    id: 'promerica_premia_gold',
+    name: 'Promerica Premia Gold (Origami 3D)',
+    category: 'premia_oro',
+    categoryLabel: 'Promerica Premia',
+    description: 'Facetas geométricas 3D en bronce y champagne mate con estrella Promerica y tipografía Premia',
+    badgeLabel: 'PREMIA GOLD',
+    gradient: 'from-[#8c7247] via-[#a38755] via-[#c5a974] to-[#5c4728]',
+    borderColor: 'border-amber-400/70',
+    chipColor: 'silver',
+    textColor: 'text-white',
+    accentColor: '#f59e0b',
+    isGoldFoil: true,
+  },
   {
     id: 'premia_gold',
     name: 'Premia Gold Prestige',
@@ -128,6 +156,48 @@ export const CARD_DESIGN_PRESETS: CardDesignPreset[] = [
     chipColor: 'gold',
     textColor: 'text-yellow-950',
     accentColor: '#eab308',
+    isGoldFoil: true,
+  },
+  {
+    id: 'davivienda_oro',
+    name: 'Davivienda Dorada / Gold',
+    category: 'premia_oro',
+    categoryLabel: 'Davivienda Gold',
+    description: 'Oro noble con la icónica casita roja de Davivienda, banda carmesí y chip dorado de alto gramaje',
+    badgeLabel: 'DAVIVIENDA GOLD',
+    gradient: 'from-[#fef08a] via-[#eab308] via-[#ca8a04] to-[#7f1d1d]',
+    borderColor: 'border-red-400/60',
+    chipColor: 'gold',
+    textColor: 'text-amber-950',
+    accentColor: '#ef4444',
+    isGoldFoil: true,
+  },
+  {
+    id: 'fedecredito_oro',
+    name: 'FEDECRÉDITO Visa Oro Oficial',
+    category: 'premia_oro',
+    categoryLabel: 'FEDECRÉDITO Oro',
+    description: 'Oro satinado oficial del Sistema FEDECRÉDITO con círculo institucional en amarillo sol y azul rey',
+    badgeLabel: 'FEDECRÉDITO ORO',
+    gradient: 'from-[#fef08a] via-[#ca8a04] via-[#003882] to-[#001f4d]',
+    borderColor: 'border-yellow-300/80',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#facc15',
+    isGoldFoil: true,
+  },
+  {
+    id: 'banco_azul_oro',
+    name: 'Banco Azul Oro / Gold',
+    category: 'premia_oro',
+    categoryLabel: 'Banco Azul Oro',
+    description: 'Dorado champagne con la insignia oficial del ave y onda azul eléctrico de Banco Azul El Salvador',
+    badgeLabel: 'AZUL ORO',
+    gradient: 'from-[#fef08a] via-[#0284c7] to-[#082f49]',
+    borderColor: 'border-amber-300/80',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#38bdf8',
     isGoldFoil: true,
   },
 
@@ -210,8 +280,34 @@ export const CARD_DESIGN_PRESETS: CardDesignPreset[] = [
     textColor: 'text-white',
     accentColor: '#fb923c',
   },
+  {
+    id: 'promerica_club',
+    name: 'Club Promerica Esmeralda',
+    category: 'super',
+    categoryLabel: 'Club Promerica',
+    description: 'Verde esmeralda y titanio mate para compras en comercios afiliados y supermercados',
+    badgeLabel: 'CLUB PROMERICA',
+    gradient: 'from-[#059669] via-[#047857] to-[#064e3b]',
+    borderColor: 'border-emerald-400/60',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#34d399',
+  },
 
   // --- 💙 LAS AZULES ---
+  {
+    id: 'agricola_clasica_azul_nueva',
+    name: 'Agrícola Crédito Clásica Azul (Nueva)',
+    category: 'azul',
+    categoryLabel: 'Agrícola Azul',
+    description: 'Azul cobalto oficial de Banco Agrícola con los arcos multicolor de la nueva identidad',
+    badgeLabel: 'CRÉDITO CLÁSICA',
+    gradient: 'from-[#1d4ed8] via-[#1e3a8a] to-[#0f172a]',
+    borderColor: 'border-blue-400/60',
+    chipColor: 'silver',
+    textColor: 'text-white',
+    accentColor: '#38bdf8',
+  },
   {
     id: 'blue_clasica',
     name: 'Azul / Clásica Rewards',
@@ -266,6 +362,58 @@ export const CARD_DESIGN_PRESETS: CardDesignPreset[] = [
   },
 
   // --- 💎 ALTA GAMA PLATINO & OBSIDIANA ---
+  {
+    id: 'promerica_premia_platinum',
+    name: 'Promerica Premia Platinum 3D',
+    category: 'premium',
+    categoryLabel: 'Promerica Platinum',
+    description: 'Facetas geométricas 3D en plata y titanio mercurio con estrella blanca y Premia platinum',
+    badgeLabel: 'PREMIA PLATINUM',
+    gradient: 'from-[#94a3b8] via-[#cbd5e1] via-[#64748b] to-[#334155]',
+    borderColor: 'border-slate-300/70',
+    chipColor: 'silver',
+    textColor: 'text-slate-900',
+    accentColor: '#e2e8f0',
+  },
+  {
+    id: 'promerica_premia_black',
+    name: 'Promerica Premia Black 3D',
+    category: 'premium',
+    categoryLabel: 'Promerica Black',
+    description: 'Facetas geométricas 3D en obsidiana carbón y grafito mate con estrella blanca',
+    badgeLabel: 'PREMIA BLACK',
+    gradient: 'from-[#27272a] via-[#18181b] to-[#09090b]',
+    borderColor: 'border-amber-400/50',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#fbbf24',
+  },
+  {
+    id: 'agricola_platinum_nueva',
+    name: 'Agrícola Crédito Platinum (Nueva)',
+    category: 'premium',
+    categoryLabel: 'Agrícola Platinum',
+    description: 'Plata satinada mercurio con los arcos multicolor de la nueva identidad de Banco Agrícola',
+    badgeLabel: 'CRÉDITO PLATINUM',
+    gradient: 'from-[#f1f5f9] via-[#cbd5e1] to-[#64748b]',
+    borderColor: 'border-slate-300/70',
+    chipColor: 'silver',
+    textColor: 'text-slate-900',
+    accentColor: '#94a3b8',
+  },
+  {
+    id: 'agricola_black_nueva',
+    name: 'Agrícola Crédito Black (Nueva)',
+    category: 'premium',
+    categoryLabel: 'Agrícola Black',
+    description: 'Negro obsidiana mate con los arcos multicolor de la nueva identidad de Banco Agrícola',
+    badgeLabel: 'CRÉDITO BLACK',
+    gradient: 'from-[#18181b] via-[#0f172a] to-[#020617]',
+    borderColor: 'border-amber-400/40',
+    chipColor: 'gold',
+    textColor: 'text-white',
+    accentColor: '#facc15',
+  },
   {
     id: 'platinum',
     name: 'Platino / Platinum Metal',
@@ -368,10 +516,43 @@ export function resolveCardDesign(card?: Partial<CreditCard>): CardDesignPreset 
   }
 
   const name = (card.name || '').toLowerCase();
+  if (name.includes('agrícola dorada') || name.includes('agricola dorada') || name.includes('crédito dorada') || name.includes('credito dorada')) {
+    return getCardDesignPreset('agricola_dorada_nueva');
+  }
+  if (name.includes('promerica premia gold') || name.includes('promerica gold')) {
+    return getCardDesignPreset('promerica_premia_gold');
+  }
+  if (name.includes('promerica premia plat') || name.includes('promerica platinum')) {
+    return getCardDesignPreset('promerica_premia_platinum');
+  }
+  if (name.includes('promerica premia black') || name.includes('promerica black')) {
+    return getCardDesignPreset('promerica_premia_black');
+  }
+  if (name.includes('agrícola clásica') || name.includes('agricola clasica') || name.includes('crédito clásica') || name.includes('credito clasica') || (name.includes('agricola') && name.includes('azul'))) {
+    return getCardDesignPreset('agricola_clasica_azul_nueva');
+  }
+  if (name.includes('agrícola plat') || name.includes('agricola plat')) {
+    return getCardDesignPreset('agricola_platinum_nueva');
+  }
+  if (name.includes('agrícola black') || name.includes('agricola black')) {
+    return getCardDesignPreset('agricola_black_nueva');
+  }
   if (name.includes('walmart black') || (name.includes('walmart') && (name.includes('black') || name.includes('elite')))) {
     return getCardDesignPreset('walmart_black');
   }
   if (name.includes('walmart')) return getCardDesignPreset('walmart');
+  if (name.includes('davivienda oro') || name.includes('davivienda gold') || name.includes('davivienda dorada')) {
+    return getCardDesignPreset('davivienda_oro');
+  }
+  if (name.includes('fedecredito oro') || name.includes('fedecrédito oro') || name.includes('fedecredito gold')) {
+    return getCardDesignPreset('fedecredito_oro');
+  }
+  if (name.includes('banco azul oro') || name.includes('azul oro') || name.includes('azul gold')) {
+    return getCardDesignPreset('banco_azul_oro');
+  }
+  if (name.includes('club promerica')) {
+    return getCardDesignPreset('promerica_club');
+  }
   if (name.includes('selectos oro') || name.includes('selectos gold')) return getCardDesignPreset('super_selectos_oro');
   if (name.includes('selectos')) return getCardDesignPreset('super_selectos');
   if (name.includes('pricesmart')) return getCardDesignPreset('pricesmart');
@@ -422,7 +603,49 @@ export interface ElSalvadorCardTemplate {
 }
 
 export const EL_SALVADOR_CARD_TEMPLATES: ElSalvadorCardTemplate[] = [
-  // --- PREMIA GOLD ---
+  // --- PREMIA GOLD & DORADAS DE LAS FOTOS ---
+  {
+    id: 'tmpl_agricola_dorada_nueva',
+    name: 'Agrícola Crédito Dorada',
+    bank: 'Banco Agrícola',
+    bankLogoKey: 'agricola',
+    designPreset: 'agricola_dorada_nueva',
+    network: 'mastercard',
+    badgeTitle: 'Crédito Dorada',
+    typeTag: 'dorada',
+    typicalLimit: 250000,
+    cutOffDay: 20,
+    paymentDueDay: 5,
+    accent: '#c4a35a',
+  },
+  {
+    id: 'tmpl_promerica_premia_gold',
+    name: 'Promerica Premia Gold',
+    bank: 'Banco Promerica',
+    bankLogoKey: 'promerica',
+    designPreset: 'promerica_premia_gold',
+    network: 'mastercard',
+    badgeTitle: 'Premia Gold 3D',
+    typeTag: 'premia',
+    typicalLimit: 250000,
+    cutOffDay: 16,
+    paymentDueDay: 31,
+    accent: '#a38755',
+  },
+  {
+    id: 'tmpl_agricola_clasica_azul_nueva',
+    name: 'Agrícola Crédito Clásica Azul',
+    bank: 'Banco Agrícola',
+    bankLogoKey: 'agricola',
+    designPreset: 'agricola_clasica_azul_nueva',
+    network: 'visa',
+    badgeTitle: 'Crédito Clásica',
+    typeTag: 'azul',
+    typicalLimit: 120000,
+    cutOffDay: 22,
+    paymentDueDay: 7,
+    accent: '#2563eb',
+  },
   {
     id: 'tmpl_cuscatlan_premia_gold',
     name: 'Cuscatlán Premia Gold',
@@ -436,20 +659,6 @@ export const EL_SALVADOR_CARD_TEMPLATES: ElSalvadorCardTemplate[] = [
     cutOffDay: 15,
     paymentDueDay: 30,
     accent: '#f59e0b',
-  },
-  {
-    id: 'tmpl_promerica_premia_gold',
-    name: 'Promerica Premia Gold',
-    bank: 'Banco Promerica',
-    bankLogoKey: 'promerica',
-    designPreset: 'premia_gold',
-    network: 'visa',
-    badgeTitle: 'Premia Gold SV',
-    typeTag: 'premia',
-    typicalLimit: 250000,
-    cutOffDay: 16,
-    paymentDueDay: 31,
-    accent: '#10b981',
   },
   {
     id: 'tmpl_bac_premia_gold',
@@ -686,7 +895,7 @@ export const EL_SALVADOR_CARD_TEMPLATES: ElSalvadorCardTemplate[] = [
     name: 'Davivienda Dorada Gold',
     bank: 'Banco Davivienda',
     bankLogoKey: 'davivienda',
-    designPreset: 'gold',
+    designPreset: 'davivienda_oro',
     network: 'mastercard',
     badgeTitle: 'Davivienda Gold',
     typeTag: 'dorada',
@@ -700,7 +909,7 @@ export const EL_SALVADOR_CARD_TEMPLATES: ElSalvadorCardTemplate[] = [
     name: 'FEDECRÉDITO Visa Oro',
     bank: 'Sistema FEDECRÉDITO',
     bankLogoKey: 'fedecredito',
-    designPreset: 'gold',
+    designPreset: 'fedecredito_oro',
     network: 'visa',
     badgeTitle: 'FEDECRÉDITO Oro',
     typeTag: 'dorada',
@@ -709,8 +918,36 @@ export const EL_SALVADOR_CARD_TEMPLATES: ElSalvadorCardTemplate[] = [
     paymentDueDay: 5,
     accent: '#eab308',
   },
+  {
+    id: 'tmpl_banco_azul_oro',
+    name: 'Banco Azul Visa Oro',
+    bank: 'Banco Azul de El Salvador',
+    bankLogoKey: 'banco_azul',
+    designPreset: 'banco_azul_oro',
+    network: 'visa',
+    badgeTitle: 'Banco Azul Oro',
+    typeTag: 'dorada',
+    typicalLimit: 210000,
+    cutOffDay: 19,
+    paymentDueDay: 4,
+    accent: '#38bdf8',
+  },
 
   // --- VIAJES & CO-BRANDED ---
+  {
+    id: 'tmpl_promerica_club',
+    name: 'Club Promerica Esmeralda',
+    bank: 'Banco Promerica',
+    bankLogoKey: 'promerica',
+    designPreset: 'promerica_club',
+    network: 'visa',
+    badgeTitle: 'Club Promerica',
+    typeTag: 'super',
+    typicalLimit: 175000,
+    cutOffDay: 16,
+    paymentDueDay: 31,
+    accent: '#10b981',
+  },
   {
     id: 'tmpl_agricola_lifemiles',
     name: 'Agrícola Avianca LifeMiles',
@@ -755,6 +992,62 @@ export const EL_SALVADOR_CARD_TEMPLATES: ElSalvadorCardTemplate[] = [
   },
 
   // --- BLACK & PLATINO ---
+  {
+    id: 'tmpl_promerica_premia_platinum',
+    name: 'Promerica Premia Platinum 3D',
+    bank: 'Banco Promerica',
+    bankLogoKey: 'promerica',
+    designPreset: 'promerica_premia_platinum',
+    network: 'mastercard',
+    badgeTitle: 'Premia Platinum 3D',
+    typeTag: 'black',
+    typicalLimit: 450000,
+    cutOffDay: 16,
+    paymentDueDay: 31,
+    accent: '#cbd5e1',
+  },
+  {
+    id: 'tmpl_promerica_premia_black',
+    name: 'Promerica Premia Black 3D',
+    bank: 'Banco Promerica',
+    bankLogoKey: 'promerica',
+    designPreset: 'promerica_premia_black',
+    network: 'mastercard',
+    badgeTitle: 'Premia Black 3D',
+    typeTag: 'black',
+    typicalLimit: 600000,
+    cutOffDay: 16,
+    paymentDueDay: 31,
+    accent: '#fbbf24',
+  },
+  {
+    id: 'tmpl_agricola_platinum_nueva',
+    name: 'Agrícola Crédito Platinum',
+    bank: 'Banco Agrícola',
+    bankLogoKey: 'agricola',
+    designPreset: 'agricola_platinum_nueva',
+    network: 'visa',
+    badgeTitle: 'Crédito Platinum',
+    typeTag: 'black',
+    typicalLimit: 450000,
+    cutOffDay: 20,
+    paymentDueDay: 5,
+    accent: '#cbd5e1',
+  },
+  {
+    id: 'tmpl_agricola_black_nueva',
+    name: 'Agrícola Crédito Black',
+    bank: 'Banco Agrícola',
+    bankLogoKey: 'agricola',
+    designPreset: 'agricola_black_nueva',
+    network: 'mastercard',
+    badgeTitle: 'Crédito Black',
+    typeTag: 'black',
+    typicalLimit: 650000,
+    cutOffDay: 20,
+    paymentDueDay: 5,
+    accent: '#facc15',
+  },
   {
     id: 'tmpl_cuscatlan_infinite_black',
     name: 'Cuscatlán Infinite Black',
@@ -802,6 +1095,202 @@ export const EL_SALVADOR_CARD_TEMPLATES: ElSalvadorCardTemplate[] = [
 // -------------------------------------------------------------
 // Vector SVG Emblems for Co-Branded Cards & Textures
 // -------------------------------------------------------------
+
+// Banco Agrícola Nueva Identidad - Arcos Multicolor Dinámicos
+export const AgricolaRainbowArcs: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <svg
+    viewBox="0 0 400 250"
+    className={`absolute inset-0 w-full h-full pointer-events-none ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Grupo superior de arcos que envuelven el chip EMV */}
+    {/* Arco Verde Esmeralda */}
+    <path
+      d="M 145 -15 C 158 20, 150 50, 128 66 C 114 76, 96 82, 70 82"
+      stroke="#00a86b"
+      strokeWidth="4.5"
+      strokeLinecap="round"
+    />
+    {/* Arco Morado Real */}
+    <path
+      d="M 158 -15 C 172 20, 164 54, 138 72 C 120 84, 98 88, 70 88"
+      stroke="#8b5cf6"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    {/* Arco Amarillo Sol */}
+    <path
+      d="M 100 102 C 108 92, 118 78, 122 62"
+      stroke="#facc15"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    {/* Arco Cyan / Celeste */}
+    <path
+      d="M 46 122 C 48 114, 55 106, 64 104"
+      stroke="#06b6d4"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+
+    {/* Grupo inferior izquierdo que asciende hacia el chip */}
+    {/* Arco Naranja Cálido */}
+    <path
+      d="M 18 245 C 20 195, 36 158, 65 138 C 76 130, 88 128, 98 128"
+      stroke="#f97316"
+      strokeWidth="4.5"
+      strokeLinecap="round"
+    />
+    {/* Arco Amarillo brillante */}
+    <path
+      d="M 30 225 C 32 185, 45 152, 70 134"
+      stroke="#eab308"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    {/* Arco Celeste brillante */}
+    <path
+      d="M 44 168 C 50 148, 62 133, 78 128"
+      stroke="#06b6d4"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+// Banco Agrícola Nueva Identidad - Logotipo 3 Trazos '≡ Ba'
+export const AgricolaThreeBarsLogo: React.FC<{ className?: string; isDarkText?: boolean }> = ({
+  className = 'h-7',
+  isDarkText = true,
+}) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    {/* 3 trazos horizontales gruesos redondeados con ligera inclinación */}
+    <div className="flex flex-col gap-1 -rotate-6 transform shrink-0">
+      <div className={`w-6 h-1.5 rounded-full ${isDarkText ? 'bg-neutral-900' : 'bg-white'}`} />
+      <div className={`w-8 h-1.5 rounded-full ${isDarkText ? 'bg-neutral-900' : 'bg-white'}`} />
+      <div className={`w-7 h-1.5 rounded-full ${isDarkText ? 'bg-neutral-900' : 'bg-white'}`} />
+    </div>
+    <span
+      className={`font-black text-2xl tracking-tighter ${
+        isDarkText ? 'text-neutral-900' : 'text-white'
+      } font-sans drop-shadow-sm select-none leading-none ml-1`}
+    >
+      Ba
+    </span>
+  </div>
+);
+
+// Banco Promerica - Malla de Facetas Geométricas 3D Origami (Origami Prism)
+export const PromericaFacetedMesh: React.FC<{
+  className?: string;
+  variant?: 'gold' | 'platinum' | 'black';
+}> = ({ className = '', variant = 'gold' }) => {
+  const colors = {
+    gold: {
+      p1: '#705731',
+      p2: '#9a7f4e',
+      p3: '#bfa068',
+      p4: '#5e4826',
+      p5: '#836a3e',
+      p6: '#d8ba82',
+      p7: '#47361a',
+      p8: '#a98d5a',
+    },
+    platinum: {
+      p1: '#94a3b8',
+      p2: '#cbd5e1',
+      p3: '#e2e8f0',
+      p4: '#64748b',
+      p5: '#94a3b8',
+      p6: '#f8fafc',
+      p7: '#475569',
+      p8: '#cbd5e1',
+    },
+    black: {
+      p1: '#1c1917',
+      p2: '#292524',
+      p3: '#44403c',
+      p4: '#0c0a09',
+      p5: '#1c1917',
+      p6: '#57534e',
+      p7: '#000000',
+      p8: '#292524',
+    },
+  }[variant];
+
+  return (
+    <svg
+      viewBox="0 0 400 250"
+      className={`absolute inset-0 w-full h-full pointer-events-none ${className}`}
+      preserveAspectRatio="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <linearGradient id={`grad-mesh-1-${variant}`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={colors.p1} />
+          <stop offset="100%" stopColor={colors.p4} />
+        </linearGradient>
+        <linearGradient id={`grad-mesh-2-${variant}`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={colors.p2} />
+          <stop offset="100%" stopColor={colors.p6} />
+        </linearGradient>
+        <linearGradient id={`grad-mesh-3-${variant}`} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor={colors.p7} />
+          <stop offset="100%" stopColor={colors.p3} />
+        </linearGradient>
+      </defs>
+
+      {/* Facetas poligonales triangulares 3D */}
+      <polygon points="0,0 160,0 120,95 0,110" fill={`url(#grad-mesh-1-${variant})`} />
+      <polygon points="160,0 290,0 220,115 120,95" fill={colors.p3} />
+      <polygon points="290,0 400,0 400,105 220,115" fill={colors.p5} />
+      <polygon points="0,110 120,95 155,190 0,250" fill={colors.p4} />
+      <polygon points="120,95 220,115 250,215 155,190" fill={`url(#grad-mesh-2-${variant})`} />
+      <polygon points="220,115 400,105 400,250 250,215" fill={`url(#grad-mesh-3-${variant})`} />
+      <polygon points="155,190 250,215 400,250 0,250" fill={colors.p7} />
+      <polygon points="135,70 240,65 190,140" fill={colors.p6} opacity="0.45" />
+
+      {/* Aristas y reflejos de luz */}
+      <line x1="120" y1="95" x2="220" y2="115" stroke="rgba(255,255,255,0.3)" strokeWidth="0.8" />
+      <line x1="120" y1="95" x2="155" y2="190" stroke="rgba(0,0,0,0.35)" strokeWidth="0.8" />
+      <line x1="220" y1="115" x2="250" y2="215" stroke="rgba(255,255,255,0.25)" strokeWidth="0.8" />
+      <line x1="220" y1="115" x2="400" y2="105" stroke="rgba(0,0,0,0.4)" strokeWidth="0.8" />
+    </svg>
+  );
+};
+
+// Banco Promerica - Logotipo Oficial Estrella y Tipografía
+export const PromericaStarEmblem: React.FC<{ className?: string }> = ({ className = 'h-6' }) => (
+  <div className={`flex items-center gap-1.5 ${className}`}>
+    <span className="font-black italic text-xs sm:text-sm tracking-tight text-white font-sans drop-shadow-sm">
+      Banco Promerica
+    </span>
+    {/* Estrella Promerica blanca con ala dinámica */}
+    <svg viewBox="0 0 100 100" className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 fill-white drop-shadow">
+      <polygon points="50,10 61,35 88,28 72,50 95,70 65,65 52,90 42,65 15,68 32,48 18,25 42,35" />
+    </svg>
+  </div>
+);
+
+// Banco Promerica - Sello Premia Gold Header
+export const PromericaPremiaHeader: React.FC<{
+  tier?: 'gold' | 'platinum' | 'black';
+  className?: string;
+}> = ({ tier = 'gold', className = '' }) => (
+  <div className={`text-right ${className}`}>
+    <span className="block font-black text-sm sm:text-base tracking-tight text-white font-sans drop-shadow leading-none">
+      Premia
+    </span>
+    <span
+      className={`block font-semibold text-[10px] sm:text-xs lowercase tracking-wider leading-tight ${
+        tier === 'gold' ? 'text-amber-200' : tier === 'platinum' ? 'text-slate-300' : 'text-amber-400'
+      }`}
+    >
+      {tier}
+    </span>
+  </div>
+);
 
 // Walmart Official Spark Emblem (6 bursts) & typography
 export const WalmartSparkEmblem: React.FC<{ className?: string; showText?: boolean }> = ({
@@ -1793,6 +2282,61 @@ export const DigitalCardMiniBanner: React.FC<{
                 {card.bank}
               </span>
               {/* Co-branded badge */}
+              {design.id === 'agricola_dorada_nueva' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/30 border border-amber-300 text-amber-200">
+                  Crédito Dorada ✦
+                </span>
+              )}
+              {design.id === 'agricola_clasica_azul_nueva' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-600/30 border border-blue-400 text-blue-200">
+                  Crédito Clásica 💙
+                </span>
+              )}
+              {design.id === 'agricola_platinum_nueva' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-700/50 border border-slate-300 text-slate-200">
+                  Crédito Platinum 💎
+                </span>
+              )}
+              {design.id === 'agricola_black_nueva' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/60 border border-amber-400 text-amber-300">
+                  Crédito Black 🖤
+                </span>
+              )}
+              {design.id === 'promerica_premia_gold' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#705731] border border-amber-300 text-amber-200">
+                  Premia Gold 3D 🥇
+                </span>
+              )}
+              {design.id === 'promerica_premia_platinum' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800 border border-slate-300 text-slate-200">
+                  Premia Platinum 3D 💎
+                </span>
+              )}
+              {design.id === 'promerica_premia_black' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black border border-amber-400 text-amber-300">
+                  Premia Black 3D 🖤
+                </span>
+              )}
+              {design.id === 'davivienda_oro' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-900/60 border border-amber-300 text-amber-200">
+                  Davivienda Oro 🏠
+                </span>
+              )}
+              {design.id === 'fedecredito_oro' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-950/80 border border-yellow-400 text-yellow-300">
+                  FEDECRÉDITO Oro 👑
+                </span>
+              )}
+              {design.id === 'banco_azul_oro' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-950/80 border border-amber-300 text-amber-200">
+                  Banco Azul Oro 🌊
+                </span>
+              )}
+              {design.id === 'promerica_club' && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-900 border border-emerald-400 text-emerald-200">
+                  Club Promerica 🌿
+                </span>
+              )}
               {(design.id === 'walmart' || design.id === 'walmart_black') && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#0071dc] border border-yellow-400 text-yellow-300">
                   Walmart✦
@@ -1892,6 +2436,28 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
   const borderColor = design.id !== 'bank_default' ? design.borderColor : preset.borderColor;
   const chipColor = design.id !== 'bank_default' ? design.chipColor : preset.chipColor;
 
+  const isAgricolaNew =
+    design.id === 'agricola_dorada_nueva' ||
+    design.id === 'agricola_clasica_azul_nueva' ||
+    design.id === 'agricola_platinum_nueva' ||
+    design.id === 'agricola_black_nueva';
+
+  const isPromericaFaceted =
+    design.id === 'promerica_premia_gold' ||
+    design.id === 'promerica_premia_platinum' ||
+    design.id === 'promerica_premia_black';
+
+  const isDarkText =
+    design.textColor.includes('neutral-900') ||
+    design.textColor.includes('slate-900') ||
+    design.textColor.includes('amber-950') ||
+    design.textColor.includes('yellow-950');
+
+  const mainTextColor = isDarkText ? 'text-neutral-900' : 'text-white';
+  const subTextColor = isDarkText ? 'text-neutral-800' : 'text-white/85';
+  const mutedTextColor = isDarkText ? 'text-neutral-700/80' : 'text-white/70';
+  const borderDivider = isDarkText ? 'border-neutral-900/25' : 'border-white/20';
+
   return (
     <div
       className={`relative rounded-2xl md:rounded-3xl p-5 md:p-6 overflow-hidden border bg-gradient-to-br ${bgGradient} ${borderColor} shadow-2xl transition-all duration-300 hover:shadow-cyan-900/20 group select-none ${
@@ -1902,8 +2468,24 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
         minHeight: compact ? '195px' : '215px',
       }}
     >
+      {/* 0. Banco Agrícola Arcos Multicolor Oficiales (alrededor del chip) */}
+      {isAgricolaNew && <AgricolaRainbowArcs />}
+
+      {/* 0. Banco Promerica 3D Faceted Origami Mesh */}
+      {isPromericaFaceted && (
+        <PromericaFacetedMesh
+          variant={
+            design.id === 'promerica_premia_gold'
+              ? 'gold'
+              : design.id === 'promerica_premia_platinum'
+              ? 'platinum'
+              : 'black'
+          }
+        />
+      )}
+
       {/* 1. Guilloché Security Wave Pattern for Premia Gold, Gold, Puntos Oro */}
-      {(design.id === 'premia_gold' || design.id === 'gold' || design.id === 'puntos_oro' || design.id === 'millas_gold' || design.id === 'premia_platinum') && (
+      {(design.id === 'premia_gold' || design.id === 'gold' || design.id === 'puntos_oro' || design.id === 'millas_gold' || design.id === 'premia_platinum' || design.id === 'davivienda_oro' || design.id === 'fedecredito_oro') && (
         <GuillocheSecurityPattern opacity={0.22} />
       )}
 
@@ -1955,44 +2537,98 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
       />
 
       {/* Card Content Layout */}
-      <div className="relative z-10 flex flex-col justify-between h-full text-white">
+      <div className={`relative z-10 flex flex-col justify-between h-full ${mainTextColor}`}>
         {/* Top Row: Bank Brand Logo & Co-Branding & Contactless */}
         <div className="flex items-start justify-between gap-3">
-          {/* Bank Logo / Image */}
-          <div className="flex items-center gap-2">
-            {card.bankLogoUrl && !imgError ? (
-              <div className="h-8 max-w-[140px] flex items-center">
-                <img
-                  src={card.bankLogoUrl}
-                  alt={card.bank}
-                  className="max-h-8 max-w-[130px] object-contain drop-shadow"
-                  onError={() => setImgError(true)}
-                />
+          {isAgricolaNew ? (
+            /* Banco Agrícola Nueva Identidad (Fiel a la fotografía) */
+            <>
+              <div className="flex flex-col text-left">
+                <span className={`text-sm sm:text-base font-black tracking-tight leading-none ${mainTextColor}`}>
+                  {design.badgeLabel}
+                </span>
+                <span className={`text-[9px] uppercase tracking-wider font-bold mt-1 opacity-80 ${mainTextColor}`}>
+                  Banco Agrícola
+                </span>
               </div>
-            ) : (
-              <div className="drop-shadow-md">{preset.renderLogo('h-7')}</div>
-            )}
-            <span className="text-[10px] tracking-wider uppercase font-semibold text-white/80 hidden sm:inline">
-              {card.bank}
-            </span>
-          </div>
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <AgricolaThreeBarsLogo isDarkText={isDarkText} className="h-6 sm:h-7" />
+                <ContactlessIcon className={`w-4 h-4 drop-shadow opacity-90 ${mainTextColor}`} />
+              </div>
+            </>
+          ) : isPromericaFaceted ? (
+            /* Banco Promerica Premia 3D (Fiel a la fotografía) */
+            <>
+              <div className="flex items-center gap-2">
+                <PromericaStarEmblem className="h-6 sm:h-7" />
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <PromericaPremiaHeader
+                  tier={
+                    design.id === 'promerica_premia_gold'
+                      ? 'gold'
+                      : design.id === 'promerica_premia_platinum'
+                      ? 'platinum'
+                      : 'black'
+                  }
+                />
+                <ContactlessIcon className="w-4 h-4 text-white/90 drop-shadow ml-1" />
+              </div>
+            </>
+          ) : (
+            /* Standard & Other Salvadoran Bank Brands */
+            <>
+              <div className="flex items-center gap-2">
+                {card.bankLogoUrl && !imgError ? (
+                  <div className="h-8 max-w-[140px] flex items-center">
+                    <img
+                      src={card.bankLogoUrl}
+                      alt={card.bank}
+                      className="max-h-8 max-w-[130px] object-contain drop-shadow"
+                      onError={() => setImgError(true)}
+                    />
+                  </div>
+                ) : (
+                  <div className="drop-shadow-md">{preset.renderLogo('h-7')}</div>
+                )}
+                <span className={`text-[10px] tracking-wider uppercase font-semibold hidden sm:inline ${subTextColor}`}>
+                  {card.bank}
+                </span>
+              </div>
 
-          {/* Top-Right: Co-Branded Retail Badge or Contactless Wave */}
-          <div className="flex items-center gap-2">
-            {(design.id === 'walmart' || design.id === 'walmart_black') && <WalmartSparkEmblem className="h-6" />}
-            {(design.id === 'super_selectos' || design.id === 'super_selectos_oro') && <SuperSelectosEmblem className="h-6" />}
-            {design.id === 'pricesmart' && <PriceSmartEmblem className="h-6" />}
-            {design.id === 'premia_gold' && <PremiaGoldEmblem />}
-            {design.id === 'premia_platinum' && <PremiaPlatinumEmblem />}
-            {design.id === 'lifemiles_avianca' && <LifeMilesEmblem className="h-6" />}
-            {design.id === 'real_madrid_cuscatlan' && <RealMadridEmblem className="h-6" />}
-            {design.id === 'millas_gold' && <MillasCompassEmblem className="h-6" />}
+              {/* Top-Right: Co-Branded Retail Badge or Contactless Wave */}
+              <div className="flex items-center gap-2">
+                {(design.id === 'walmart' || design.id === 'walmart_black') && <WalmartSparkEmblem className="h-6" />}
+                {(design.id === 'super_selectos' || design.id === 'super_selectos_oro') && <SuperSelectosEmblem className="h-6" />}
+                {design.id === 'pricesmart' && <PriceSmartEmblem className="h-6" />}
+                {design.id === 'premia_gold' && <PremiaGoldEmblem />}
+                {design.id === 'premia_platinum' && <PremiaPlatinumEmblem />}
+                {design.id === 'davivienda_oro' && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-900/60 border border-amber-300 text-amber-200">
+                    ORO 🏠
+                  </span>
+                )}
+                {design.id === 'fedecredito_oro' && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-950/80 border border-yellow-400 text-yellow-300">
+                    ORO 👑
+                  </span>
+                )}
+                {design.id === 'banco_azul_oro' && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-950/80 border border-amber-300 text-amber-200">
+                    AZUL ORO 🌊
+                  </span>
+                )}
+                {design.id === 'lifemiles_avianca' && <LifeMilesEmblem className="h-6" />}
+                {design.id === 'real_madrid_cuscatlan' && <RealMadridEmblem className="h-6" />}
+                {design.id === 'millas_gold' && <MillasCompassEmblem className="h-6" />}
 
-            <ContactlessIcon className="w-4 h-4 text-white/90 drop-shadow" />
-            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-black/35 border border-white/20 backdrop-blur-sm">
-              DIGITAL
-            </span>
-          </div>
+                <ContactlessIcon className={`w-4 h-4 drop-shadow ${mainTextColor}`} />
+                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-black/35 border border-white/20 backdrop-blur-sm text-white">
+                  DIGITAL
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Middle Row: EMV Metallic Chip & Card Name / Subtitle */}
@@ -2000,10 +2636,10 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
           <div className="flex items-center gap-3">
             <MetallicChip color={chipColor} />
             <div className="text-left">
-              <h3 className="text-base sm:text-lg font-black tracking-tight drop-shadow-md text-white truncate max-w-[200px] sm:max-w-xs">
+              <h3 className={`text-base sm:text-lg font-black tracking-tight drop-shadow-md truncate max-w-[200px] sm:max-w-xs ${mainTextColor}`}>
                 {card.name}
               </h3>
-              <span className="text-[10px] font-mono tracking-widest text-white/80 block uppercase font-semibold">
+              <span className={`text-[10px] font-mono tracking-widest block uppercase font-semibold ${subTextColor}`}>
                 {design.badgeLabel || 'CRÉDITO REVOLVENTE'}
               </span>
             </div>
@@ -2014,29 +2650,29 @@ export const DigitalCreditCard: React.FC<DigitalCreditCardProps> = ({
         <div className="space-y-2 pt-2">
           {/* Card Number Mask */}
           <div className="flex items-center justify-between">
-            <div className="font-mono text-xs sm:text-sm tracking-[0.25em] text-white/95 drop-shadow font-bold">
+            <div className={`font-mono text-xs sm:text-sm tracking-[0.25em] drop-shadow font-bold ${mainTextColor}`}>
               •••• •••• •••• {digits}
             </div>
 
-            <div className="flex items-center gap-3 text-[10px] text-white/85">
+            <div className={`flex items-center gap-3 text-[10px] ${subTextColor}`}>
               <div className="text-right">
-                <span className="block text-[8px] uppercase tracking-wider text-white/70 font-semibold">CORTE</span>
+                <span className={`block text-[8px] uppercase tracking-wider font-semibold ${mutedTextColor}`}>CORTE</span>
                 <span className="font-mono font-bold">DÍA {card.cutOffDay}</span>
               </div>
               <div className="text-right">
-                <span className="block text-[8px] uppercase tracking-wider text-white/70 font-semibold">LÍMITE</span>
+                <span className={`block text-[8px] uppercase tracking-wider font-semibold ${mutedTextColor}`}>LÍMITE</span>
                 <span className="font-mono font-bold">DÍA {card.paymentDueDay}</span>
               </div>
             </div>
           </div>
 
           {/* Cardholder Name & Payment Network */}
-          <div className="flex items-end justify-between pt-1 border-t border-white/20">
+          <div className={`flex items-end justify-between pt-1 border-t ${borderDivider}`}>
             <div className="truncate pr-2">
-              <span className="block text-[8px] uppercase tracking-widest text-white/70 font-semibold">
+              <span className={`block text-[8px] uppercase tracking-widest font-semibold ${mutedTextColor}`}>
                 LÍMITE ASIGNADO
               </span>
-              <span className="text-xs font-mono font-black tracking-wide text-white drop-shadow">
+              <span className={`text-xs font-mono font-black tracking-wide drop-shadow ${mainTextColor}`}>
                 {formatMoney(card.limit, currencySymbol)}
               </span>
             </div>
