@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 import {
   DigitalCreditCard,
   BANK_PRESETS,
@@ -49,6 +50,7 @@ export const CreditCardsView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
+  const [cardToDelete, setCardToDelete] = useState<CreditCard | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -313,18 +315,18 @@ export const CreditCardsView: React.FC = () => {
                 />
 
                 {/* Top-Right Quick Edit/Delete Overlays */}
-                <div className="absolute top-3 right-3 flex items-center gap-1 z-20">
+                <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
                   <button
                     onClick={() => openEditModal(card)}
-                    className="p-1.5 rounded-xl bg-black/60 hover:bg-black/90 text-white backdrop-blur-md border border-white/20 transition cursor-pointer shadow-lg"
+                    className="p-1.5 rounded-xl bg-slate-900/85 hover:bg-blue-600 text-slate-100 hover:text-white backdrop-blur-md border border-white/30 transition cursor-pointer shadow-lg credit-card-action-btn credit-card-edit-btn"
                     title="Editar tarjeta y diseño de banco"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => deleteCreditCard(card.id)}
-                    className="p-1.5 rounded-xl bg-black/60 hover:bg-rose-950/90 text-white hover:text-rose-300 backdrop-blur-md border border-white/20 transition cursor-pointer shadow-lg"
-                    title="Eliminar tarjeta"
+                    onClick={() => setCardToDelete(card)}
+                    className="p-1.5 rounded-xl bg-rose-950/85 hover:bg-rose-600 text-rose-200 hover:text-white backdrop-blur-md border border-rose-400/40 transition cursor-pointer shadow-lg credit-card-action-btn credit-card-delete-btn"
+                    title="Eliminar tarjeta (requiere confirmación de seguridad)"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -929,6 +931,23 @@ export const CreditCardsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Credit Card Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(cardToDelete)}
+        onClose={() => setCardToDelete(null)}
+        onConfirm={() => {
+          if (cardToDelete) {
+            deleteCreditCard(cardToDelete.id);
+            setCardToDelete(null);
+          }
+        }}
+        title="Eliminar Tarjeta de Crédito"
+        itemName={cardToDelete?.name || ''}
+        itemTypeLabel="Tarjeta de Crédito"
+        itemDetails={`${cardToDelete?.bank || 'Tarjeta'} • Límite: ${formatMoney(cardToDelete?.limit || 0, settings.currencySymbol)}`}
+        warningNote="¿Estás seguro de que deseas eliminar esta tarjeta de crédito? Se mantendrán las transacciones históricas y podrás deshacer esta acción inmediatamente."
+      />
     </div>
   );
 };

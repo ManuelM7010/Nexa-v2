@@ -40,6 +40,13 @@ import {
 } from '../services/seedData';
 import { getTodayDateStr } from '../utils/formatters';
 
+export interface UndoAction {
+  id: string;
+  description: string;
+  timestamp: number;
+  undo: () => Promise<void>;
+}
+
 interface FinanceContextType {
   // Navigation & Date
   selectedYear: number;
@@ -224,6 +231,13 @@ interface FinanceContextType {
   exportBackupJSON: () => Promise<void>;
   importBackupJSON: (jsonStr: string) => Promise<boolean>;
   exportTransactionsCSV: () => Promise<void>;
+
+  // Undo / Revert Engine
+  undoStack: UndoAction[];
+  lastUndo: UndoAction | null;
+  performUndo: () => Promise<boolean>;
+  dismissUndo: () => void;
+  pushUndo: (description: string, undoFn: () => Promise<void>) => void;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -325,6 +339,53 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [monthlyCloses, setMonthlyCloses] = useState<MonthlyClose[]>([]);
   const [settings, setSettings] = useState<AppSettings>(getDefaultAppSettings());
   const [isLoading, setIsLoading] = useState(true);
+
+  // Undo / Revert History Stack
+  const [undoStack, setUndoStack] = useState<UndoAction[]>([]);
+  const lastUndo = undoStack[undoStack.length - 1] || null;
+
+  const pushUndo = useCallback((description: string, undoFn: () => Promise<void>) => {
+    const item: UndoAction = {
+      id: `undo_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      description,
+      timestamp: Date.now(),
+      undo: undoFn,
+    };
+    setUndoStack((prev) => [...prev.slice(-19), item]); // Keep up to 20 actions in history
+  }, []);
+
+  const performUndo = useCallback(async (): Promise<boolean> => {
+    if (undoStack.length === 0) return false;
+    const itemToUndo = undoStack[undoStack.length - 1];
+    setUndoStack((prev) => prev.slice(0, -1));
+    try {
+      await itemToUndo.undo();
+      return true;
+    } catch (err) {
+      console.error('Error al deshacer acción:', err);
+      return false;
+    }
+  }, [undoStack]);
+
+  const dismissUndo = useCallback(() => {
+    setUndoStack((prev) => prev.slice(0, -1));
+  }, []);
+
+  // Keyboard shortcut Ctrl+Z / Cmd+Z for global undo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) {
+          return;
+        }
+        e.preventDefault();
+        performUndo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [performUndo]);
 
   // Load from storage on mount
   const loadAllData = useCallback(async () => {
@@ -804,8 +865,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteTransaction = async (id: string) => {
+    const found = transactions.find((t) => t.id === id);
     await storage.delete('transactions', id);
     setTransactions((prev) => prev.filter((t) => t.id !== id));
+    if (found) {
+      pushUndo(
+        `Movimiento "${found.concept}" ($${(found.amount / 100).toFixed(2)}) eliminado`,
+        async () => {
+          await storage.put('transactions', found);
+          setTransactions((prev) => [found, ...prev]);
+        }
+      );
+    }
   };
 
   const duplicateTransaction = async (id: string) => {
@@ -884,8 +955,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteAccount = async (id: string) => {
+    const found = accounts.find((a) => a.id === id);
     await storage.delete('accounts', id);
     setAccounts((prev) => prev.filter((a) => a.id !== id));
+    if (found) {
+      pushUndo(
+        `Cuenta "${found.name}" eliminada`,
+        async () => {
+          await storage.put('accounts', found);
+          setAccounts((prev) => [...prev, found]);
+        }
+      );
+    }
   };
 
   const saveSavingsAccount = async (savData: Partial<SavingsAccount> & { name: string }) => {
@@ -1094,8 +1175,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteCreditCard = async (id: string) => {
+    const found = creditCards.find((c) => c.id === id);
     await storage.delete('creditCards', id);
     setCreditCards((prev) => prev.filter((c) => c.id !== id));
+    if (found) {
+      pushUndo(
+        `Tarjeta "${found.name}" eliminada`,
+        async () => {
+          await storage.put('creditCards', found);
+          setCreditCards((prev) => [...prev, found]);
+        }
+      );
+    }
   };
 
   const saveCategory = async (cat: Category) => {
@@ -1230,8 +1321,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteInstallmentPurchase = async (id: string) => {
+    const found = installmentPurchases.find((i) => i.id === id);
     await storage.delete('installmentPurchases', id);
     setInstallmentPurchases((prev) => prev.filter((i) => i.id !== id));
+    if (found) {
+      pushUndo(
+        `Compra en cuotas "${found.concept}" eliminada`,
+        async () => {
+          await storage.put('installmentPurchases', found);
+          setInstallmentPurchases((prev) => [...prev, found]);
+        }
+      );
+    }
   };
 
   const saveLoan = async (loanData: Partial<Loan> & { name: string; originalAmount: number }) => {
@@ -1286,8 +1387,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteLoan = async (id: string) => {
+    const found = loans.find((l) => l.id === id);
     await storage.delete('loans', id);
     setLoans((prev) => prev.filter((l) => l.id !== id));
+    if (found) {
+      pushUndo(
+        `Préstamo "${found.name}" eliminado`,
+        async () => {
+          await storage.put('loans', found);
+          setLoans((prev) => [...prev, found]);
+        }
+      );
+    }
   };
 
   const registerLoanExtraPayment = async (
@@ -2089,6 +2200,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         exportBackupJSON,
         importBackupJSON,
         exportTransactionsCSV,
+        undoStack,
+        lastUndo,
+        performUndo,
+        dismissUndo,
+        pushUndo,
       }}
     >
       {children}

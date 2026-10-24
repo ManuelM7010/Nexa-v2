@@ -22,6 +22,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 
 export const AccountsView: React.FC = () => {
   const {
@@ -41,6 +42,7 @@ export const AccountsView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -459,18 +461,18 @@ export const AccountsView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => openEditModal(acc)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                    className="p-1.5 rounded-xl border border-slate-700/60 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer shadow-sm"
                     title="Editar cuenta"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => deleteAccount(acc.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer"
-                    title="Eliminar cuenta"
+                    onClick={() => setAccountToDelete(acc)}
+                    className="p-1.5 rounded-xl border border-rose-500/30 bg-rose-950/20 hover:bg-rose-900/40 text-rose-300 hover:text-rose-200 transition cursor-pointer shadow-sm"
+                    title="Eliminar cuenta (requiere confirmación)"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -884,6 +886,23 @@ export const AccountsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Account Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(accountToDelete)}
+        onClose={() => setAccountToDelete(null)}
+        onConfirm={() => {
+          if (accountToDelete) {
+            deleteAccount(accountToDelete.id);
+            setAccountToDelete(null);
+          }
+        }}
+        title="Eliminar Cuenta"
+        itemName={accountToDelete?.name || ''}
+        itemTypeLabel="Cuenta"
+        itemDetails={`${accountToDelete?.type?.toUpperCase() || ''} ${accountToDelete?.bankName ? `• ${accountToDelete.bankName}` : ''}`}
+        warningNote="¿Estás seguro de que deseas eliminar esta cuenta? Podrás deshacer esta acción inmediatamente con el botón Deshacer."
+      />
     </div>
   );
 };

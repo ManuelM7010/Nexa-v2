@@ -12,6 +12,7 @@ import { MobileQuickExpenseFAB } from './components/common/MobileQuickExpenseFAB
 import { QuickSearchModal } from './components/common/QuickSearchModal';
 import { FinancialAlertsModal } from './components/common/FinancialAlertsModal';
 import { DropdownCalculator } from './components/common/DropdownCalculator';
+import { UndoToast } from './components/common/UndoToast';
 
 import { DashboardView } from './components/views/DashboardView';
 import { DailyCashFlowView } from './components/views/DailyCashFlowView';
@@ -131,6 +132,7 @@ const MainAppContent: React.FC = () => {
       <RenderGuideModal />
       <QuickSearchModal />
       <FinancialAlertsModal />
+      <UndoToast />
 
       {/* Global Multi-Module Quick Calculator */}
       <DropdownCalculator

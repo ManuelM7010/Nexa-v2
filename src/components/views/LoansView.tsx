@@ -20,6 +20,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 
 export const LoansView: React.FC = () => {
   const {
@@ -35,6 +36,7 @@ export const LoansView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
+  const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
 
   // Form state
@@ -317,18 +319,18 @@ export const LoansView: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => openEditModal(loan)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-                    title="Editar"
+                    className="p-1.5 rounded-xl border border-slate-700/60 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer shadow-sm"
+                    title="Editar préstamo"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => deleteLoan(loan.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer"
-                    title="Eliminar"
+                    onClick={() => setLoanToDelete(loan)}
+                    className="p-1.5 rounded-xl border border-rose-500/30 bg-rose-950/20 hover:bg-rose-900/40 text-rose-300 hover:text-rose-200 transition cursor-pointer shadow-sm"
+                    title="Eliminar préstamo (requiere confirmación)"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -808,6 +810,23 @@ export const LoansView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Loan Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(loanToDelete)}
+        onClose={() => setLoanToDelete(null)}
+        onConfirm={() => {
+          if (loanToDelete) {
+            deleteLoan(loanToDelete.id);
+            setLoanToDelete(null);
+          }
+        }}
+        title="Eliminar Préstamo"
+        itemName={loanToDelete?.name || ''}
+        itemTypeLabel={loanToDelete?.isExtrafinanciamiento ? 'Extrafinanciamiento TDC' : 'Préstamo Bancario'}
+        itemDetails={`${loanToDelete?.lender || 'Institución'} • Monto original: ${formatMoney(loanToDelete?.originalAmount || 0, settings.currencySymbol)}`}
+        warningNote="¿Estás seguro de que deseas eliminar este préstamo? Podrás deshacer esta acción inmediatamente."
+      />
     </div>
   );
 };

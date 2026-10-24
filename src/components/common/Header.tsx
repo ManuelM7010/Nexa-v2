@@ -17,6 +17,7 @@ import {
   Sun,
   Moon,
   Calculator,
+  RotateCcw,
 } from 'lucide-react';
 import { formatDateEs } from '../../utils/formatters';
 
@@ -38,6 +39,9 @@ export const Header: React.FC = () => {
     toggleTheme,
     isCalculatorOpen,
     toggleCalculator,
+    undoStack,
+    performUndo,
+    lastUndo,
   } = useFinance();
 
   const [isOnline, setIsOnline] = useState(
@@ -138,6 +142,31 @@ export const Header: React.FC = () => {
           >
             <ArrowLeftRight className="w-4 h-4 text-emerald-400" />
             <span className="hidden md:inline">Movs</span>
+          </button>
+
+          {/* Global Undo (Deshacer) button */}
+          <button
+            id="btn-header-undo"
+            onClick={performUndo}
+            disabled={undoStack.length === 0}
+            className={`flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold cursor-pointer transition active:scale-95 relative ${
+              undoStack.length > 0
+                ? 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border-blue-500/50 shadow-md shadow-blue-500/10 ring-1 ring-blue-500/30 animate-pulse'
+                : 'bg-slate-900 border-slate-800 text-slate-500 opacity-60 cursor-not-allowed'
+            }`}
+            title={
+              undoStack.length > 0
+                ? `Deshacer: ${lastUndo?.description} (Ctrl+Z)`
+                : 'Deshacer (Ctrl+Z): Sin acciones recientes para revertir'
+            }
+          >
+            <RotateCcw className={`w-4 h-4 ${undoStack.length > 0 ? 'text-blue-400' : 'text-slate-500'}`} />
+            <span className="hidden md:inline">Deshacer</span>
+            {undoStack.length > 0 && (
+              <span className="w-4 h-4 rounded-full bg-blue-500 text-[9px] font-bold text-white flex items-center justify-center shrink-0">
+                {undoStack.length}
+              </span>
+            )}
           </button>
 
           {/* Global Quick Calculator button */}

@@ -16,6 +16,7 @@ import {
   Check,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 
 export const InstallmentsView: React.FC = () => {
   const {
@@ -29,6 +30,7 @@ export const InstallmentsView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InstallmentPurchase | null>(null);
+  const [installmentToDelete, setInstallmentToDelete] = useState<InstallmentPurchase | null>(null);
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
   const [hidePriorInstallments, setHidePriorInstallments] = useState(true);
   const liquidityStart = settings.liquidityStartDate || '2026-09-15';
@@ -195,18 +197,18 @@ export const InstallmentsView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => openEditModal(item)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-                    title="Editar"
+                    className="p-1.5 rounded-xl border border-slate-700/60 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer shadow-sm"
+                    title="Editar compra en cuotas"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => deleteInstallmentPurchase(item.id)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer"
-                    title="Eliminar"
+                    onClick={() => setInstallmentToDelete(item)}
+                    className="p-1.5 rounded-xl border border-rose-500/30 bg-rose-950/20 hover:bg-rose-900/40 text-rose-300 hover:text-rose-200 transition cursor-pointer shadow-sm"
+                    title="Eliminar compra en cuotas (requiere confirmación)"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -472,6 +474,23 @@ export const InstallmentsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Installment Purchase Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(installmentToDelete)}
+        onClose={() => setInstallmentToDelete(null)}
+        onConfirm={() => {
+          if (installmentToDelete) {
+            deleteInstallmentPurchase(installmentToDelete.id);
+            setInstallmentToDelete(null);
+          }
+        }}
+        title="Eliminar Compra en Cuotas"
+        itemName={installmentToDelete?.concept || ''}
+        itemTypeLabel="Compra a Plazos"
+        itemDetails={`Total: ${formatMoney(installmentToDelete?.totalAmount || 0, settings.currencySymbol)} • ${installmentToDelete?.totalInstallments || 0} cuotas`}
+        warningNote="¿Estás seguro de que deseas eliminar este plan de cuotas? Podrás deshacer esta acción inmediatamente."
+      />
     </div>
   );
 };
