@@ -99,41 +99,41 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
           {/* Card 1: Real Current Liquidity */}
           <motion.div
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setSelectedCardModal('liquidez')}
-            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
+            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 p-3 sm:p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group flex flex-col justify-between"
           >
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-400" />
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
+            <div className="flex items-center justify-between text-slate-400 mb-1.5 sm:mb-2">
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 truncate">
                 {executiveSummary.isCurrentMonth
-                  ? 'Liquidez Real Hoy'
+                  ? 'Liquidez Real'
                   : selectedMonthKey > todayMonthKey
-                  ? `Liquidez Apertura (${MONTH_NAMES_SHORT_ES[selectedMonth - 1] || 'Mes'})`
-                  : `Liquidez Cierre (${MONTH_NAMES_SHORT_ES[selectedMonth - 1] || 'Mes'})`}
+                  ? `Apertura (${MONTH_NAMES_SHORT_ES[selectedMonth - 1] || 'Mes'})`
+                  : `Cierre (${MONTH_NAMES_SHORT_ES[selectedMonth - 1] || 'Mes'})`}
               </span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   {executiveSummary.periodLabel || (executiveSummary.isCurrentMonth ? 'Hoy' : `${MONTH_NAMES_SHORT_ES[selectedMonth - 1]} ${selectedYear}`)}
                 </span>
-                <div className="p-1.5 rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20 transition">
+                <div className="p-1 sm:p-1.5 rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20 transition hidden sm:block">
                   <Wallet className="w-4 h-4" />
                 </div>
               </div>
             </div>
-            <div className="text-2xl font-black text-white tracking-tight privacy-blur">
+            <div className="text-lg sm:text-2xl font-black text-white tracking-tight privacy-blur">
               {formatMoney(executiveSummary.currentRealCashBalance, settings.currencySymbol)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
               <span className="flex items-center gap-1 truncate">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-                Bancos ({formatMoney(executiveSummary.bankBalance, settings.currencySymbol)}) + Efectivo ({formatMoney(executiveSummary.cashBalance, settings.currencySymbol)})
+                <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="truncate">Bancos + Efectivo</span>
               </span>
-              <span className="text-blue-400 group-hover:translate-x-0.5 transition font-semibold text-[10px] ml-1">Ver ↗</span>
+              <span className="text-blue-400 group-hover:translate-x-0.5 transition font-semibold text-[9px] sm:text-[10px] ml-1 shrink-0">Ver ↗</span>
             </p>
           </motion.div>
 
@@ -142,19 +142,19 @@ export const DashboardView: React.FC = () => {
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setSelectedCardModal('cierre')}
-            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
+            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-sky-500/50 p-3 sm:p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group flex flex-col justify-between"
           >
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sky-400 to-blue-500" />
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">
-                Liquidez Proyectada Cierre
+            <div className="flex items-center justify-between text-slate-400 mb-1.5 sm:mb-2">
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider truncate">
+                Cierre Proyectado
               </span>
-              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400 group-hover:bg-sky-500/20 transition">
-                <TrendingUp className="w-4 h-4" />
+              <div className="p-1 sm:p-2 rounded-xl bg-sky-500/10 text-sky-400 group-hover:bg-sky-500/20 transition">
+                <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div
-              className={`text-2xl font-black tracking-tight privacy-blur ${
+              className={`text-lg sm:text-2xl font-black tracking-tight privacy-blur ${
                 executiveSummary.projectedEndBalance < 0
                   ? 'text-rose-400'
                   : 'text-sky-300'
@@ -162,9 +162,9 @@ export const DashboardView: React.FC = () => {
             >
               {formatMoney(executiveSummary.projectedEndBalance, settings.currencySymbol)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
-              <span>Saldo al día {dailyCashFlow[dailyCashFlow.length - 1]?.date.slice(8) || 30}</span>
-              <span className="text-sky-400 group-hover:translate-x-0.5 transition font-semibold text-[10px]">
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
+              <span className="truncate">Día {dailyCashFlow[dailyCashFlow.length - 1]?.date.slice(8) || 30}</span>
+              <span className="text-sky-400 group-hover:translate-x-0.5 transition font-semibold text-[9px] sm:text-[10px] shrink-0">
                 Mín: {formatMoney(executiveSummary.lowestProjectedBalance, settings.currencySymbol)} ↗
               </span>
             </p>
@@ -175,19 +175,19 @@ export const DashboardView: React.FC = () => {
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setSelectedCardModal('disponible')}
-            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
+            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 p-3 sm:p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group flex flex-col justify-between"
           >
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">
-                Disponible Libre Real
+            <div className="flex items-center justify-between text-slate-400 mb-1.5 sm:mb-2">
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider truncate">
+                Disponible Libre
               </span>
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20 transition">
-                <ShieldCheck className="w-4 h-4" />
+              <div className="p-1 sm:p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20 transition">
+                <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div
-              className={`text-2xl font-black tracking-tight privacy-blur ${
+              className={`text-lg sm:text-2xl font-black tracking-tight privacy-blur ${
                 executiveSummary.freeCashAfterObligations < 0
                   ? 'text-rose-400'
                   : 'text-emerald-400'
@@ -195,11 +195,11 @@ export const DashboardView: React.FC = () => {
             >
               {formatMoney(executiveSummary.freeCashAfterObligations, settings.currencySymbol)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
               <span className="truncate">
-                Descontando {formatMoney(executiveSummary.upcomingObligationsCommitted, settings.currencySymbol)} pendientes
+                Obligaciones deducidas
               </span>
-              <span className="text-emerald-400 group-hover:translate-x-0.5 transition font-semibold text-[10px] ml-1">Ver ↗</span>
+              <span className="text-emerald-400 group-hover:translate-x-0.5 transition font-semibold text-[9px] sm:text-[10px] ml-1 shrink-0">Ver ↗</span>
             </p>
           </motion.div>
 
@@ -208,23 +208,23 @@ export const DashboardView: React.FC = () => {
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setSelectedCardModal('deuda')}
-            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-rose-500/50 p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group"
+            className="rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-rose-500/50 p-3 sm:p-4 relative overflow-hidden shadow-lg shadow-black/20 cursor-pointer transition group flex flex-col justify-between"
           >
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-amber-500" />
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">
-                Deuda Total Externa
+            <div className="flex items-center justify-between text-slate-400 mb-1.5 sm:mb-2">
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider truncate">
+                Deuda Externa
               </span>
-              <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 group-hover:bg-rose-500/20 transition">
-                <CreditCard className="w-4 h-4" />
+              <div className="p-1 sm:p-2 rounded-xl bg-rose-500/10 text-rose-400 group-hover:bg-rose-500/20 transition">
+                <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-rose-400 tracking-tight privacy-blur">
+            <div className="text-lg sm:text-2xl font-black text-rose-400 tracking-tight privacy-blur">
               {formatMoney(executiveSummary.totalDebt, settings.currencySymbol)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
-              <span>Tarjetas: {formatMoney(executiveSummary.creditCardDebt, settings.currencySymbol)}</span>
-              <span className="text-rose-400 group-hover:translate-x-0.5 transition font-semibold text-[10px]">Ver ↗</span>
+            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center justify-between privacy-blur">
+              <span className="truncate">Tarjetas & Préstamos</span>
+              <span className="text-rose-400 group-hover:translate-x-0.5 transition font-semibold text-[9px] sm:text-[10px] shrink-0">Ver ↗</span>
             </p>
           </motion.div>
         </div>

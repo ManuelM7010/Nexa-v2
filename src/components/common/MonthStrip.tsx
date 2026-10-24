@@ -58,8 +58,8 @@ export const MonthStrip: React.FC = () => {
   };
 
   return (
-    <div className="w-full bg-slate-900/90 border-y border-slate-800/80 backdrop-blur sticky top-0 z-30 px-3 sm:px-6 py-2.5">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+    <div className="w-full bg-slate-900/95 border-b border-slate-800/80 backdrop-blur md:sticky md:top-[57px] z-30 px-2.5 sm:px-6 py-1.5 sm:py-2.5 transition-all">
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-stretch md:items-center justify-between gap-1.5 sm:gap-3">
         {/* Left: Year selector & active title */}
         <div className="flex items-center justify-between md:justify-start gap-3">
           <div className="flex items-center gap-2">

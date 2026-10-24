@@ -113,7 +113,7 @@ const MainAppContent: React.FC = () => {
       <MonthStrip />
 
       {/* Main Dynamic Viewport with mobile bottom bar padding */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 pb-28 md:pb-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-6 lg:px-8 py-3 sm:py-6 pb-24 md:pb-8">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center min-h-[400px] space-y-3">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
