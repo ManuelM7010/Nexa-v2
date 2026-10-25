@@ -764,16 +764,18 @@ export const TransactionsView: React.FC = () => {
                   const isIncome = tx.type === 'ingreso';
                   const isCardPayment = tx.type === 'pago_tarjeta';
                   const isToday = tx.date === todayStr;
+                  const isPast = tx.date < todayStr;
+                  const isFuture = tx.date > todayStr;
 
                   return (
                     <tr
                       key={tx.id}
                       className={`transition ${
                         isToday
-                          ? 'bg-sky-950/60 hover:bg-sky-900/60 border-l-4 border-l-sky-400 ring-1 ring-sky-500/30 font-semibold'
-                          : tx.status === 'realizado'
-                          ? 'bg-slate-900/40 hover:bg-slate-850/60'
-                          : 'hover:bg-slate-850/60'
+                          ? 'tx-row-today bg-sky-950/60 hover:bg-sky-900/60 border-l-4 border-l-sky-400 ring-1 ring-sky-500/30 font-semibold'
+                          : isPast
+                          ? `tx-row-past ${tx.status === 'realizado' ? 'bg-slate-900/40 hover:bg-slate-850/60' : 'hover:bg-slate-850/60'}`
+                          : `tx-row-future ${tx.status === 'realizado' ? 'bg-slate-900/40 hover:bg-slate-850/60' : 'hover:bg-slate-850/60'}`
                       }`}
                     >
                       {/* Status Toggle Button */}
@@ -798,13 +800,13 @@ export const TransactionsView: React.FC = () => {
                           {isToday && (
                             <span
                               title={`Movimiento de la fecha de hoy (${formatDateEs(todayStr, { withDayName: true })})`}
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-sky-500 text-slate-950 shadow-sm shadow-sky-500/25 ring-1 ring-sky-300 flex-shrink-0 animate-pulse"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-sky-500 text-slate-950 shadow-sm shadow-sky-500/25 ring-1 ring-sky-300 flex-shrink-0 animate-pulse tx-today-pill"
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-950"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-950 tx-today-dot"></span>
                               HOY
                             </span>
                           )}
-                          <span className={isToday ? 'font-bold text-sky-400' : ''}>
+                          <span className={isToday ? 'font-bold text-sky-400 tx-date-text' : 'tx-date-text'}>
                             {formatDateEs(tx.date, { withDayName: false })}
                           </span>
                         </div>

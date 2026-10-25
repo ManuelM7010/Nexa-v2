@@ -650,13 +650,122 @@ body.light,
   border-color: #eef2f6 !important;
 }
 
-[data-theme="light"] tbody tr:nth-child(even),
-.theme-light tbody tr:nth-child(even) {
+/* =========================================================
+   MÓDULO DE MOVIMIENTOS: CRONOLOGÍA EN MODO CLARO
+   - Días anteriores a hoy: oscurito (#e5edf5 / #d6e2ee)
+   - Día de hoy: resaltado bonito (azul radiante #dbeafe / #eff6ff con acento)
+   - Días futuros / resto: claro (#ffffff / #fafbfc)
+   ========================================================= */
+
+/* Días anteriores a hoy (Oscurito) */
+[data-theme="light"] tbody tr.tx-row-past,
+[data-theme="light"] tbody tr.tx-row-past:nth-child(even),
+.theme-light tbody tr.tx-row-past,
+.theme-light tbody tr.tx-row-past:nth-child(even) {
+  background-color: #e5edf5 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-past:hover,
+.theme-light tbody tr.tx-row-past:hover {
+  background-color: #d6e2ee !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-past td,
+.theme-light tbody tr.tx-row-past td {
+  color: #334155 !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-past .text-white,
+.theme-light tbody tr.tx-row-past .text-white {
+  color: #1e293b !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-past .tx-date-text,
+.theme-light tbody tr.tx-row-past .tx-date-text {
+  color: #475569 !important;
+  font-weight: 600 !important;
+}
+
+/* El día de hoy (Resaltado Bonito) */
+[data-theme="light"] tbody tr.tx-row-today,
+[data-theme="light"] tbody tr.tx-row-today:nth-child(even),
+.theme-light tbody tr.tx-row-today,
+.theme-light tbody tr.tx-row-today:nth-child(even) {
+  background: linear-gradient(90deg, #dbeafe 0%, #eff6ff 45%, #f8fcff 100%) !important;
+  border-left: 4.5px solid #0284c7 !important;
+  border-top: 1.5px solid #93c5fd !important;
+  border-bottom: 2px solid #60a5fa !important;
+  box-shadow: 0 4px 14px -2px rgba(2, 132, 199, 0.2), inset 0 0 0 1px rgba(56, 189, 248, 0.35) !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-today:hover,
+.theme-light tbody tr.tx-row-today:hover {
+  background: linear-gradient(90deg, #bae6fd 0%, #e0f2fe 100%) !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-today td,
+.theme-light tbody tr.tx-row-today td {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-today .text-white,
+.theme-light tbody tr.tx-row-today .text-white {
+  color: #0369a1 !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-today .tx-date-text,
+.theme-light tbody tr.tx-row-today .tx-date-text {
+  color: #0284c7 !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="light"] .tx-today-pill,
+.theme-light .tx-today-pill {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid #0284c7 !important;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35) !important;
+}
+
+[data-theme="light"] .tx-today-dot,
+.theme-light .tx-today-dot {
+  background-color: #ffffff !important;
+}
+
+/* El resto de días / Futuros (Color Claro) */
+[data-theme="light"] tbody tr.tx-row-future,
+.theme-light tbody tr.tx-row-future {
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-future:nth-child(even),
+.theme-light tbody tr.tx-row-future:nth-child(even) {
+  background-color: #fafbfc !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-future:hover,
+.theme-light tbody tr.tx-row-future:hover {
+  background-color: #f0f7ff !important;
+}
+
+[data-theme="light"] tbody tr.tx-row-future .text-white,
+.theme-light tbody tr.tx-row-future .text-white {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+/* Filas estándar no clasificadas */
+[data-theme="light"] tbody tr:not(.tx-row-past):not(.tx-row-today):not(.tx-row-future):nth-child(even),
+.theme-light tbody tr:not(.tx-row-past):not(.tx-row-today):not(.tx-row-future):nth-child(even) {
   background-color: #fbfcfe !important;
 }
 
-[data-theme="light"] tr:hover,
-.theme-light tr:hover {
+[data-theme="light"] tbody tr:not(.tx-row-past):not(.tx-row-today):not(.tx-row-future):hover,
+.theme-light tbody tr:not(.tx-row-past):not(.tx-row-today):not(.tx-row-future):hover {
   background-color: #f0f7ff !important;
 }
 
