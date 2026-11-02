@@ -165,10 +165,22 @@ export const NewTransactionModal: React.FC = () => {
       billingDay: isFixedMonthly ? (Number(date.slice(8)) || 1) : undefined,
       notes: notes.trim() || undefined,
       origin: editingTransaction?.origin || (type === 'pago_tarjeta' ? `pago_tarjeta:${creditCardId}` : 'manual'),
+      installmentPurchaseId: editingTransaction?.installmentPurchaseId || (editingTransaction?.origin?.startsWith('cuota:') ? editingTransaction.origin.split(':')[1] : undefined),
+      loanId: editingTransaction?.loanId || (editingTransaction?.origin?.startsWith('prestamo:') ? editingTransaction.origin.split(':')[1] : undefined),
     });
 
     handleClose();
   };
+
+  const isEditingOriginItem = editingTransaction && (
+    editingTransaction.origin?.startsWith('suscripcion:') ||
+    editingTransaction.origin?.startsWith('sub:') ||
+    editingTransaction.origin?.startsWith('cuota:') ||
+    editingTransaction.origin?.startsWith('inst:') ||
+    editingTransaction.origin?.startsWith('prestamo:') ||
+    editingTransaction.type === 'cuota_prestamo' ||
+    editingTransaction.type === 'suscripcion'
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
@@ -192,6 +204,18 @@ export const NewTransactionModal: React.FC = () => {
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {isEditingOriginItem && (
+          <div className="mt-3 p-3 rounded-xl bg-purple-950/40 border border-purple-500/35 text-xs text-purple-200 flex items-start gap-2.5">
+            <span className="text-base">💡</span>
+            <div>
+              <strong className="block text-purple-100">Movimiento de Suscripción / Cuota / Préstamo</strong>
+              <span>
+                Puedes ajustar libremente la fecha o el monto si en tu banco se cobró en un día distinto (por ejemplo, después de la fecha de corte). Tu Estado de Cuenta de Tarjeta y tu Flujo Diario se sincronizarán según lo que definas aquí.
+              </span>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           {/* Quick template auto-fill presets */}

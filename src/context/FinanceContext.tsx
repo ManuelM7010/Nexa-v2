@@ -846,6 +846,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       savingsAccountId: txData.savingsAccountId,
       status: txData.status || 'planificado',
       origin: txData.origin || 'manual',
+      installmentPurchaseId: txData.installmentPurchaseId,
+      loanId: txData.loanId,
       isFixedMonthly: txData.isFixedMonthly,
       billingDay: txData.billingDay,
       createdAt: txData.createdAt || now,

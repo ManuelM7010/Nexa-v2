@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethodType } from '../../types';
-import { formatMoney, formatDateEs } from '../../utils/formatters';
+import { formatMoney, formatDateEs, daysInMonth, MONTH_NAMES_ES, MONTH_NAMES_SHORT_ES } from '../../utils/formatters';
 import {
   Search,
   Plus,
@@ -24,6 +24,7 @@ import {
   FileSpreadsheet,
   Download,
   ChevronDown,
+  X,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
@@ -51,10 +52,27 @@ export const TransactionsView: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<string>('all');
-  const [filterOnlyToday, setFilterOnlyToday] = useState(false);
+  const [selectedFilterDate, setSelectedFilterDate] = useState<string | null>(null);
+  const [isDayPickerOpen, setIsDayPickerOpen] = useState(false);
+  const dayPickerRef = useRef<HTMLDivElement>(null);
   const [isTableScrollFixed, setIsTableScrollFixed] = useState(true);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+
+  // Close day picker on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dayPickerRef.current && !dayPickerRef.current.contains(event.target as Node)) {
+        setIsDayPickerOpen(false);
+      }
+    };
+    if (isDayPickerOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDayPickerOpen]);
 
   const exportTransactionsToCsv = (scope: 'filtered' | 'month') => {
     const listToExport = scope === 'filtered' ? filteredTransactions : allMonthTransactions;
@@ -157,15 +175,72 @@ export const TransactionsView: React.FC = () => {
     setIsExportMenuOpen(false);
   };
 
+  // Map of transactions count for each date in this month
+  const movementCountByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const tx of allMonthTransactions) {
+      map[tx.date] = (map[tx.date] || 0) + 1;
+    }
+    return map;
+  }, [allMonthTransactions]);
+
   // Count movements specifically on today's real date
-  const todayCount = useMemo(() => {
-    return allMonthTransactions.filter((tx) => tx.date === todayStr).length;
-  }, [allMonthTransactions, todayStr]);
+  const todayCount = movementCountByDate[todayStr] || 0;
+
+  // Calendar cells for the interactive day picker popover
+  const calendarGridDays = useMemo(() => {
+    const totalDays = daysInMonth(selectedYear, selectedMonth);
+    // In JS: getDay() returns 0 for Sunday, 1 for Monday...
+    // Adjust to Monday = 0, Tuesday = 1, ... Sunday = 6
+    const firstDayOfWeek = (new Date(selectedYear, selectedMonth - 1, 1).getDay() + 6) % 7;
+
+    const days: Array<{
+      dayNum: number | null;
+      dateStr: string | null;
+      count: number;
+      isToday: boolean;
+      isPast: boolean;
+      isSelected: boolean;
+    }> = [];
+
+    // Blank padding cells before day 1
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      days.push({
+        dayNum: null,
+        dateStr: null,
+        count: 0,
+        isToday: false,
+        isPast: false,
+        isSelected: false,
+      });
+    }
+
+    const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+
+    for (let d = 1; d <= totalDays; d++) {
+      const dateStr = `${monthKey}-${String(d).padStart(2, '0')}`;
+      const isToday = dateStr === todayStr;
+      const isPast = dateStr < todayStr;
+      const isSelected = selectedFilterDate === dateStr;
+      const count = movementCountByDate[dateStr] || 0;
+
+      days.push({
+        dayNum: d,
+        dateStr,
+        count,
+        isToday,
+        isPast,
+        isSelected,
+      });
+    }
+
+    return days;
+  }, [selectedYear, selectedMonth, todayStr, selectedFilterDate, movementCountByDate]);
 
   const filteredTransactions = useMemo(() => {
     return allMonthTransactions.filter((tx) => {
-      // Filter only today
-      if (filterOnlyToday && tx.date !== todayStr) {
+      // Filter by specific selected day
+      if (selectedFilterDate && tx.date !== selectedFilterDate) {
         return false;
       }
       // Search
@@ -212,7 +287,7 @@ export const TransactionsView: React.FC = () => {
       }
       return true;
     });
-  }, [allMonthTransactions, searchTerm, filterType, filterCategory, filterStatus, filterPayment, filterOnlyToday, todayStr]);
+  }, [allMonthTransactions, searchTerm, filterType, filterCategory, filterStatus, filterPayment, selectedFilterDate]);
 
   // Quick stats of filtered transactions
   const filteredStats = useMemo(() => {
@@ -617,38 +692,192 @@ export const TransactionsView: React.FC = () => {
             )}
           </select>
 
-          {/* Filter specifically by today's movements */}
-          <button
-            type="button"
-            onClick={() => setFilterOnlyToday(!filterOnlyToday)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer border ${
-              filterOnlyToday
-                ? 'bg-sky-500 text-slate-950 border-sky-400 font-extrabold shadow-sm shadow-sky-500/25 ring-1 ring-sky-300'
-                : 'bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-800'
-            }`}
-            title={`Filtrar para ver únicamente los movimientos del día de hoy (${formatDateEs(todayStr, { withDayName: true })})`}
-          >
-            <Calendar className={`w-3.5 h-3.5 ${filterOnlyToday ? 'text-slate-950' : 'text-sky-400'}`} />
-            <span>Solo Hoy</span>
-            {todayCount > 0 && (
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  filterOnlyToday
-                    ? 'bg-slate-950 text-sky-400'
-                    : 'bg-sky-500/20 text-sky-300 border border-sky-400/30'
-                }`}
-              >
-                {todayCount}
+          {/* Interactive Day Filter Button & Calendar Dropdown */}
+          <div className="relative" ref={dayPickerRef}>
+            <button
+              type="button"
+              onClick={() => setIsDayPickerOpen(!isDayPickerOpen)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer border ${
+                selectedFilterDate
+                  ? 'bg-sky-500 text-slate-950 border-sky-400 font-extrabold shadow-sm shadow-sky-500/25 ring-1 ring-sky-300'
+                  : 'bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-800'
+              }`}
+              title={`Filtrar movimientos por cualquier día del mes o ver los de hoy`}
+            >
+              <Calendar className={`w-3.5 h-3.5 ${selectedFilterDate ? 'text-slate-950' : 'text-sky-400'}`} />
+              <span>
+                {selectedFilterDate === todayStr
+                  ? 'Hoy'
+                  : selectedFilterDate
+                  ? `Día ${Number(selectedFilterDate.split('-')[2])} ${MONTH_NAMES_SHORT_ES[Number(selectedFilterDate.split('-')[1]) - 1]}`
+                  : 'Filtrar por Día'}
               </span>
+              {selectedFilterDate && movementCountByDate[selectedFilterDate] !== undefined ? (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-950 text-sky-400">
+                  {movementCountByDate[selectedFilterDate]}
+                </span>
+              ) : todayCount > 0 ? (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/30">
+                  Hoy: {todayCount}
+                </span>
+              ) : null}
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${isDayPickerOpen ? 'rotate-180' : ''} ${
+                  selectedFilterDate ? 'text-slate-950' : 'text-slate-400'
+                }`}
+              />
+            </button>
+
+            {/* Interactive Month Day Calendar Popover */}
+            {isDayPickerOpen && (
+              <div className="absolute left-0 sm:right-auto mt-2 w-80 rounded-2xl bg-slate-900 border border-slate-700/80 p-3.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-slate-100 day-picker-dropdown">
+                {/* Popover Header */}
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-sky-400" />
+                    <span className="font-bold text-xs text-white">
+                      {MONTH_NAMES_ES[selectedMonth - 1]} {selectedYear}
+                    </span>
+                  </div>
+                  {selectedFilterDate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedFilterDate(null);
+                        setIsDayPickerOpen(false);
+                      }}
+                      className="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition cursor-pointer"
+                    >
+                      Quitar filtro
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Action Buttons */}
+                <div className="grid grid-cols-2 gap-2 my-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFilterDate(todayStr);
+                      setIsDayPickerOpen(false);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer border ${
+                      selectedFilterDate === todayStr
+                        ? 'bg-sky-500 text-slate-950 border-sky-400 shadow-sm'
+                        : 'bg-slate-950 hover:bg-slate-800 text-sky-300 border-slate-800'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-sky-400" />
+                      <span>Solo Hoy</span>
+                    </span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                        selectedFilterDate === todayStr
+                          ? 'bg-slate-950 text-sky-300'
+                          : 'bg-sky-500/20 text-sky-300'
+                      }`}
+                    >
+                      {todayCount}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFilterDate(null);
+                      setIsDayPickerOpen(false);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer border ${
+                      selectedFilterDate === null
+                        ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                        : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800'
+                    }`}
+                  >
+                    <span>Todo el Mes</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
+                      {allMonthTransactions.length}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Weekday column headers */}
+                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 py-1 border-t border-slate-800/80 mb-1">
+                  <span>Lu</span>
+                  <span>Ma</span>
+                  <span>Mi</span>
+                  <span>Ju</span>
+                  <span>Vi</span>
+                  <span>Sá</span>
+                  <span>Do</span>
+                </div>
+
+                {/* Calendar Day Grid (1..daysInMonth) */}
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarGridDays.map((cell, idx) => {
+                    if (!cell.dayNum || !cell.dateStr) {
+                      return <div key={`blank-${idx}`} className="h-8 rounded-lg opacity-0" />;
+                    }
+
+                    const isSel = cell.isSelected;
+                    const isTod = cell.isToday;
+                    const hasMov = cell.count > 0;
+
+                    return (
+                      <button
+                        key={cell.dateStr}
+                        type="button"
+                        onClick={() => {
+                          setSelectedFilterDate(cell.dateStr);
+                          setIsDayPickerOpen(false);
+                        }}
+                        className={`h-8 rounded-lg text-xs font-semibold relative flex flex-col items-center justify-center transition cursor-pointer ${
+                          isSel
+                            ? 'bg-sky-500 text-slate-950 font-black shadow-sm ring-1 ring-sky-300 scale-105 z-10'
+                            : isTod
+                            ? 'bg-sky-500/20 text-sky-300 border border-sky-400 font-bold hover:bg-sky-500/30'
+                            : hasMov
+                            ? 'bg-slate-950 hover:bg-slate-800 text-white border border-slate-800 font-bold'
+                            : 'text-slate-500 hover:bg-slate-800/60 hover:text-slate-300'
+                        }`}
+                        title={`${cell.dayNum} de ${MONTH_NAMES_ES[selectedMonth - 1]}: ${cell.count} movimiento(s)`}
+                      >
+                        <span className="leading-none">{cell.dayNum}</span>
+                        {hasMov && (
+                          <span
+                            className={`w-1 h-1 rounded-full mt-0.5 ${
+                              isSel ? 'bg-slate-950' : isTod ? 'bg-sky-400' : 'bg-blue-400'
+                            }`}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Calendar Popover Footer */}
+                <div className="mt-3 pt-2.5 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span className="truncate max-w-[200px]">
+                    {selectedFilterDate
+                      ? `${formatDateEs(selectedFilterDate, { withDayName: true })}`
+                      : `Todo el mes (${allMonthTransactions.length} movs)`}
+                  </span>
+                  {selectedFilterDate && (
+                    <span className="font-bold text-sky-400 font-mono shrink-0">
+                      {movementCountByDate[selectedFilterDate] || 0} mov(s)
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
-          </button>
+          </div>
 
           {(searchTerm ||
             filterType !== 'all' ||
             filterCategory !== 'all' ||
             filterStatus !== 'all' ||
             filterPayment !== 'all' ||
-            filterOnlyToday) && (
+            selectedFilterDate !== null) && (
             <button
               onClick={() => {
                 setSearchTerm('');
@@ -656,7 +885,7 @@ export const TransactionsView: React.FC = () => {
                 setFilterCategory('all');
                 setFilterStatus('all');
                 setFilterPayment('all');
-                setFilterOnlyToday(false);
+                setSelectedFilterDate(null);
               }}
               className="text-blue-400 hover:underline ml-auto font-medium cursor-pointer"
             >
@@ -679,6 +908,26 @@ export const TransactionsView: React.FC = () => {
             <span>
               <span className="text-amber-400 font-semibold">{filteredStats.pendingCount}</span> planificados
             </span>
+            {selectedFilterDate && (
+              <>
+                <span className="text-slate-600">•</span>
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                  <Calendar className="w-3 h-3 text-sky-400" />
+                  <span>Día:</span>
+                  <strong className="text-white">
+                    {formatDateEs(selectedFilterDate, { withDayName: true })}
+                  </strong>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFilterDate(null)}
+                    className="p-0.5 hover:text-white text-sky-400 cursor-pointer ml-0.5"
+                    title="Quitar filtro de día"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              </>
+            )}
             {filterPayment !== 'all' && (
               <>
                 <span className="text-slate-600">•</span>

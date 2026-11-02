@@ -58,6 +58,7 @@ export const CreditCardStatementsView: React.FC = () => {
     transactions,
     installmentPurchases,
     loans,
+    subscriptions,
     categories,
     accounts,
     saveTransaction,
@@ -148,9 +149,10 @@ export const CreditCardStatementsView: React.FC = () => {
       installmentPurchases,
       todayStr,
       loans,
-      liquidityStartDate
+      liquidityStartDate,
+      subscriptions
     );
-  }, [currentCard, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate]);
+  }, [currentCard, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate, subscriptions]);
 
   // Statements for all cards for global summary
   const allStatements: CreditCardStatement[] = useMemo(() => {
@@ -162,9 +164,10 @@ export const CreditCardStatementsView: React.FC = () => {
       installmentPurchases,
       todayStr,
       loans,
-      liquidityStartDate
+      liquidityStartDate,
+      subscriptions
     );
-  }, [activeCards, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate]);
+  }, [activeCards, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate, subscriptions]);
 
   // Aggregate totals
   const totalGlobalTDDC = useMemo(() => {
@@ -1092,6 +1095,7 @@ export const CreditCardStatementsView: React.FC = () => {
                         <th className="py-3 px-3">Tipo / Origen</th>
                         <th className="py-3 px-3 text-right">Monto</th>
                         <th className="py-3 px-3 text-center">Estado</th>
+                        <th className="py-3 px-3 text-center">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-medium">
@@ -1168,6 +1172,16 @@ export const CreditCardStatementsView: React.FC = () => {
                               >
                                 {tx.status === 'realizado' ? 'Confirmado' : 'Planificado'}
                               </span>
+                            </td>
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => setEditingTransaction(tx)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                                title="Editar fecha, monto o detalles de este movimiento en el estado de cuenta"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
                             </td>
                           </tr>
                         );
