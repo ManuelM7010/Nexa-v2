@@ -540,7 +540,8 @@ export class NexaFinancialEngine {
           referenceToday,
           data.loans || [],
           liquidityStartDate,
-          data.subscriptions || []
+          data.subscriptions || [],
+          data.services || []
         );
 
         // Date of payment: Exactly in the card's payment date as defined by the statement (paymentDueDate)
@@ -2807,7 +2808,8 @@ export class NexaFinancialEngine {
     todayStr: string = new Date().toISOString().split('T')[0],
     loans: Loan[] = [],
     liquidityStartDate: string = '2026-09-15',
-    subscriptions: Subscription[] = []
+    subscriptions: Subscription[] = [],
+    services: ServiceItem[] = []
   ): CreditCardStatement {
     const { cycleStartDate, cycleEndDate, cutOffDayActual } = NexaFinancialEngine.getBillingCycleDates(card, year, month);
 
@@ -2934,10 +2936,11 @@ export class NexaFinancialEngine {
       }
     });
 
-    // 3. Subscriptions charged to this credit card
+    // 3. Subscriptions charged to THIS credit card
     (subscriptions || []).forEach((sub) => {
-      const isTdc = sub.paymentMethodType === 'tarjeta_credito' || sub.creditCardId === card.id;
-      if (!isTdc || sub.status === 'cancelada') return;
+      // Must be paid via credit card AND strictly assigned to THIS specific card
+      const isCard = (sub.paymentMethodType === 'tarjeta_credito' || !!sub.creditCardId) && sub.creditCardId === card.id;
+      if (!isCard || sub.status === 'cancelada') return;
 
       const exception = sub.monthlyExceptions?.[cycleMonthKey];
       if (exception?.paused) return;
@@ -2945,7 +2948,7 @@ export class NexaFinancialEngine {
       const subAmount = exception?.overrideAmount !== undefined ? exception.overrideAmount : sub.amount;
       if (subAmount <= 0) return;
 
-      // Check if an explicit/edited movement exists in allTransactions
+      // Check if an explicit/edited movement exists in allTransactions for this subscription
       const explicitTx = allTransactions.find(
         (tx) =>
           tx.status !== 'cancelado' &&
@@ -2955,11 +2958,12 @@ export class NexaFinancialEngine {
 
       if (explicitTx) {
         // The user edited the subscription movement!
-        // Its date and amount in allTransactions dictate whether it falls in this cycle
+        // If it belongs to this card, it was already included in purchaseTxs above.
+        // In all cases, do not inject from projection.
         return;
       }
 
-      // If not yet edited, calculate projected billing date in this cycle
+      // If not yet manually edited, calculate projected billing date in this cycle
       const cycleDays = daysInMonth(year, month);
       const billingDay = Math.min(sub.billingDay, cycleDays);
       const projectedDate = `${cycleMonthKey}-${String(billingDay).padStart(2, '0')}`;
@@ -2977,6 +2981,54 @@ export class NexaFinancialEngine {
           creditCardId: card.id,
           status: projectedDate <= todayStr ? 'realizado' : 'planificado',
           origin: `suscripcion:${sub.id}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    // 4. Services / Utilities charged to THIS credit card
+    (services || []).forEach((srv) => {
+      const isCard = (srv.paymentMethodType === 'tarjeta_credito' || !!srv.creditCardId) && srv.creditCardId === card.id;
+      if (!isCard) return;
+
+      const record = srv.monthlyRecords?.[cycleMonthKey];
+      const srvAmount = record?.budgetedAmount !== undefined ? record.budgetedAmount : srv.budgetedAmount;
+      const actualAmount = record?.actualAmount;
+      const isPaid = record?.status === 'pagado';
+      const effectiveAmount = actualAmount !== undefined ? actualAmount : srvAmount;
+      if (effectiveAmount <= 0) return;
+
+      // Check if an explicit/edited movement exists in allTransactions
+      const explicitTx = allTransactions.find(
+        (tx) =>
+          tx.status !== 'cancelado' &&
+          (tx.origin === `servicio:${srv.id}` || tx.origin === `srv:${srv.id}`) &&
+          (tx.date.startsWith(cycleMonthKey) || (tx.date >= cycleStartDate && tx.date <= cycleEndDate))
+      );
+
+      if (explicitTx) {
+        return;
+      }
+
+      const cycleDays = daysInMonth(year, month);
+      const estimatedDay = Math.min(srv.estimatedDay, cycleDays);
+      const dateStr = record?.paidDate || `${cycleMonthKey}-${String(estimatedDay).padStart(2, '0')}`;
+      if (dateStr >= cycleStartDate && dateStr <= cycleEndDate && dateStr >= liquidityStartDate) {
+        purchasesSum += effectiveAmount;
+        cycleTxs.push({
+          id: `gen_srv_${srv.id}_${cycleMonthKey}`,
+          date: dateStr,
+          expectedDate: `${cycleMonthKey}-${String(estimatedDay).padStart(2, '0')}`,
+          realDate: isPaid ? dateStr : undefined,
+          concept: `Servicio: ${srv.company} - ${srv.serviceName}`,
+          type: 'servicio',
+          categoryId: srv.categoryId,
+          amount: effectiveAmount,
+          paymentMethodType: 'tarjeta_credito',
+          creditCardId: card.id,
+          status: isPaid ? 'realizado' : 'planificado',
+          origin: `servicio:${srv.id}`,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
@@ -3087,7 +3139,8 @@ export class NexaFinancialEngine {
     todayStr: string = new Date().toISOString().split('T')[0],
     loans: Loan[] = [],
     liquidityStartDate: string = '2026-09-15',
-    subscriptions: Subscription[] = []
+    subscriptions: Subscription[] = [],
+    services: ServiceItem[] = []
   ): CreditCardStatement[] {
     return creditCards
       .filter((c) => c.isActive)
@@ -3101,7 +3154,8 @@ export class NexaFinancialEngine {
           todayStr,
           loans,
           liquidityStartDate,
-          subscriptions
+          subscriptions,
+          services
         )
       );
   }

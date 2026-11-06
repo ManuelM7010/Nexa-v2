@@ -59,6 +59,7 @@ export const CreditCardStatementsView: React.FC = () => {
     installmentPurchases,
     loans,
     subscriptions,
+    services,
     categories,
     accounts,
     saveTransaction,
@@ -150,9 +151,10 @@ export const CreditCardStatementsView: React.FC = () => {
       todayStr,
       loans,
       liquidityStartDate,
-      subscriptions
+      subscriptions,
+      services
     );
-  }, [currentCard, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate, subscriptions]);
+  }, [currentCard, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate, subscriptions, services]);
 
   // Statements for all cards for global summary
   const allStatements: CreditCardStatement[] = useMemo(() => {
@@ -165,9 +167,10 @@ export const CreditCardStatementsView: React.FC = () => {
       todayStr,
       loans,
       liquidityStartDate,
-      subscriptions
+      subscriptions,
+      services
     );
-  }, [activeCards, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate, subscriptions]);
+  }, [activeCards, selectedYear, selectedMonth, transactions, installmentPurchases, todayStr, loans, liquidityStartDate, subscriptions, services]);
 
   // Aggregate totals
   const totalGlobalTDDC = useMemo(() => {
@@ -227,6 +230,20 @@ export const CreditCardStatementsView: React.FC = () => {
         ) {
           return true;
         }
+      }
+
+      // Check subscription
+      if (tx.origin && tx.origin.startsWith('suscripcion:')) {
+        const subId = tx.origin.split(':')[1];
+        const sub = subscriptions.find((s) => s.id === subId);
+        if (sub && sub.creditCardId === rangeCardId) return true;
+      }
+
+      // Check service
+      if (tx.origin && tx.origin.startsWith('servicio:')) {
+        const srvId = tx.origin.split(':')[1];
+        const srv = services.find((s) => s.id === srvId);
+        if (srv && srv.creditCardId === rangeCardId) return true;
       }
 
       // If paymentMethodType is tarjeta_credito but creditCardId is empty, and only 1 card exists
@@ -345,6 +362,8 @@ export const CreditCardStatementsView: React.FC = () => {
     rangeEndDate,
     effectiveToday,
     activeCards,
+    subscriptions,
+    services,
   ]);
 
   // 2. Filtered list for UI display according to type, status, and search query
