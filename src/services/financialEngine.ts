@@ -394,6 +394,12 @@ export class NexaFinancialEngine {
       const dateStr = `${monthKey}-${String(billingDay).padStart(2, '0')}`;
       if (dateStr < liquidityStartDate) continue;
 
+      // Check validity range if defined as not indefinite
+      if (sub.isIndefinite === false) {
+        if (sub.startDate && dateStr < (sub.startDate.length === 7 ? `${sub.startDate}-01` : sub.startDate)) continue;
+        if (sub.endDate && dateStr > (sub.endDate.length === 7 ? `${sub.endDate}-31` : sub.endDate)) continue;
+      }
+
       // Check if user already registered an explicit/realized transaction for this
       const hasDuplicate = data.existingTransactions.some(
         (t) => t.date.startsWith(monthKey) && t.origin === `suscripcion:${sub.id}`
@@ -429,6 +435,12 @@ export class NexaFinancialEngine {
       const estimatedDay = Math.min(srv.estimatedDay, daysCount);
       const dateStr = record?.paidDate || `${monthKey}-${String(estimatedDay).padStart(2, '0')}`;
       if (dateStr < liquidityStartDate) continue;
+
+      // Check validity range if defined as not indefinite
+      if (srv.isIndefinite === false) {
+        if (srv.startDate && dateStr < (srv.startDate.length === 7 ? `${srv.startDate}-01` : srv.startDate)) continue;
+        if (srv.endDate && dateStr > (srv.endDate.length === 7 ? `${srv.endDate}-31` : srv.endDate)) continue;
+      }
 
       const hasDuplicate = data.existingTransactions.some(
         (t) => t.date.startsWith(monthKey) && t.origin === `servicio:${srv.id}`
@@ -2963,10 +2975,26 @@ export class NexaFinancialEngine {
         return;
       }
 
-      // If not yet manually edited, calculate projected billing date in this cycle
-      const cycleDays = daysInMonth(year, month);
-      const billingDay = Math.min(sub.billingDay, cycleDays);
-      const projectedDate = `${cycleMonthKey}-${String(billingDay).padStart(2, '0')}`;
+      // If not yet manually edited, calculate projected billing date that falls in this cycle [cycleStartDate, cycleEndDate]
+      let pYear = year;
+      let pMonth = month;
+      if (sub.billingDay > card.cutOffDay) {
+        pMonth = month - 1;
+        if (pMonth < 1) {
+          pMonth = 12;
+          pYear = year - 1;
+        }
+      }
+      const pMaxDays = daysInMonth(pYear, pMonth);
+      const actualBillingDay = Math.min(sub.billingDay, pMaxDays);
+      const projectedDate = `${pYear}-${String(pMonth).padStart(2, '0')}-${String(actualBillingDay).padStart(2, '0')}`;
+
+      // Check validity range if defined as not indefinite
+      if (sub.isIndefinite === false) {
+        if (sub.startDate && projectedDate < (sub.startDate.length === 7 ? `${sub.startDate}-01` : sub.startDate)) return;
+        if (sub.endDate && projectedDate > (sub.endDate.length === 7 ? `${sub.endDate}-31` : sub.endDate)) return;
+      }
+
       if (projectedDate >= cycleStartDate && projectedDate <= cycleEndDate && projectedDate >= liquidityStartDate) {
         purchasesSum += subAmount;
         cycleTxs.push({
@@ -3011,15 +3039,32 @@ export class NexaFinancialEngine {
         return;
       }
 
-      const cycleDays = daysInMonth(year, month);
-      const estimatedDay = Math.min(srv.estimatedDay, cycleDays);
-      const dateStr = record?.paidDate || `${cycleMonthKey}-${String(estimatedDay).padStart(2, '0')}`;
+      // Calculate projected date in this billing cycle [cycleStartDate, cycleEndDate]
+      let pYear = year;
+      let pMonth = month;
+      if (srv.estimatedDay > card.cutOffDay) {
+        pMonth = month - 1;
+        if (pMonth < 1) {
+          pMonth = 12;
+          pYear = year - 1;
+        }
+      }
+      const pMaxDays = daysInMonth(pYear, pMonth);
+      const actualEstDay = Math.min(srv.estimatedDay, pMaxDays);
+      const dateStr = record?.paidDate || `${pYear}-${String(pMonth).padStart(2, '0')}-${String(actualEstDay).padStart(2, '0')}`;
+
+      // Check validity range if defined as not indefinite
+      if (srv.isIndefinite === false) {
+        if (srv.startDate && dateStr < (srv.startDate.length === 7 ? `${srv.startDate}-01` : srv.startDate)) return;
+        if (srv.endDate && dateStr > (srv.endDate.length === 7 ? `${srv.endDate}-31` : srv.endDate)) return;
+      }
+
       if (dateStr >= cycleStartDate && dateStr <= cycleEndDate && dateStr >= liquidityStartDate) {
         purchasesSum += effectiveAmount;
         cycleTxs.push({
           id: `gen_srv_${srv.id}_${cycleMonthKey}`,
           date: dateStr,
-          expectedDate: `${cycleMonthKey}-${String(estimatedDay).padStart(2, '0')}`,
+          expectedDate: `${pYear}-${String(pMonth).padStart(2, '0')}-${String(actualEstDay).padStart(2, '0')}`,
           realDate: isPaid ? dateStr : undefined,
           concept: `Servicio: ${srv.company} - ${srv.serviceName}`,
           type: 'servicio',

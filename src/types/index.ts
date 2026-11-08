@@ -229,6 +229,9 @@ export interface Subscription {
   creditCardId?: string;
   categoryId: string;
   status: 'activa' | 'pausada' | 'cancelada';
+  isIndefinite?: boolean; // true if it projects indefinitely every month/year
+  startDate?: string; // YYYY-MM-DD or YYYY-MM
+  endDate?: string; // YYYY-MM-DD or YYYY-MM
   monthlyExceptions: Record<string, { paused?: boolean; overrideAmount?: number }>; // key: YYYY-MM
   notes?: string;
   createdAt: string;
@@ -247,6 +250,9 @@ export interface ServiceItem {
   accountId?: string;
   creditCardId?: string;
   categoryId: string;
+  isIndefinite?: boolean; // true if it projects indefinitely every month/year
+  startDate?: string; // YYYY-MM-DD or YYYY-MM
+  endDate?: string; // YYYY-MM-DD or YYYY-MM
   monthlyRecords: Record<
     string,
     {

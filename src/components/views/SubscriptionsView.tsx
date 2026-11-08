@@ -46,6 +46,9 @@ export const SubscriptionsView: React.FC = () => {
   const [creditCardId, setCreditCardId] = useState(creditCards[0]?.id || '');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [categoryId, setCategoryId] = useState('cat_suscripciones');
+  const [isIndefinite, setIsIndefinite] = useState(true);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
 
   const openNewModal = () => {
@@ -57,6 +60,9 @@ export const SubscriptionsView: React.FC = () => {
     setCreditCardId(creditCards[0]?.id || '');
     setAccountId(accounts[0]?.id || '');
     setCategoryId('cat_suscripciones');
+    setIsIndefinite(true);
+    setStartDate('');
+    setEndDate('');
     setNotes('');
     setIsModalOpen(true);
   };
@@ -70,6 +76,9 @@ export const SubscriptionsView: React.FC = () => {
     setCreditCardId(sub.creditCardId || creditCards[0]?.id || '');
     setAccountId(sub.accountId || accounts[0]?.id || '');
     setCategoryId(sub.categoryId);
+    setIsIndefinite(sub.isIndefinite !== false);
+    setStartDate(sub.startDate || '');
+    setEndDate(sub.endDate || '');
     setNotes(sub.notes || '');
     setIsModalOpen(true);
   };
@@ -87,6 +96,9 @@ export const SubscriptionsView: React.FC = () => {
       creditCardId: paymentMethodType === 'tarjeta_credito' ? creditCardId : undefined,
       accountId: paymentMethodType === 'banco' ? accountId : undefined,
       categoryId,
+      isIndefinite,
+      startDate: !isIndefinite && startDate ? startDate : undefined,
+      endDate: !isIndefinite && endDate ? endDate : undefined,
       notes: notes.trim() || undefined,
     });
 
@@ -192,14 +204,25 @@ export const SubscriptionsView: React.FC = () => {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                    <span>{sub.concept}</span>
-                    {isPausedThisMonth && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                        Pausada este mes
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                      <span>{sub.concept}</span>
+                      {isPausedThisMonth && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                          Pausada este mes
+                        </span>
+                      )}
+                    </h3>
+                    {sub.isIndefinite !== false ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                        ♾️ Indefinido
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/15 text-purple-300 border border-purple-500/20">
+                        📅 {sub.startDate ? sub.startDate.slice(5) : 'Inicio'} a {sub.endDate ? sub.endDate.slice(5) : 'Fin'}
                       </span>
                     )}
-                  </h3>
+                  </div>
                   <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
                     {sub.paymentMethodType === 'tarjeta_credito' ? (
                       <>
@@ -408,6 +431,65 @@ export const SubscriptionsView: React.FC = () => {
                       </option>
                     ))}
                 </select>
+              </div>
+
+              {/* Duración / Proyección de la Suscripción */}
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <label className="block text-slate-300 font-semibold text-xs">Duración & Proyección</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsIndefinite(true)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      isIndefinite
+                        ? 'bg-purple-600/25 border-purple-500 text-purple-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>♾️ Indefinida</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsIndefinite(false)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      !isIndefinite
+                        ? 'bg-purple-600/25 border-purple-500 text-purple-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>📅 Rango de Fechas</span>
+                  </button>
+                </div>
+
+                {isIndefinite ? (
+                  <p className="text-[11px] text-slate-400">
+                    Se proyectará automáticamente todos los meses de todos los años en tu Flujo Diario y Estado de Cuenta.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Fecha Inicial (Desde)</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Fecha Final (Hasta)</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                      />
+                    </div>
+                    <p className="text-[11px] text-purple-300 sm:col-span-2">
+                      Solo se proyectará dentro de este periodo. Fuera de estas fechas no generará cobros ni afectará cuentas.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>

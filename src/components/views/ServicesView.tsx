@@ -44,6 +44,9 @@ export const ServicesView: React.FC = () => {
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [creditCardId, setCreditCardId] = useState(creditCards[0]?.id || '');
   const [categoryId, setCategoryId] = useState('cat_servicios');
+  const [isIndefinite, setIsIndefinite] = useState(true);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
 
   // Quick edit monthly bill state
@@ -60,6 +63,9 @@ export const ServicesView: React.FC = () => {
     setAccountId(accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || '');
     setCreditCardId(creditCards[0]?.id || '');
     setCategoryId('cat_servicios');
+    setIsIndefinite(true);
+    setStartDate('');
+    setEndDate('');
     setNotes('');
     setIsModalOpen(true);
   };
@@ -74,6 +80,9 @@ export const ServicesView: React.FC = () => {
     setAccountId(srv.accountId || accounts[0]?.id || '');
     setCreditCardId(srv.creditCardId || creditCards[0]?.id || '');
     setCategoryId(srv.categoryId || 'cat_servicios');
+    setIsIndefinite(srv.isIndefinite !== false);
+    setStartDate(srv.startDate || '');
+    setEndDate(srv.endDate || '');
     setNotes(srv.notes || '');
     setIsModalOpen(true);
   };
@@ -92,6 +101,9 @@ export const ServicesView: React.FC = () => {
       accountId: paymentMethodType === 'banco' || paymentMethodType === 'efectivo' ? accountId : undefined,
       creditCardId: paymentMethodType === 'tarjeta_credito' ? creditCardId : undefined,
       categoryId,
+      isIndefinite,
+      startDate: !isIndefinite && startDate ? startDate : undefined,
+      endDate: !isIndefinite && endDate ? endDate : undefined,
       notes: notes.trim() || undefined,
     });
 
@@ -220,7 +232,18 @@ export const ServicesView: React.FC = () => {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-white">{srv.serviceName}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white">{srv.serviceName}</h3>
+                    {srv.isIndefinite !== false ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                        ♾️ Indefinido
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/15 text-purple-300 border border-purple-500/20">
+                        📅 {srv.startDate ? srv.startDate.slice(5) : 'Inicio'} a {srv.endDate ? srv.endDate.slice(5) : 'Fin'}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs text-slate-400">{srv.company}</span>
                 </div>
 
@@ -466,6 +489,65 @@ export const ServicesView: React.FC = () => {
                       </option>
                     ))}
                 </select>
+              </div>
+
+              {/* Duración / Proyección del Servicio */}
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <label className="block text-slate-300 font-semibold text-xs">Duración & Proyección</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsIndefinite(true)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      isIndefinite
+                        ? 'bg-blue-600/25 border-blue-500 text-blue-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>♾️ Indefinido</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsIndefinite(false)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      !isIndefinite
+                        ? 'bg-purple-600/25 border-purple-500 text-purple-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>📅 Rango de Fechas</span>
+                  </button>
+                </div>
+
+                {isIndefinite ? (
+                  <p className="text-[11px] text-slate-400">
+                    Se proyectará automáticamente todos los meses de todos los años en tu Flujo Diario y Estado de Cuenta.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Fecha Inicial (Desde)</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Fecha Final (Hasta)</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                      />
+                    </div>
+                    <p className="text-[11px] text-purple-300 sm:col-span-2">
+                      Solo se proyectará dentro de este periodo. Fuera de estas fechas no generará cobros ni afectará cuentas.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { TransactionType, PaymentMethodType, TransactionStatus } from '../../types';
-import { formatMoney, dollarsToCents, centsToDollars, getTodayDateStr } from '../../utils/formatters';
-import { X, ArrowRight, AlertCircle, CheckCircle, Plus, Zap, RefreshCw, CreditCard as CreditCardIcon } from 'lucide-react';
+import { formatMoney, dollarsToCents, centsToDollars, getTodayDateStr, daysInMonth } from '../../utils/formatters';
+import { X, ArrowRight, AlertCircle, CheckCircle, Plus, Zap, RefreshCw, CreditCard as CreditCardIcon, Copy, Calendar as CalendarIcon, Check } from 'lucide-react';
 import { NewCategoryModal } from './NewCategoryModal';
 import { NexaFinancialEngine } from '../../services/financialEngine';
 
@@ -42,6 +42,8 @@ export const NewTransactionModal: React.FC = () => {
   const [savingsAccountId, setSavingsAccountId] = useState('');
   const [status, setStatus] = useState<TransactionStatus>('planificado');
   const [isFixedMonthly, setIsFixedMonthly] = useState(false);
+  const [shouldDuplicate, setShouldDuplicate] = useState(false);
+  const [selectedDuplicateMonths, setSelectedDuplicateMonths] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
@@ -84,6 +86,8 @@ export const NewTransactionModal: React.FC = () => {
       setSavingsAccountId(savingsAccounts[0]?.id || '');
       setStatus('planificado');
       setIsFixedMonthly(false);
+      setShouldDuplicate(false);
+      setSelectedDuplicateMonths([]);
       setNotes('');
     }
   }, [
@@ -100,12 +104,41 @@ export const NewTransactionModal: React.FC = () => {
     savingsAccounts,
   ]);
 
+  const candidateMonths = useMemo(() => {
+    if (!date) return [];
+    const currentMonthKey = date.slice(0, 7);
+    const [startYear, startMonth] = currentMonthKey.split('-').map(Number);
+    const list: { key: string; label: string; year: number; month: number; monthName: string }[] = [];
+    const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    let curY = startYear;
+    let curM = startMonth;
+    for (let i = 0; i < 18; i++) {
+      curM++;
+      if (curM > 12) {
+        curM = 1;
+        curY++;
+      }
+      const key = `${curY}-${String(curM).padStart(2, '0')}`;
+      list.push({
+        key,
+        label: `${MONTH_LABELS[curM - 1]} ${curY}`,
+        year: curY,
+        month: curM,
+        monthName: MONTH_LABELS[curM - 1],
+      });
+    }
+    return list;
+  }, [date]);
+
   if (!isOpen) return null;
 
   const handleClose = () => {
     setIsNewTxOpen(false);
     setEditingTransaction(null);
     setNewTxInitialDate(null);
+    setShouldDuplicate(false);
+    setSelectedDuplicateMonths([]);
   };
 
   const parsedAmountCents = dollarsToCents(amountStr || 0);
@@ -168,6 +201,37 @@ export const NewTransactionModal: React.FC = () => {
       installmentPurchaseId: editingTransaction?.installmentPurchaseId || (editingTransaction?.origin?.startsWith('cuota:') ? editingTransaction.origin.split(':')[1] : undefined),
       loanId: editingTransaction?.loanId || (editingTransaction?.origin?.startsWith('prestamo:') ? editingTransaction.origin.split(':')[1] : undefined),
     });
+
+    // Replicate across selected months if requested
+    if (shouldDuplicate && selectedDuplicateMonths.length > 0) {
+      const dayNum = Number(date.slice(8)) || 1;
+      for (const mKey of selectedDuplicateMonths) {
+        const [yStr, mStr] = mKey.split('-');
+        const y = Number(yStr);
+        const m = Number(mStr);
+        const maxD = daysInMonth(y, m);
+        const targetDay = Math.min(dayNum, maxD);
+        const targetDate = `${mKey}-${String(targetDay).padStart(2, '0')}`;
+
+        await saveTransaction({
+          concept: concept.trim(),
+          amount: parsedAmountCents,
+          date: targetDate,
+          type,
+          categoryId: (type === 'transferencia' || type === 'aporte_ahorro' || type === 'retiro_ahorro' || type === 'pago_tarjeta') ? undefined : categoryId || undefined,
+          paymentMethodType: type === 'gasto_desde_ahorro' ? 'ahorros' : (type === 'pago_tarjeta' ? 'banco' : paymentMethodType),
+          accountId: (paymentMethodType === 'tarjeta_credito' && type !== 'pago_tarjeta' || type === 'gasto_desde_ahorro') ? undefined : accountId,
+          creditCardId: (paymentMethodType === 'tarjeta_credito' || type === 'pago_tarjeta') ? creditCardId : undefined,
+          creditCardCycleKey: undefined,
+          transferToAccountId: type === 'transferencia' ? transferToAccountId : undefined,
+          savingsAccountId: (type === 'aporte_ahorro' || type === 'retiro_ahorro' || type === 'gasto_desde_ahorro') ? savingsAccountId : undefined,
+          status: 'planificado',
+          isFixedMonthly: false,
+          notes: notes.trim() ? `${notes.trim()} (Replicado)` : undefined,
+          origin: 'manual',
+        });
+      }
+    }
 
     handleClose();
   };
@@ -845,6 +909,126 @@ export const NewTransactionModal: React.FC = () => {
                 <span className="font-bold font-mono bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
                   Día {Number(date.slice(8)) || 1} de cada mes
                 </span>
+              </div>
+            )}
+          </div>
+
+          {/* Duplicar / Replicar por más meses (Requirement 2) */}
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Copy className={`w-4 h-4 ${shouldDuplicate ? 'text-purple-400' : 'text-slate-400'}`} />
+                <div>
+                  <label htmlFor="shouldDuplicateCheck" className="text-xs font-bold text-white cursor-pointer select-none">
+                    ¿Duplicar / Replicar en más meses?
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Crea copias exactas de este gasto en los meses futuros que elijas
+                  </p>
+                </div>
+              </div>
+              <input
+                id="shouldDuplicateCheck"
+                type="checkbox"
+                checked={shouldDuplicate}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setShouldDuplicate(val);
+                  if (val && selectedDuplicateMonths.length === 0) {
+                    setSelectedDuplicateMonths(candidateMonths.slice(0, 3).map((m) => m.key));
+                  }
+                }}
+                className="w-4 h-4 rounded text-purple-600 bg-slate-900 border-slate-700 focus:ring-purple-500 cursor-pointer"
+              />
+            </div>
+
+            {shouldDuplicate && (
+              <div className="pt-2 border-t border-slate-800 space-y-2">
+                {/* Quick Selection Shortcuts */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 mr-1">Rápido:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDuplicateMonths(candidateMonths.slice(0, 3).map((m) => m.key))}
+                    className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-purple-950/60 border border-slate-800 hover:border-purple-500/40 text-[11px] text-purple-300 font-medium transition cursor-pointer"
+                  >
+                    +3 Meses
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDuplicateMonths(candidateMonths.slice(0, 6).map((m) => m.key))}
+                    className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-purple-950/60 border border-slate-800 hover:border-purple-500/40 text-[11px] text-purple-300 font-medium transition cursor-pointer"
+                  >
+                    +6 Meses
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const curY = Number(date.slice(0, 4));
+                      const restOfYear = candidateMonths.filter((m) => m.year === curY).map((m) => m.key);
+                      setSelectedDuplicateMonths(restOfYear);
+                    }}
+                    className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-purple-950/60 border border-slate-800 hover:border-purple-500/40 text-[11px] text-purple-300 font-medium transition cursor-pointer"
+                  >
+                    Resto del año
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDuplicateMonths(candidateMonths.map((m) => m.key))}
+                    className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-purple-950/60 border border-slate-800 hover:border-purple-500/40 text-[11px] text-purple-300 font-medium transition cursor-pointer"
+                  >
+                    Todos (+18m)
+                  </button>
+                  {selectedDuplicateMonths.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDuplicateMonths([])}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-[11px] text-slate-400 transition cursor-pointer ml-auto"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                {/* Interactive Month Pills Grid */}
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 max-h-36 overflow-y-auto p-1 bg-slate-900/60 rounded-xl border border-slate-850">
+                  {candidateMonths.map((m) => {
+                    const isSelected = selectedDuplicateMonths.includes(m.key);
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedDuplicateMonths((prev) => prev.filter((k) => k !== m.key));
+                          } else {
+                            setSelectedDuplicateMonths((prev) => [...prev, m.key]);
+                          }
+                        }}
+                        className={`py-1 px-1.5 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer border ${
+                          isSelected
+                            ? 'bg-purple-600/30 border-purple-500 text-purple-200 shadow-sm'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 text-purple-400 shrink-0" />}
+                        <span>{m.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Duplication summary message */}
+                <div className="flex items-center justify-between text-xs text-purple-300 pt-1">
+                  <span>
+                    {selectedDuplicateMonths.length === 0
+                      ? 'Ningún mes seleccionado'
+                      : `Se replicará en ${selectedDuplicateMonths.length} ${selectedDuplicateMonths.length === 1 ? 'mes' : 'meses'} (${formatMoney(parsedAmountCents * selectedDuplicateMonths.length, settings.currencySymbol)} total)`}
+                  </span>
+                  <span className="font-mono text-[11px] text-slate-400">
+                    Día {Number(date.slice(8)) || 1} de cada mes
+                  </span>
+                </div>
               </div>
             )}
           </div>

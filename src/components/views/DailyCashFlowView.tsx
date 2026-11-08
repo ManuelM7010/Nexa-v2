@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { formatMoney, formatDateEs, MONTH_NAMES_SHORT_ES } from '../../utils/formatters';
 import {
@@ -18,6 +18,10 @@ import {
   X,
   ArrowRight,
   Info,
+  Building2,
+  CreditCard,
+  Layers,
+  Wallet,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CalculatorButton } from '../common/CalculatorButton';
@@ -28,6 +32,9 @@ export const DailyCashFlowView: React.FC = () => {
     selectedMonth,
     selectedYear,
     settings,
+    accounts,
+    categories,
+    creditCards,
     setIsNewTxOpen,
     setEditingTransaction,
     openNewTransactionModal,
@@ -79,6 +86,66 @@ export const DailyCashFlowView: React.FC = () => {
   const totalRealOut = dailyCashFlow.reduce((acc, d) => acc + (d.realExpense ?? d.realizedExpense), 0);
   const totalMonthIncome = totalPlannedIn + totalRealIn;
   const totalMonthExpense = totalPlannedOut + totalRealOut;
+
+  // Detail Modal breakdown data
+  const [expenseDetailFilter, setExpenseDetailFilter] = useState<'all' | 'tarjeta' | 'prestamo' | 'servicio' | 'suscripcion' | 'otros'>('all');
+
+  const allMonthMovements = useMemo(() => {
+    const list: any[] = [];
+    dailyCashFlow.forEach((d) => {
+      const movs = d.movements || d.events || [];
+      movs.forEach((m) => {
+        list.push({ ...m, dayDate: d.date, dayName: d.dayName });
+      });
+    });
+    return list;
+  }, [dailyCashFlow]);
+
+  const monthInflows = useMemo(() => {
+    return allMonthMovements.filter((m) => m.type === 'ingreso' || m.type === 'retiro_ahorro');
+  }, [allMonthMovements]);
+
+  const monthOutflows = useMemo(() => {
+    return allMonthMovements.filter((m) => m.type !== 'ingreso' && m.type !== 'retiro_ahorro');
+  }, [allMonthMovements]);
+
+  const filteredMonthOutflows = useMemo(() => {
+    if (expenseDetailFilter === 'all') return monthOutflows;
+    if (expenseDetailFilter === 'tarjeta') {
+      return monthOutflows.filter(
+        (m) =>
+          m.type === 'pago_tarjeta' ||
+          m.origin?.startsWith('pago_tarjeta:') ||
+          m.origin?.startsWith('cuota:') ||
+          m.installmentPurchaseId
+      );
+    }
+    if (expenseDetailFilter === 'prestamo') {
+      return monthOutflows.filter(
+        (m) => m.type === 'cuota_prestamo' || m.origin?.startsWith('prestamo:') || m.loanId
+      );
+    }
+    if (expenseDetailFilter === 'servicio') {
+      return monthOutflows.filter((m) => m.type === 'servicio' || m.origin?.startsWith('servicio:'));
+    }
+    if (expenseDetailFilter === 'suscripcion') {
+      return monthOutflows.filter((m) => m.type === 'suscripcion' || m.origin?.startsWith('suscripcion:'));
+    }
+    return monthOutflows.filter(
+      (m) =>
+        m.type !== 'pago_tarjeta' &&
+        !m.origin?.startsWith('pago_tarjeta:') &&
+        !m.origin?.startsWith('cuota:') &&
+        !m.installmentPurchaseId &&
+        m.type !== 'cuota_prestamo' &&
+        !m.origin?.startsWith('prestamo:') &&
+        !m.loanId &&
+        m.type !== 'servicio' &&
+        !m.origin?.startsWith('servicio:') &&
+        m.type !== 'suscripcion' &&
+        !m.origin?.startsWith('suscripcion:')
+    );
+  }, [monthOutflows, expenseDetailFilter]);
 
   const scrollToDay = (dateStr: string) => {
     setExpandedDay(dateStr);
@@ -617,7 +684,7 @@ export const DailyCashFlowView: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 30 }}
               transition={{ duration: 0.18 }}
-              className="w-full max-w-lg bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 text-slate-100 max-h-[90vh] overflow-y-auto flex flex-col"
+              className="w-full max-w-2xl bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 text-slate-100 max-h-[90vh] overflow-y-auto flex flex-col"
             >
               {/* Mobile drag handle */}
               <div className="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mb-3 sm:hidden cursor-grab" />
@@ -626,7 +693,7 @@ export const DailyCashFlowView: React.FC = () => {
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2.5">
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                       selectedKpiCard === 'lowest'
                         ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                         : selectedKpiCard === 'income'
@@ -645,13 +712,17 @@ export const DailyCashFlowView: React.FC = () => {
                   <div>
                     <h3 className="text-base font-bold text-white">
                       {selectedKpiCard === 'lowest' && 'Día de Menor Liquidez (Punto Crítico)'}
-                      {selectedKpiCard === 'initial' && 'Saldo Inicial y Punto de Partida'}
-                      {selectedKpiCard === 'income' && 'Ingresos Proyectados vs Realizados'}
-                      {selectedKpiCard === 'expense' && 'Gastos y Compromisos del Mes'}
-                      {selectedKpiCard === 'final' && 'Saldo de Cierre y Proyección Continua'}
+                      {selectedKpiCard === 'initial' && 'Detalle del Saldo Inicial & Cuentas'}
+                      {selectedKpiCard === 'income' && `Ingresos del Mes (${monthInflows.length} movimientos)`}
+                      {selectedKpiCard === 'expense' && `Gastos & Obligaciones (${monthOutflows.length} movimientos)`}
+                      {selectedKpiCard === 'final' && 'Saldo de Cierre & Cascada de Continuidad'}
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Análisis detallado para la toma de decisiones financieras
+                      {selectedKpiCard === 'lowest' && 'Revisa el día con el balance más ajustado de tu flujo proyectado'}
+                      {selectedKpiCard === 'initial' && 'Composición de tesorería y cuentas al inicio del periodo'}
+                      {selectedKpiCard === 'income' && 'Entradas planificadas y cobradas para este mes'}
+                      {selectedKpiCard === 'expense' && 'Salidas clasificadas por compromisos fijos, cuotas y compras'}
+                      {selectedKpiCard === 'final' && 'Balance matemático exacto que transfiere como apertura al siguiente mes'}
                     </p>
                   </div>
                 </div>
@@ -666,6 +737,382 @@ export const DailyCashFlowView: React.FC = () => {
 
               {/* Modal Body */}
               <div className="py-4 space-y-4 text-xs">
+                {/* 1. INITIAL BALANCE CARD DETAIL */}
+                {selectedKpiCard === 'initial' && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[11px] uppercase tracking-wider">
+                          Saldo Total de Apertura ({isStartMonth ? `Desde ${liquidityStartDate}` : 'Día 1'})
+                        </span>
+                        <span className="text-2xl font-black font-mono text-white">
+                          {formatMoney(monthInitialBalance, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-mono font-medium self-start sm:self-auto">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                        {isStartMonth ? 'Punto de Partida Oficial' : 'Heredado del mes anterior'}
+                      </span>
+                    </div>
+
+                    {/* Breakdown by Account */}
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide block">
+                        Composición por Cuentas Bancarias & Efectivo Activo
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto">
+                        {accounts
+                          .filter((a) => a.isActive)
+                          .map((acc) => (
+                            <div
+                              key={acc.id}
+                              className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-blue-400 shrink-0">
+                                  {acc.type === 'banco' ? (
+                                    <Building2 className="w-4 h-4" />
+                                  ) : (
+                                    <Wallet className="w-4 h-4 text-emerald-400" />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="font-bold text-white block text-xs truncate">
+                                    {acc.name}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 capitalize">
+                                    {acc.bank || (acc.type === 'banco' ? 'Cuenta Bancaria' : 'Efectivo')}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="font-mono font-bold text-slate-100 text-xs shrink-0">
+                                {formatMoney(acc.initialBalance, settings.currencySymbol)}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-200 text-xs leading-relaxed flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                      <span>
+                        {isStartMonth
+                          ? 'Septiembre de 2026 marca el punto oficial de inicio de tu sistema financiero en VALORA. Los saldos de tus cuentas bancarias y efectivo quedan registrados con fecha 15 de Septiembre.'
+                          : 'El saldo de apertura de este mes coincide exactamente con el saldo de cierre del mes anterior, garantizando continuidad matemática absoluta en tu tesorería sin desfases.'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. INCOME CARD DETAIL */}
+                {selectedKpiCard === 'income' && (
+                  <div className="space-y-3">
+                    {/* Top Totals Pill Header */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Total Entradas</span>
+                        <span className="text-base font-bold font-mono text-emerald-400">
+                          +{formatMoney(totalMonthIncome, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-emerald-400 block font-semibold uppercase">Ya Realizados</span>
+                        <span className="text-base font-bold font-mono text-emerald-300">
+                          +{formatMoney(totalRealIn, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Planificados</span>
+                        <span className="text-base font-bold font-mono text-slate-200">
+                          +{formatMoney(totalPlannedIn, settings.currencySymbol)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Itemized List */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold px-1">
+                        <span>Listado de Entradas ({monthInflows.length})</span>
+                        <span>Monto / Estado</span>
+                      </div>
+                      <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                        {monthInflows.length === 0 ? (
+                          <div className="p-6 text-center text-slate-500 bg-slate-950 rounded-xl border border-slate-850">
+                            No hay ingresos registrados ni planificados para este mes.
+                          </div>
+                        ) : (
+                          monthInflows.map((m) => (
+                            <div
+                              key={m.id}
+                              className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 flex items-center justify-between gap-3 text-xs transition"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <button
+                                  onClick={() => toggleTransactionStatus(m.id)}
+                                  className={`p-1 rounded transition cursor-pointer shrink-0 ${
+                                    m.status === 'realizado'
+                                      ? 'text-emerald-400 bg-emerald-500/10'
+                                      : 'text-slate-500 hover:text-emerald-400'
+                                  }`}
+                                  title={m.status === 'realizado' ? 'Marcar como planificado' : 'Marcar como realizado'}
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-white truncate flex items-center gap-1.5">
+                                    <span>{m.concept}</span>
+                                    {m.notes && (
+                                      <span className="text-[10px] text-slate-400 font-normal truncate">
+                                        ({m.notes})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                    <span className="font-mono text-slate-300">
+                                      {m.dayDate ? `${m.dayDate.slice(8)} ${MONTH_NAMES_SHORT_ES[Number(m.dayDate.slice(5, 7)) - 1]}` : ''}
+                                    </span>
+                                    <span>•</span>
+                                    <span className="capitalize">{m.paymentMethodType || 'Banco'}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-right">
+                                  <span className="font-mono font-bold text-emerald-400 block text-xs">
+                                    +{formatMoney(m.amount, settings.currencySymbol)}
+                                  </span>
+                                  <span
+                                    className={`text-[9px] font-semibold px-1.5 py-0.2 rounded ${
+                                      m.status === 'realizado'
+                                        ? 'bg-emerald-500/15 text-emerald-300'
+                                        : 'bg-amber-500/15 text-amber-300'
+                                    }`}
+                                  >
+                                    {m.status === 'realizado' ? 'Realizado' : 'Planificado'}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setSelectedKpiCard(null);
+                                    setEditingTransaction(m);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition text-[11px] cursor-pointer"
+                                  title="Editar movimiento"
+                                >
+                                  Editar
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. EXPENSES & OBLIGATIONS CARD DETAIL */}
+                {selectedKpiCard === 'expense' && (
+                  <div className="space-y-3">
+                    {/* Top Totals Pill Header */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Total Salidas</span>
+                        <span className="text-base font-bold font-mono text-rose-400">
+                          -{formatMoney(totalMonthExpense, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-rose-400 block font-semibold uppercase">Ya Realizados</span>
+                        <span className="text-base font-bold font-mono text-rose-300">
+                          -{formatMoney(totalRealOut, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Pendientes</span>
+                        <span className="text-base font-bold font-mono text-slate-200">
+                          -{formatMoney(totalPlannedOut, settings.currencySymbol)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Filter Pills */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                      {[
+                        { id: 'all', label: `Todos (${monthOutflows.length})` },
+                        { id: 'tarjeta', label: 'Tarjetas / Pagos' },
+                        { id: 'prestamo', label: 'Préstamos' },
+                        { id: 'servicio', label: 'Servicios' },
+                        { id: 'suscripcion', label: 'Suscripciones' },
+                        { id: 'otros', label: 'Otros Gastos' },
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setExpenseDetailFilter(tab.id as any)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer border ${
+                            expenseDetailFilter === tab.id
+                              ? 'bg-rose-600/30 border-rose-500 text-rose-200'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Itemized List */}
+                    <div className="space-y-1.5">
+                      <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                        {filteredMonthOutflows.length === 0 ? (
+                          <div className="p-6 text-center text-slate-500 bg-slate-950 rounded-xl border border-slate-850">
+                            No hay gastos ni compromisos bajo esta categoría para este mes.
+                          </div>
+                        ) : (
+                          filteredMonthOutflows.map((m) => (
+                            <div
+                              key={m.id}
+                              className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 flex items-center justify-between gap-3 text-xs transition"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <button
+                                  onClick={() => toggleTransactionStatus(m.id)}
+                                  className={`p-1 rounded transition cursor-pointer shrink-0 ${
+                                    m.status === 'realizado'
+                                      ? 'text-emerald-400 bg-emerald-500/10'
+                                      : 'text-slate-500 hover:text-rose-400'
+                                  }`}
+                                  title={m.status === 'realizado' ? 'Marcar como pendiente' : 'Marcar como pagado/realizado'}
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-white truncate flex items-center gap-1.5">
+                                    <span>{m.concept}</span>
+                                    {m.notes && (
+                                      <span className="text-[10px] text-slate-400 font-normal truncate">
+                                        ({m.notes})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                    <span className="font-mono text-slate-300">
+                                      {m.dayDate ? `${m.dayDate.slice(8)} ${MONTH_NAMES_SHORT_ES[Number(m.dayDate.slice(5, 7)) - 1]}` : ''}
+                                    </span>
+                                    <span>•</span>
+                                    <span className="capitalize">{m.paymentMethodType?.replace('_', ' ') || 'Gasto'}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-right">
+                                  <span className="font-mono font-bold text-rose-400 block text-xs">
+                                    -{formatMoney(m.amount, settings.currencySymbol)}
+                                  </span>
+                                  <span
+                                    className={`text-[9px] font-semibold px-1.5 py-0.2 rounded ${
+                                      m.status === 'realizado'
+                                        ? 'bg-emerald-500/15 text-emerald-300'
+                                        : 'bg-amber-500/15 text-amber-300'
+                                    }`}
+                                  >
+                                    {m.status === 'realizado' ? 'Realizado' : 'Planificado'}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setSelectedKpiCard(null);
+                                    setEditingTransaction(m);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition text-[11px] cursor-pointer"
+                                  title="Editar movimiento"
+                                >
+                                  Editar
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. FINAL BALANCE WATERFALL DETAIL */}
+                {selectedKpiCard === 'final' && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[11px] uppercase tracking-wider">
+                          Saldo Final Estimado al Cierre del Mes
+                        </span>
+                        <span
+                          className={`text-2xl font-black font-mono ${
+                            monthFinalBalance < 0 ? 'text-rose-400' : 'text-blue-300'
+                          }`}
+                        >
+                          {formatMoney(monthFinalBalance, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block">Resultado Neto Mensual:</span>
+                        <span
+                          className={`font-mono font-bold text-sm ${
+                            totalMonthIncome - totalMonthExpense >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                          }`}
+                        >
+                          {totalMonthIncome - totalMonthExpense >= 0 ? '+' : ''}
+                          {formatMoney(totalMonthIncome - totalMonthExpense, settings.currencySymbol)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Arithmetic Waterfall Card */}
+                    <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+                      <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wide block border-b border-slate-850 pb-1.5">
+                        Cascada de Continuidad Matemática de Tesorería
+                      </span>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-300">(+) Saldo Inicial de Apertura:</span>
+                        <span className="font-mono font-bold text-white">
+                          +{formatMoney(monthInitialBalance, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-emerald-400">
+                        <span>(+) Total de Ingresos (Planificados + Realizados):</span>
+                        <span className="font-mono font-bold">
+                          +{formatMoney(totalMonthIncome, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-rose-400">
+                        <span>(-) Total Salidas & Compromisos (Planificados + Realizados):</span>
+                        <span className="font-mono font-bold">
+                          -{formatMoney(totalMonthExpense, settings.currencySymbol)}
+                        </span>
+                      </div>
+                      <div className="border-t border-slate-800 pt-2 flex justify-between items-center text-xs font-bold">
+                        <span className="text-white">(=) Saldo Final Proyectado de Cierre:</span>
+                        <span
+                          className={`font-mono text-sm ${
+                            monthFinalBalance < 0 ? 'text-rose-400' : 'text-blue-300'
+                          }`}
+                        >
+                          {formatMoney(monthFinalBalance, settings.currencySymbol)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 text-xs leading-relaxed flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Garantía de Continuidad Activa:</strong> Este saldo final se transfiere de forma íntegra e instantánea como el <strong>Saldo Inicial</strong> del día 1 del siguiente mes, eliminando descuadres entre periodos.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. LOWEST LIQUIDITY DAY DETAIL */}
                 {selectedKpiCard === 'lowest' && lowestLiquidityDay && (
                   <div className="space-y-3">
                     <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
@@ -689,26 +1136,65 @@ export const DailyCashFlowView: React.FC = () => {
                           {formatMoney(lowestLiquidityDay.finalBalance, settings.currencySymbol)}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-center">
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-center">
+                        <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block uppercase font-semibold">Apertura Día</span>
+                          <span className="font-mono font-bold text-slate-200 text-xs">
+                            {formatMoney(lowestLiquidityDay.initialBalance, settings.currencySymbol)}
+                          </span>
+                        </div>
                         <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
                           <span className="text-[10px] text-emerald-400 block uppercase font-semibold">Ingresos Día</span>
-                          <span className="font-mono font-bold text-emerald-300">
+                          <span className="font-mono font-bold text-emerald-300 text-xs">
                             +{formatMoney((lowestLiquidityDay.plannedIncome || 0) + (lowestLiquidityDay.realIncome || 0), settings.currencySymbol)}
                           </span>
                         </div>
                         <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
                           <span className="text-[10px] text-rose-400 block uppercase font-semibold">Gastos Día</span>
-                          <span className="font-mono font-bold text-rose-300">
+                          <span className="font-mono font-bold text-rose-300 text-xs">
                             -{formatMoney((lowestLiquidityDay.plannedExpense || 0) + (lowestLiquidityDay.realExpense || 0), settings.currencySymbol)}
                           </span>
                         </div>
                       </div>
                     </div>
 
+                    {/* Specific movements occurring on this lowest day */}
+                    {((lowestLiquidityDay.movements || lowestLiquidityDay.events) || []).length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wide block">
+                          Movimientos Programados en este Día ({((lowestLiquidityDay.movements || lowestLiquidityDay.events) || []).length})
+                        </span>
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                          {((lowestLiquidityDay.movements || lowestLiquidityDay.events) || []).map((m: any) => (
+                            <div
+                              key={m.id}
+                              className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex items-center justify-between text-xs"
+                            >
+                              <div className="min-w-0 pr-2">
+                                <span className="font-bold text-white block truncate">{m.concept}</span>
+                                <span className="text-[10px] text-slate-400 capitalize">{m.paymentMethodType || 'Gasto'}</span>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span
+                                  className={`font-mono font-bold ${
+                                    m.type === 'ingreso' ? 'text-emerald-400' : 'text-rose-400'
+                                  }`}
+                                >
+                                  {m.type === 'ingreso' ? '+' : '-'}
+                                  {formatMoney(m.amount, settings.currencySymbol)}
+                                </span>
+                                <span className="block text-[9px] text-slate-400 capitalize">{m.status}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 space-y-1">
                       <div className="font-semibold flex items-center gap-1.5 text-xs">
                         <Info className="w-4 h-4 text-amber-400" />
-                        <span>Recomendación de Liquidez</span>
+                        <span>Recomendación de Tesorería</span>
                       </div>
                       <p className="text-[11px] text-amber-200/90 leading-relaxed">
                         {lowestLiquidityDay.finalBalance < 0
@@ -731,113 +1217,10 @@ export const DailyCashFlowView: React.FC = () => {
                     </button>
                   </div>
                 )}
-
-                {selectedKpiCard === 'initial' && (
-                  <div className="space-y-3">
-                    <p className="text-slate-300 leading-relaxed">
-                      {isStartMonth
-                        ? 'Septiembre de 2026 marca el punto oficial de inicio de tu sistema financiero en VALORA Finanzas. Los saldos de tus cuentas bancarias y efectivo quedan registrados con fecha 15 de Septiembre.'
-                        : 'El saldo de apertura de este mes coincide exactamente con el saldo de cierre del mes anterior, garantizando continuidad matemática absoluta en tu tesorería.'}
-                    </p>
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
-                      <span className="text-slate-400">Saldo Apertura Activo:</span>
-                      <span className="font-mono font-bold text-white text-sm">
-                        {formatMoney(monthInitialBalance, settings.currencySymbol)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {selectedKpiCard === 'income' && (
-                  <div className="space-y-3">
-                    <p className="text-slate-300 leading-relaxed">
-                      Total de entradas programadas y registradas para el mes. El motor actualiza el flujo conforme marcas los movimientos como realizados.
-                    </p>
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Ingresos Ya Realizados:</span>
-                        <span className="font-mono font-bold text-emerald-400">
-                          +{formatMoney(totalRealIn, settings.currencySymbol)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Ingresos Aún Planificados:</span>
-                        <span className="font-mono font-bold text-slate-200">
-                          +{formatMoney(totalPlannedIn, settings.currencySymbol)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-t border-slate-800 pt-2 font-bold">
-                        <span className="text-white">Total Entradas:</span>
-                        <span className="font-mono text-emerald-400">
-                          +{formatMoney(totalMonthIncome, settings.currencySymbol)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedKpiCard === 'expense' && (
-                  <div className="space-y-3">
-                    <p className="text-slate-300 leading-relaxed">
-                      Total de salidas proyectadas que incluyen tus compromisos fijos, cuotas de préstamos, suscripciones y gastos del día a día.
-                    </p>
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Gastos Ya Realizados:</span>
-                        <span className="font-mono font-bold text-rose-400">
-                          -{formatMoney(totalRealOut, settings.currencySymbol)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Compromisos Pendientes:</span>
-                        <span className="font-mono font-bold text-slate-200">
-                          -{formatMoney(totalPlannedOut, settings.currencySymbol)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-t border-slate-800 pt-2 font-bold">
-                        <span className="text-white">Total Salidas:</span>
-                        <span className="font-mono text-rose-400">
-                          -{formatMoney(totalMonthExpense, settings.currencySymbol)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedKpiCard === 'final' && (
-                  <div className="space-y-3">
-                    <p className="text-slate-300 leading-relaxed">
-                      Saldo proyectado al último día del mes. Este monto se transfiere automáticamente como saldo de apertura del día 1 del siguiente mes.
-                    </p>
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Saldo Cierre Proyectado:</span>
-                        <span
-                          className={`font-mono font-bold text-sm ${
-                            monthFinalBalance < 0 ? 'text-rose-400' : 'text-blue-300'
-                          }`}
-                        >
-                          {formatMoney(monthFinalBalance, settings.currencySymbol)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Resultado Neto del Mes:</span>
-                        <span
-                          className={`font-mono font-bold ${
-                            totalMonthIncome - totalMonthExpense >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                          }`}
-                        >
-                          {totalMonthIncome - totalMonthExpense >= 0 ? '+' : ''}
-                          {formatMoney(totalMonthIncome - totalMonthExpense, settings.currencySymbol)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Close Button */}
-              <div className="pt-2">
+              <div className="pt-2 border-t border-slate-800">
                 <button
                   onClick={() => setSelectedKpiCard(null)}
                   className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition cursor-pointer"
