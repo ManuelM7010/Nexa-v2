@@ -14,8 +14,10 @@ import {
   Building2,
   CheckCircle2,
   Clock,
+  Tag,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
+import { NewCategoryModal } from '../common/NewCategoryModal';
 
 export const SubscriptionsView: React.FC = () => {
   const {
@@ -36,6 +38,7 @@ export const SubscriptionsView: React.FC = () => {
   const isPriorToStartMonth = currentMonthKey < liquidityStart.slice(0, 7);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
 
   // Form state
@@ -223,7 +226,7 @@ export const SubscriptionsView: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                  <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
                     {sub.paymentMethodType === 'tarjeta_credito' ? (
                       <>
                         <CreditCard className="w-3.5 h-3.5 text-rose-400" />
@@ -235,6 +238,15 @@ export const SubscriptionsView: React.FC = () => {
                         <span>{acc ? acc.name : 'Banco'}</span>
                       </>
                     )}
+                    {(() => {
+                      const cat = categories.find((c) => c.id === sub.categoryId);
+                      return cat ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-purple-300 border border-slate-700/60 ml-1">
+                          <Tag className="w-2.5 h-2.5 text-purple-400" />
+                          <span>{cat.name}</span>
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
 
@@ -416,18 +428,28 @@ export const SubscriptionsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Categoría</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-300 font-semibold text-xs">Categoría</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCategoryModalOpen(true)}
+                    className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer transition"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Nueva Categoría</span>
+                  </button>
+                </div>
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
-                  <option value="cat_suscripciones">Suscripciones & Streaming</option>
+                  <option value="cat_suscripciones">🔴 Suscripciones & Streaming</option>
                   {categories
                     .filter((c) => c.type === 'gasto' && c.id !== 'cat_suscripciones')
                     .map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        🔴 {c.name}
                       </option>
                     ))}
                 </select>
@@ -522,6 +544,16 @@ export const SubscriptionsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Nueva Categoría */}
+      <NewCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        defaultType="gasto"
+        onCategoryCreated={(newCat) => {
+          setCategoryId(newCat.id);
+        }}
+      />
     </div>
   );
 };

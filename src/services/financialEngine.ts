@@ -1505,7 +1505,10 @@ export class NexaFinancialEngine {
     budgetItems: BudgetAnalysisItem[],
     liquidityStartDate: string = '2026-09-15',
     savingsAccounts: SavingsAccount[] = [],
-    monthTransactions?: Transaction[]
+    monthTransactions?: Transaction[],
+    installmentPurchases: InstallmentPurchase[] = [],
+    subscriptions: Subscription[] = [],
+    services: ServiceItem[] = []
   ): ExecutiveSummary {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     const daysInCurrentMonth = daysInMonth(year, month);
@@ -1757,7 +1760,7 @@ export class NexaFinancialEngine {
     let creditCardDebt = 0;
     creditCards.forEach((c) => {
       if (c.isActive) {
-        creditCardDebt += NexaFinancialEngine.calculateCardCurrentBalance(c, allTransactions, undefined, liquidityStartDate).balance;
+        creditCardDebt += NexaFinancialEngine.calculateCardCurrentBalance(c, allTransactions, todayStr, liquidityStartDate).balance;
       }
     });
 
@@ -1876,17 +1879,42 @@ export class NexaFinancialEngine {
       });
     }
 
-    // 2b. High credit card utilization alerts
+    // 2b. High credit card utilization alerts - strictly evaluates billing cycle (corte), applied payments (abonos), due dates, and available credit
     creditCards.forEach((c) => {
       if (c.isActive && c.limit > 0) {
-        const used = NexaFinancialEngine.calculateCardCurrentBalance(c, allTransactions).balance;
-        const util = (used / c.limit) * 100;
+        const stmt = NexaFinancialEngine.generateCreditCardStatement(
+          c,
+          year,
+          month,
+          allTransactions,
+          installmentPurchases,
+          todayStr,
+          loans,
+          liquidityStartDate,
+          subscriptions,
+          services
+        );
+
+        // If the statement is already fully paid or has no debt, no alert is needed
+        if (stmt.status === 'pagado' || stmt.remainingDue <= 0) {
+          return;
+        }
+
+        const remainingDebt = stmt.remainingDue;
+        const util = (remainingDebt / c.limit) * 100;
+
         if (util >= 85) {
+          const isDanger = util >= 95;
+          const displayUtil = Math.min(100, Math.round(util));
+          const paymentsInfo = stmt.totalPayments > 0
+            ? ` (abonos aplicados: $${(stmt.totalPayments / 100).toFixed(2)})`
+            : '';
+
           alerts.push({
-            id: `alert_card_util_${c.id}`,
-            type: 'warning',
-            title: `Tarjeta ${c.name} al ${Math.round(util)}%`,
-            message: `Has utilizado $${(used / 100).toFixed(2)} de tu límite de $${(c.limit / 100).toFixed(2)}. Procura liquidarla antes del corte.`,
+            id: `alert_card_util_${c.id}_${year}_${month}`,
+            type: isDanger ? 'danger' : 'warning',
+            title: `Tarjeta ${c.name} al ${displayUtil}% de su límite`,
+            message: `En el ${stmt.cycleLabel}, tienes un saldo pendiente de $${(remainingDebt / 100).toFixed(2)}${paymentsInfo} de tu límite de $${(c.limit / 100).toFixed(2)}. Disponible: $${(stmt.availableCredit / 100).toFixed(2)}. Fecha de pago: ${stmt.paymentDueDate}.`,
             targetTab: 'tarjetas',
           });
         }
@@ -2582,12 +2610,12 @@ export class NexaFinancialEngine {
     asOfDate?: string,
     liquidityStartDate: string = '2026-09-15'
   ): { balance: number; available: number; usagePercentage: number } {
+    const effectiveAsOfDate = asOfDate || new Date().toISOString().split('T')[0];
     let balance = card.initialUsedBalance || 0;
 
     allTransactions.forEach((tx) => {
       if (tx.status === 'cancelado') return;
-      if (tx.creditCardId !== card.id) return;
-      if (asOfDate && tx.date > asOfDate) return;
+      if (effectiveAsOfDate && tx.date > effectiveAsOfDate) return;
       if (tx.date < liquidityStartDate && (card.initialUsedBalance || 0) > 0) return;
 
       // Extrafinanciamiento cuota: does NOT affect credit card purchase limit (Requirement: no afecta el límite de compras de la TDC)
@@ -2595,17 +2623,23 @@ export class NexaFinancialEngine {
         return;
       }
 
-      const isTdcCharge = (tx.paymentMethodType === 'tarjeta_credito' || tx.creditCardId === card.id) && tx.type !== 'pago_tarjeta';
+      const isCardPayment = tx.type === 'pago_tarjeta' && (
+        tx.creditCardId === card.id ||
+        tx.origin === `pago_tarjeta:${card.id}` ||
+        (tx.origin ? (tx.origin.startsWith('pago_tarjeta:') && tx.origin.includes(card.id)) : false)
+      );
 
-      if (isTdcCharge) {
+      const isCardCharge = (tx.paymentMethodType === 'tarjeta_credito' || tx.creditCardId === card.id) && tx.type !== 'pago_tarjeta';
+
+      if (isCardCharge) {
         balance += tx.amount;
-      } else if (tx.type === 'pago_tarjeta') {
+      } else if (isCardPayment) {
         balance = Math.max(0, balance - tx.amount);
       }
     });
 
     const available = Math.max(0, card.limit - balance);
-    const usagePercentage = card.limit > 0 ? Math.round((balance / card.limit) * 100) : 0;
+    const usagePercentage = card.limit > 0 ? Math.min(100, Math.round((balance / card.limit) * 100)) : 0;
 
     return {
       balance,

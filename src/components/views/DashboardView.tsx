@@ -39,6 +39,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { QuickExpenseTemplates } from '../common/QuickExpenseTemplates';
 import { CalculatorButton } from '../common/CalculatorButton';
 import { BankLogoBadge } from '../common/DigitalCreditCard';
+import { NexaFinancialEngine } from '../../services/financialEngine';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -56,6 +57,7 @@ export const DashboardView: React.FC = () => {
     creditCards,
     loans,
     todayStr,
+    transactions,
   } = useFinance();
 
   const selectedMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
@@ -776,7 +778,13 @@ export const DashboardView: React.FC = () => {
                       </span>
                       <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
                         {creditCards.map((c) => {
-                          const usedPercent = c.limit > 0 ? Math.round((c.initialUsedBalance / c.limit) * 100) : 0;
+                          const cardBal = NexaFinancialEngine.calculateCardCurrentBalance(
+                            c,
+                            transactions,
+                            todayStr,
+                            settings.liquidityStartDate || '2026-09-15'
+                          );
+                          const usedPercent = cardBal.usagePercentage;
                           return (
                             <div key={c.id} className="flex justify-between items-center p-2 rounded-lg bg-slate-950/60 border border-slate-800/80 text-[11px]">
                               <div className="flex items-center gap-2 min-w-0">
@@ -787,8 +795,8 @@ export const DashboardView: React.FC = () => {
                                 </div>
                               </div>
                               <div className="text-right">
-                                <span className="font-mono font-bold text-rose-400">{formatMoney(c.initialUsedBalance, settings.currencySymbol)}</span>
-                                <span className="text-[10px] text-slate-500 block">Límite: {formatMoney(c.limit, settings.currencySymbol)}</span>
+                                <span className="font-mono font-bold text-rose-400">{formatMoney(cardBal.balance, settings.currencySymbol)}</span>
+                                <span className="text-[10px] text-slate-500 block">Disp: {formatMoney(cardBal.available, settings.currencySymbol)}</span>
                               </div>
                             </div>
                           );

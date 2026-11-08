@@ -507,8 +507,8 @@ export const NewTransactionModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Category (for gasto, ingreso, gasto_desde_ahorro) */}
-          {(type === 'gasto' || type === 'ingreso' || type === 'gasto_desde_ahorro') && (
+          {/* Category (for gasto, ingreso, gasto_desde_ahorro, suscripcion, servicio, cuotas) */}
+          {(type === 'gasto' || type === 'ingreso' || type === 'gasto_desde_ahorro' || type === 'suscripcion' || type === 'servicio' || type === 'cuota_tarjeta' || type === 'cuota_prestamo') && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-slate-300">

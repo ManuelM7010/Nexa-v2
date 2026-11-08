@@ -761,7 +761,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       budgetAnalysis,
       settings.liquidityStartDate || '2026-09-15',
       savingsAccounts,
-      allMonthTransactions
+      allMonthTransactions,
+      installmentPurchases,
+      subscriptions,
+      services
     );
   }, [
     selectedYear,
@@ -776,6 +779,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     budgetAnalysis,
     settings.liquidityStartDate,
     savingsAccounts,
+    installmentPurchases,
+    subscriptions,
+    services,
   ]);
 
   // 12-Month Multi-Month Cash Flow & Net Savings Projection

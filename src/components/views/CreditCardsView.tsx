@@ -222,7 +222,7 @@ export const CreditCardsView: React.FC = () => {
 
   const cardBalances = creditCards.map((c) => ({
     card: c,
-    ...NexaFinancialEngine.calculateCardCurrentBalance(c, transactions, undefined, liquidityStart),
+    ...NexaFinancialEngine.calculateCardCurrentBalance(c, transactions, todayStr, liquidityStart),
   }));
 
   const totalLimit = creditCards.reduce((acc, c) => acc + c.limit, 0);
@@ -296,7 +296,7 @@ export const CreditCardsView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {creditCards.map((card) => {
           const { balance: currentBalance, available, usagePercentage: usedPct } =
-            NexaFinancialEngine.calculateCardCurrentBalance(card, transactions, undefined, liquidityStart);
+            NexaFinancialEngine.calculateCardCurrentBalance(card, transactions, todayStr, liquidityStart);
           const isHighUsage = usedPct >= 80;
           const isPayingThis = paymentCardId === card.id;
 
