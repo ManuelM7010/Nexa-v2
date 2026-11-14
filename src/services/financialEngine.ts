@@ -134,8 +134,9 @@ export class NexaFinancialEngine {
     totalInstallments: number;
     date: string; // YYYY-MM-DD
     amount: number;
+    isOverridden?: boolean;
   }[] {
-    const schedule: { installmentNumber: number; totalInstallments: number; date: string; amount: number }[] = [];
+    const schedule: { installmentNumber: number; totalInstallments: number; date: string; amount: number; isOverridden?: boolean }[] = [];
     if (!ip.firstPaymentDate || !ip.totalInstallments || ip.totalInstallments <= 0) {
       return schedule;
     }
@@ -144,6 +145,7 @@ export class NexaFinancialEngine {
     if (!firstY || !firstM || !firstD) return schedule;
 
     for (let i = 0; i < ip.totalInstallments; i++) {
+      const installmentNumber = i + 1;
       let y = firstY;
       let m = firstM + i;
       while (m > 12) {
@@ -152,12 +154,15 @@ export class NexaFinancialEngine {
       }
       const maxDay = daysInMonth(y, m);
       const d = Math.min(firstD, maxDay);
-      const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const computedDate = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const overrideDate = ip.installmentDateOverrides?.[installmentNumber];
+      const overrideAmount = ip.installmentAmountOverrides?.[installmentNumber];
       schedule.push({
-        installmentNumber: i + 1,
+        installmentNumber,
         totalInstallments: ip.totalInstallments,
-        date: dateStr,
-        amount: ip.installmentAmount,
+        date: overrideDate || computedDate,
+        amount: overrideAmount !== undefined ? overrideAmount : ip.installmentAmount,
+        isOverridden: Boolean(overrideDate || overrideAmount !== undefined),
       });
     }
 
@@ -204,7 +209,8 @@ export class NexaFinancialEngine {
 
     const paidCount = Math.min(total, Math.max(ip.paidInstallmentsCount || 0, elapsed.length));
     const remainingCount = Math.max(0, total - paidCount);
-    const pendingBalance = remainingCount * ip.installmentAmount;
+    const remainingSlice = schedule.slice(paidCount);
+    const pendingBalance = remainingSlice.reduce((sum, s) => sum + s.amount, 0);
     const isCompleted = remainingCount === 0;
 
     const lastPaymentDate = elapsed.length > 0 ? elapsed[elapsed.length - 1].date : null;
@@ -384,86 +390,150 @@ export class NexaFinancialEngine {
     for (const sub of data.subscriptions) {
       if (sub.status === 'cancelada') continue;
 
+      const occurrences: { key: string; dateStr: string; amount: number }[] = [];
+
+      // Regular occurrence for this monthKey
       const exception = sub.monthlyExceptions?.[monthKey];
-      if (exception?.paused) continue;
-
-      const subAmount = exception?.overrideAmount !== undefined ? exception.overrideAmount : sub.amount;
-      if (subAmount <= 0) continue;
-
-      const billingDay = Math.min(sub.billingDay, daysCount);
-      const dateStr = `${monthKey}-${String(billingDay).padStart(2, '0')}`;
-      if (dateStr < liquidityStartDate) continue;
-
-      // Check validity range if defined as not indefinite
-      if (sub.isIndefinite === false) {
-        if (sub.startDate && dateStr < (sub.startDate.length === 7 ? `${sub.startDate}-01` : sub.startDate)) continue;
-        if (sub.endDate && dateStr > (sub.endDate.length === 7 ? `${sub.endDate}-31` : sub.endDate)) continue;
+      if (!exception?.paused) {
+        const subAmount = exception?.overrideAmount !== undefined ? exception.overrideAmount : sub.amount;
+        if (subAmount > 0) {
+          const billingDay = Math.min(sub.billingDay || 15, daysCount);
+          const defaultDateStr = `${monthKey}-${String(billingDay).padStart(2, '0')}`;
+          const targetDateStr = exception?.overrideDate || defaultDateStr;
+          if (targetDateStr.startsWith(monthKey)) {
+            occurrences.push({ key: monthKey, dateStr: targetDateStr, amount: subAmount });
+          }
+        }
       }
 
-      // Check if user already registered an explicit/realized transaction for this
-      const hasDuplicate = data.existingTransactions.some(
-        (t) => t.date.startsWith(monthKey) && t.origin === `suscripcion:${sub.id}`
-      );
+      // Cross-month occurrences explicitly moved INTO monthKey via overrideDate
+      Object.entries(sub.monthlyExceptions || {}).forEach(([exKey, ex]) => {
+        if (exKey === monthKey || ex.paused) return;
+        if (ex.overrideDate && ex.overrideDate.startsWith(monthKey)) {
+          const amt = ex.overrideAmount !== undefined ? ex.overrideAmount : sub.amount;
+          if (amt > 0) {
+            occurrences.push({ key: exKey, dateStr: ex.overrideDate, amount: amt });
+          }
+        }
+      });
 
-      if (!hasDuplicate) {
-        generated.push({
-          id: `gen_sub_${sub.id}_${monthKey}`,
-          date: dateStr,
-          expectedDate: dateStr,
-          concept: `Suscripción: ${sub.concept}`,
-          type: 'suscripcion',
-          categoryId: sub.categoryId,
-          amount: subAmount,
-          paymentMethodType: sub.paymentMethodType,
-          accountId: sub.accountId,
-          creditCardId: sub.creditCardId,
-          status: 'planificado',
-          origin: `suscripcion:${sub.id}`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+      for (const occ of occurrences) {
+        if (occ.dateStr < liquidityStartDate) continue;
+
+        if (sub.isIndefinite === false) {
+          if (sub.startDate && occ.dateStr < (sub.startDate.length === 7 ? `${sub.startDate}-01` : sub.startDate)) continue;
+          if (sub.endDate && occ.dateStr > (sub.endDate.length === 7 ? `${sub.endDate}-31` : sub.endDate)) continue;
+        }
+
+        const hasDuplicate = data.existingTransactions.some(
+          (t) =>
+            t.status !== 'cancelado' &&
+            t.date.startsWith(monthKey) &&
+            (t.origin === `suscripcion:${sub.id}` || t.origin === `sub:${sub.id}`)
+        );
+
+        if (!hasDuplicate) {
+          generated.push({
+            id: `gen_sub_${sub.id}_${occ.key}`,
+            date: occ.dateStr,
+            expectedDate: occ.dateStr,
+            concept: `Suscripción: ${sub.concept}`,
+            type: 'suscripcion',
+            categoryId: sub.categoryId,
+            amount: occ.amount,
+            paymentMethodType: sub.paymentMethodType,
+            accountId: sub.accountId,
+            creditCardId: sub.creditCardId,
+            status: 'planificado',
+            origin: `suscripcion:${sub.id}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
     }
 
     // 2. Services / Utilities
     for (const srv of data.services) {
+      const occurrences: {
+        key: string;
+        dateStr: string;
+        expectedDateStr: string;
+        amount: number;
+        isPaid: boolean;
+      }[] = [];
+
       const record = srv.monthlyRecords?.[monthKey];
       const srvAmount = record?.budgetedAmount !== undefined ? record.budgetedAmount : srv.budgetedAmount;
       const actualAmount = record?.actualAmount;
       const isPaid = record?.status === 'pagado';
+      const estimatedDay = Math.min(srv.estimatedDay || 20, daysCount);
+      const defaultDateStr = `${monthKey}-${String(estimatedDay).padStart(2, '0')}`;
+      const targetDateStr = record?.customDate || record?.paidDate || defaultDateStr;
+      const effectiveAmount = actualAmount !== undefined ? actualAmount : srvAmount;
 
-      const estimatedDay = Math.min(srv.estimatedDay, daysCount);
-      const dateStr = record?.paidDate || `${monthKey}-${String(estimatedDay).padStart(2, '0')}`;
-      if (dateStr < liquidityStartDate) continue;
-
-      // Check validity range if defined as not indefinite
-      if (srv.isIndefinite === false) {
-        if (srv.startDate && dateStr < (srv.startDate.length === 7 ? `${srv.startDate}-01` : srv.startDate)) continue;
-        if (srv.endDate && dateStr > (srv.endDate.length === 7 ? `${srv.endDate}-31` : srv.endDate)) continue;
+      if (effectiveAmount > 0 && targetDateStr.startsWith(monthKey)) {
+        occurrences.push({
+          key: monthKey,
+          dateStr: targetDateStr,
+          expectedDateStr: defaultDateStr,
+          amount: effectiveAmount,
+          isPaid,
+        });
       }
 
-      const hasDuplicate = data.existingTransactions.some(
-        (t) => t.date.startsWith(monthKey) && t.origin === `servicio:${srv.id}`
-      );
+      // Cross-month service occurrences moved INTO monthKey via customDate or paidDate
+      Object.entries(srv.monthlyRecords || {}).forEach(([recKey, rec]) => {
+        if (recKey === monthKey) return;
+        const overrideDate = rec.customDate || rec.paidDate;
+        if (overrideDate && overrideDate.startsWith(monthKey)) {
+          const recAmt = rec.actualAmount !== undefined ? rec.actualAmount : (rec.budgetedAmount ?? srv.budgetedAmount);
+          if (recAmt > 0) {
+            occurrences.push({
+              key: recKey,
+              dateStr: overrideDate,
+              expectedDateStr: overrideDate,
+              amount: recAmt,
+              isPaid: rec.status === 'pagado',
+            });
+          }
+        }
+      });
 
-      if (!hasDuplicate) {
-        generated.push({
-          id: `gen_srv_${srv.id}_${monthKey}`,
-          date: dateStr,
-          expectedDate: `${monthKey}-${String(estimatedDay).padStart(2, '0')}`,
-          realDate: isPaid ? dateStr : undefined,
-          concept: `Servicio: ${srv.company} - ${srv.serviceName}`,
-          type: 'servicio',
-          categoryId: srv.categoryId,
-          amount: actualAmount || srvAmount,
-          paymentMethodType: srv.paymentMethodType,
-          accountId: srv.accountId,
-          creditCardId: srv.creditCardId,
-          status: isPaid ? 'realizado' : 'planificado',
-          origin: `servicio:${srv.id}`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+      for (const occ of occurrences) {
+        if (occ.dateStr < liquidityStartDate) continue;
+
+        if (srv.isIndefinite === false) {
+          if (srv.startDate && occ.dateStr < (srv.startDate.length === 7 ? `${srv.startDate}-01` : srv.startDate)) continue;
+          if (srv.endDate && occ.dateStr > (srv.endDate.length === 7 ? `${srv.endDate}-31` : srv.endDate)) continue;
+        }
+
+        const hasDuplicate = data.existingTransactions.some(
+          (t) =>
+            t.status !== 'cancelado' &&
+            t.date.startsWith(monthKey) &&
+            (t.origin === `servicio:${srv.id}` || t.origin === `srv:${srv.id}`)
+        );
+
+        if (!hasDuplicate) {
+          generated.push({
+            id: `gen_srv_${srv.id}_${occ.key}`,
+            date: occ.dateStr,
+            expectedDate: occ.expectedDateStr,
+            realDate: occ.isPaid ? occ.dateStr : undefined,
+            concept: `Servicio: ${srv.company} - ${srv.serviceName}`,
+            type: 'servicio',
+            categoryId: srv.categoryId,
+            amount: occ.amount,
+            paymentMethodType: srv.paymentMethodType,
+            accountId: srv.accountId,
+            creditCardId: srv.creditCardId,
+            status: occ.isPaid ? 'realizado' : 'planificado',
+            origin: `servicio:${srv.id}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
     }
 
@@ -2988,28 +3058,7 @@ export class NexaFinancialEngine {
       const isCard = (sub.paymentMethodType === 'tarjeta_credito' || !!sub.creditCardId) && sub.creditCardId === card.id;
       if (!isCard || sub.status === 'cancelada') return;
 
-      const exception = sub.monthlyExceptions?.[cycleMonthKey];
-      if (exception?.paused) return;
-
-      const subAmount = exception?.overrideAmount !== undefined ? exception.overrideAmount : sub.amount;
-      if (subAmount <= 0) return;
-
-      // Check if an explicit/edited movement exists in allTransactions for this subscription
-      const explicitTx = allTransactions.find(
-        (tx) =>
-          tx.status !== 'cancelado' &&
-          (tx.origin === `suscripcion:${sub.id}` || tx.origin === `sub:${sub.id}`) &&
-          (tx.date.startsWith(cycleMonthKey) || (tx.date >= cycleStartDate && tx.date <= cycleEndDate))
-      );
-
-      if (explicitTx) {
-        // The user edited the subscription movement!
-        // If it belongs to this card, it was already included in purchaseTxs above.
-        // In all cases, do not inject from projection.
-        return;
-      }
-
-      // If not yet manually edited, calculate projected billing date that falls in this cycle [cycleStartDate, cycleEndDate]
+      // Natural billing month whose day falls inside [cycleStartDate, cycleEndDate]
       let pYear = year;
       let pMonth = month;
       if (sub.billingDay > card.cutOffDay) {
@@ -3019,34 +3068,84 @@ export class NexaFinancialEngine {
           pYear = year - 1;
         }
       }
+      const pMonthKey = `${pYear}-${String(pMonth).padStart(2, '0')}`;
       const pMaxDays = daysInMonth(pYear, pMonth);
-      const actualBillingDay = Math.min(sub.billingDay, pMaxDays);
-      const projectedDate = `${pYear}-${String(pMonth).padStart(2, '0')}-${String(actualBillingDay).padStart(2, '0')}`;
+      const actualBillingDay = Math.min(sub.billingDay || 15, pMaxDays);
+      const naturalDate = `${pMonthKey}-${String(actualBillingDay).padStart(2, '0')}`;
 
-      // Check validity range if defined as not indefinite
-      if (sub.isIndefinite === false) {
-        if (sub.startDate && projectedDate < (sub.startDate.length === 7 ? `${sub.startDate}-01` : sub.startDate)) return;
-        if (sub.endDate && projectedDate > (sub.endDate.length === 7 ? `${sub.endDate}-31` : sub.endDate)) return;
+      const candidates: { key: string; date: string; defaultDate: string; amount: number }[] = [];
+
+      const naturalEx = sub.monthlyExceptions?.[pMonthKey];
+      if (!naturalEx?.paused) {
+        const subAmount = naturalEx?.overrideAmount !== undefined ? naturalEx.overrideAmount : sub.amount;
+        if (subAmount > 0) {
+          const effectiveDate = naturalEx?.overrideDate || naturalDate;
+          if (effectiveDate >= cycleStartDate && effectiveDate <= cycleEndDate) {
+            candidates.push({
+              key: pMonthKey,
+              date: effectiveDate,
+              defaultDate: naturalDate,
+              amount: subAmount,
+            });
+          }
+        }
       }
 
-      if (projectedDate >= cycleStartDate && projectedDate <= cycleEndDate && projectedDate >= liquidityStartDate) {
-        purchasesSum += subAmount;
-        cycleTxs.push({
-          id: `gen_sub_${sub.id}_${cycleMonthKey}`,
-          date: projectedDate,
-          expectedDate: projectedDate,
-          concept: `Suscripción: ${sub.concept}`,
-          type: 'suscripcion',
-          categoryId: sub.categoryId,
-          amount: subAmount,
-          paymentMethodType: 'tarjeta_credito',
-          creditCardId: card.id,
-          status: projectedDate <= todayStr ? 'realizado' : 'planificado',
-          origin: `suscripcion:${sub.id}`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      // Also check any other monthly exception whose overrideDate was shifted INTO this billing cycle
+      Object.entries(sub.monthlyExceptions || {}).forEach(([exKey, ex]) => {
+        if (exKey === pMonthKey || ex.paused || !ex.overrideDate) return;
+        if (ex.overrideDate >= cycleStartDate && ex.overrideDate <= cycleEndDate) {
+          const subAmount = ex.overrideAmount !== undefined ? ex.overrideAmount : sub.amount;
+          if (subAmount > 0) {
+            candidates.push({
+              key: exKey,
+              date: ex.overrideDate,
+              defaultDate: ex.overrideDate,
+              amount: subAmount,
+            });
+          }
+        }
+      });
+
+      candidates.forEach((cand) => {
+        // Check if an explicit/edited movement already exists for this billing cycle
+        const explicitTx = allTransactions.find(
+          (tx) =>
+            tx.status !== 'cancelado' &&
+            (tx.origin === `suscripcion:${sub.id}` || tx.origin === `sub:${sub.id}`) &&
+            ((tx.date >= cycleStartDate && tx.date <= cycleEndDate) ||
+              (tx.expectedDate && tx.expectedDate >= cycleStartDate && tx.expectedDate <= cycleEndDate))
+        );
+
+        if (explicitTx) {
+          return;
+        }
+
+        // Check validity range if defined as not indefinite
+        if (sub.isIndefinite === false) {
+          if (sub.startDate && cand.date < (sub.startDate.length === 7 ? `${sub.startDate}-01` : sub.startDate)) return;
+          if (sub.endDate && cand.date > (sub.endDate.length === 7 ? `${sub.endDate}-31` : sub.endDate)) return;
+        }
+
+        if (cand.date >= liquidityStartDate) {
+          purchasesSum += cand.amount;
+          cycleTxs.push({
+            id: `gen_sub_${sub.id}_${cand.key}`,
+            date: cand.date,
+            expectedDate: cand.defaultDate,
+            concept: `Suscripción: ${sub.concept}`,
+            type: 'suscripcion',
+            categoryId: sub.categoryId,
+            amount: cand.amount,
+            paymentMethodType: 'tarjeta_credito',
+            creditCardId: card.id,
+            status: cand.date <= todayStr ? 'realizado' : 'planificado',
+            origin: `suscripcion:${sub.id}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      });
     });
 
     // 4. Services / Utilities charged to THIS credit card
@@ -3054,26 +3153,7 @@ export class NexaFinancialEngine {
       const isCard = (srv.paymentMethodType === 'tarjeta_credito' || !!srv.creditCardId) && srv.creditCardId === card.id;
       if (!isCard) return;
 
-      const record = srv.monthlyRecords?.[cycleMonthKey];
-      const srvAmount = record?.budgetedAmount !== undefined ? record.budgetedAmount : srv.budgetedAmount;
-      const actualAmount = record?.actualAmount;
-      const isPaid = record?.status === 'pagado';
-      const effectiveAmount = actualAmount !== undefined ? actualAmount : srvAmount;
-      if (effectiveAmount <= 0) return;
-
-      // Check if an explicit/edited movement exists in allTransactions
-      const explicitTx = allTransactions.find(
-        (tx) =>
-          tx.status !== 'cancelado' &&
-          (tx.origin === `servicio:${srv.id}` || tx.origin === `srv:${srv.id}`) &&
-          (tx.date.startsWith(cycleMonthKey) || (tx.date >= cycleStartDate && tx.date <= cycleEndDate))
-      );
-
-      if (explicitTx) {
-        return;
-      }
-
-      // Calculate projected date in this billing cycle [cycleStartDate, cycleEndDate]
+      // Natural billing month whose estimatedDay falls inside [cycleStartDate, cycleEndDate]
       let pYear = year;
       let pMonth = month;
       if (srv.estimatedDay > card.cutOffDay) {
@@ -3083,35 +3163,93 @@ export class NexaFinancialEngine {
           pYear = year - 1;
         }
       }
+      const pMonthKey = `${pYear}-${String(pMonth).padStart(2, '0')}`;
       const pMaxDays = daysInMonth(pYear, pMonth);
-      const actualEstDay = Math.min(srv.estimatedDay, pMaxDays);
-      const dateStr = record?.paidDate || `${pYear}-${String(pMonth).padStart(2, '0')}-${String(actualEstDay).padStart(2, '0')}`;
+      const actualEstDay = Math.min(srv.estimatedDay || 20, pMaxDays);
+      const naturalDate = `${pMonthKey}-${String(actualEstDay).padStart(2, '0')}`;
 
-      // Check validity range if defined as not indefinite
-      if (srv.isIndefinite === false) {
-        if (srv.startDate && dateStr < (srv.startDate.length === 7 ? `${srv.startDate}-01` : srv.startDate)) return;
-        if (srv.endDate && dateStr > (srv.endDate.length === 7 ? `${srv.endDate}-31` : srv.endDate)) return;
-      }
+      const candidates: {
+        key: string;
+        date: string;
+        defaultDate: string;
+        amount: number;
+        isPaid: boolean;
+      }[] = [];
 
-      if (dateStr >= cycleStartDate && dateStr <= cycleEndDate && dateStr >= liquidityStartDate) {
-        purchasesSum += effectiveAmount;
-        cycleTxs.push({
-          id: `gen_srv_${srv.id}_${cycleMonthKey}`,
-          date: dateStr,
-          expectedDate: `${pYear}-${String(pMonth).padStart(2, '0')}-${String(actualEstDay).padStart(2, '0')}`,
-          realDate: isPaid ? dateStr : undefined,
-          concept: `Servicio: ${srv.company} - ${srv.serviceName}`,
-          type: 'servicio',
-          categoryId: srv.categoryId,
+      const naturalRec = srv.monthlyRecords?.[pMonthKey];
+      const srvAmount = naturalRec?.budgetedAmount !== undefined ? naturalRec.budgetedAmount : srv.budgetedAmount;
+      const effectiveAmount = naturalRec?.actualAmount !== undefined ? naturalRec.actualAmount : srvAmount;
+      const effectiveDate = naturalRec?.customDate || naturalRec?.paidDate || naturalDate;
+
+      if (effectiveAmount > 0 && effectiveDate >= cycleStartDate && effectiveDate <= cycleEndDate) {
+        candidates.push({
+          key: pMonthKey,
+          date: effectiveDate,
+          defaultDate: naturalDate,
           amount: effectiveAmount,
-          paymentMethodType: 'tarjeta_credito',
-          creditCardId: card.id,
-          status: isPaid ? 'realizado' : 'planificado',
-          origin: `servicio:${srv.id}`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          isPaid: naturalRec?.status === 'pagado',
         });
       }
+
+      // Also check any other monthlyRecord whose customDate/paidDate was shifted INTO this billing cycle
+      Object.entries(srv.monthlyRecords || {}).forEach(([recKey, rec]) => {
+        if (recKey === pMonthKey) return;
+        const overrideDate = rec.customDate || rec.paidDate;
+        if (!overrideDate) return;
+        if (overrideDate >= cycleStartDate && overrideDate <= cycleEndDate) {
+          const recAmt = rec.actualAmount !== undefined ? rec.actualAmount : (rec.budgetedAmount ?? srv.budgetedAmount);
+          if (recAmt > 0) {
+            candidates.push({
+              key: recKey,
+              date: overrideDate,
+              defaultDate: overrideDate,
+              amount: recAmt,
+              isPaid: rec.status === 'pagado',
+            });
+          }
+        }
+      });
+
+      candidates.forEach((cand) => {
+        // Check if an explicit/edited movement already exists for this billing cycle
+        const explicitTx = allTransactions.find(
+          (tx) =>
+            tx.status !== 'cancelado' &&
+            (tx.origin === `servicio:${srv.id}` || tx.origin === `srv:${srv.id}`) &&
+            ((tx.date >= cycleStartDate && tx.date <= cycleEndDate) ||
+              (tx.expectedDate && tx.expectedDate >= cycleStartDate && tx.expectedDate <= cycleEndDate))
+        );
+
+        if (explicitTx) {
+          return;
+        }
+
+        // Check validity range if defined as not indefinite
+        if (srv.isIndefinite === false) {
+          if (srv.startDate && cand.date < (srv.startDate.length === 7 ? `${srv.startDate}-01` : srv.startDate)) return;
+          if (srv.endDate && cand.date > (srv.endDate.length === 7 ? `${srv.endDate}-31` : srv.endDate)) return;
+        }
+
+        if (cand.date >= liquidityStartDate) {
+          purchasesSum += cand.amount;
+          cycleTxs.push({
+            id: `gen_srv_${srv.id}_${cand.key}`,
+            date: cand.date,
+            expectedDate: cand.defaultDate,
+            realDate: cand.isPaid ? cand.date : undefined,
+            concept: `Servicio: ${srv.company} - ${srv.serviceName}`,
+            type: 'servicio',
+            categoryId: srv.categoryId,
+            amount: cand.amount,
+            paymentMethodType: 'tarjeta_credito',
+            creditCardId: card.id,
+            status: cand.isPaid ? 'realizado' : 'planificado',
+            origin: `servicio:${srv.id}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      });
     });
 
     // Prior cycle balance (for initial setup, include initialUsedBalance if any)

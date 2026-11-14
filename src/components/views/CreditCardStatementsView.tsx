@@ -233,14 +233,14 @@ export const CreditCardStatementsView: React.FC = () => {
       }
 
       // Check subscription
-      if (tx.origin && tx.origin.startsWith('suscripcion:')) {
+      if (tx.origin && (tx.origin.startsWith('suscripcion:') || tx.origin.startsWith('sub:'))) {
         const subId = tx.origin.split(':')[1];
         const sub = subscriptions.find((s) => s.id === subId);
         if (sub && sub.creditCardId === rangeCardId) return true;
       }
 
       // Check service
-      if (tx.origin && tx.origin.startsWith('servicio:')) {
+      if (tx.origin && (tx.origin.startsWith('servicio:') || tx.origin.startsWith('srv:'))) {
         const srvId = tx.origin.split(':')[1];
         const srv = services.find((s) => s.id === srvId);
         if (srv && srv.creditCardId === rangeCardId) return true;
@@ -351,6 +351,145 @@ export const CreditCardStatementsView: React.FC = () => {
       });
     });
 
+    // Helper: enumerate YYYY-MM months overlapping [rangeStartDate, rangeEndDate] (with +-1 month padding for shifted overrides)
+    const monthsInRange: { year: number; month: number; key: string }[] = [];
+    if (rangeStartDate && rangeEndDate && rangeStartDate <= rangeEndDate) {
+      const [sy, sm] = rangeStartDate.split('-').map(Number);
+      const [ey, em] = rangeEndDate.split('-').map(Number);
+      let cy = sy;
+      let cm = sm - 1;
+      if (cm < 1) {
+        cm = 12;
+        cy -= 1;
+      }
+      let endY = ey;
+      let endM = em + 1;
+      if (endM > 12) {
+        endM = 1;
+        endY += 1;
+      }
+      let guard = 0;
+      while ((cy < endY || (cy === endY && cm <= endM)) && guard < 120) {
+        monthsInRange.push({
+          year: cy,
+          month: cm,
+          key: `${cy}-${String(cm).padStart(2, '0')}`,
+        });
+        cm += 1;
+        if (cm > 12) {
+          cm = 1;
+          cy += 1;
+        }
+        guard += 1;
+      }
+    }
+
+    // D) Subscriptions charged to target credit card(s)
+    (subscriptions || []).forEach((sub) => {
+      const isCard = sub.paymentMethodType === 'tarjeta_credito' && !!sub.creditCardId;
+      if (!isCard || sub.status === 'cancelada') return;
+      if (rangeCardId !== 'all' && sub.creditCardId !== rangeCardId) return;
+
+      monthsInRange.forEach(({ year: mY, month: mM, key: mKey }) => {
+        const ex = sub.monthlyExceptions?.[mKey];
+        if (ex?.paused) return;
+        const subAmt = ex?.overrideAmount !== undefined ? ex.overrideAmount : sub.amount;
+        if (subAmt <= 0) return;
+
+        const maxD = daysInMonth(mY, mM);
+        const day = Math.min(sub.billingDay || 15, maxD);
+        const defaultDate = `${mKey}-${String(day).padStart(2, '0')}`;
+        const effectiveDate = ex?.overrideDate || defaultDate;
+
+        if (rangeStartDate && effectiveDate < rangeStartDate) return;
+        if (rangeEndDate && effectiveDate > rangeEndDate) return;
+        if (effectiveDate < liquidityStartDate) return;
+
+        if (sub.isIndefinite === false) {
+          if (sub.startDate && effectiveDate < (sub.startDate.length === 7 ? `${sub.startDate}-01` : sub.startDate)) return;
+          if (sub.endDate && effectiveDate > (sub.endDate.length === 7 ? `${sub.endDate}-31` : sub.endDate)) return;
+        }
+
+        const alreadyExists = transactions.some(
+          (t) =>
+            t.status !== 'cancelado' &&
+            (t.origin === `suscripcion:${sub.id}` || t.origin === `sub:${sub.id}`) &&
+            (t.date === effectiveDate || t.expectedDate === defaultDate || t.date.startsWith(mKey))
+        );
+        if (alreadyExists) return;
+
+        list.push({
+          id: `gen_sub_${sub.id}_${mKey}`,
+          date: effectiveDate,
+          expectedDate: defaultDate,
+          concept: `Suscripción: ${sub.concept}`,
+          type: 'suscripcion',
+          amount: subAmt,
+          paymentMethodType: 'tarjeta_credito',
+          creditCardId: sub.creditCardId,
+          categoryId: sub.categoryId,
+          status: effectiveDate <= effectiveToday ? 'realizado' : 'planificado',
+          origin: `suscripcion:${sub.id}`,
+          createdAt: sub.createdAt || new Date().toISOString(),
+          updatedAt: sub.updatedAt || new Date().toISOString(),
+        });
+      });
+    });
+
+    // E) Services / Utilities charged to target credit card(s)
+    (services || []).forEach((srv) => {
+      const isCard = srv.paymentMethodType === 'tarjeta_credito' && !!srv.creditCardId;
+      if (!isCard) return;
+      if (rangeCardId !== 'all' && srv.creditCardId !== rangeCardId) return;
+
+      monthsInRange.forEach(({ year: mY, month: mM, key: mKey }) => {
+        const rec = srv.monthlyRecords?.[mKey];
+        const baseAmt = rec?.budgetedAmount !== undefined ? rec.budgetedAmount : srv.budgetedAmount;
+        const effectiveAmt = rec?.actualAmount !== undefined ? rec.actualAmount : baseAmt;
+        if (effectiveAmt <= 0) return;
+
+        const maxD = daysInMonth(mY, mM);
+        const day = Math.min(srv.estimatedDay || 20, maxD);
+        const defaultDate = `${mKey}-${String(day).padStart(2, '0')}`;
+        const effectiveDate = rec?.customDate || rec?.paidDate || defaultDate;
+
+        if (rangeStartDate && effectiveDate < rangeStartDate) return;
+        if (rangeEndDate && effectiveDate > rangeEndDate) return;
+        if (effectiveDate < liquidityStartDate) return;
+
+        if (srv.isIndefinite === false) {
+          if (srv.startDate && effectiveDate < (srv.startDate.length === 7 ? `${srv.startDate}-01` : srv.startDate)) return;
+          if (srv.endDate && effectiveDate > (srv.endDate.length === 7 ? `${srv.endDate}-31` : srv.endDate)) return;
+        }
+
+        const alreadyExists = transactions.some(
+          (t) =>
+            t.status !== 'cancelado' &&
+            (t.origin === `servicio:${srv.id}` || t.origin === `srv:${srv.id}`) &&
+            (t.date === effectiveDate || t.expectedDate === defaultDate || t.date.startsWith(mKey))
+        );
+        if (alreadyExists) return;
+
+        const isPaid = rec?.status === 'pagado';
+        list.push({
+          id: `gen_srv_${srv.id}_${mKey}`,
+          date: effectiveDate,
+          expectedDate: defaultDate,
+          realDate: isPaid ? effectiveDate : undefined,
+          concept: `Servicio: ${srv.company} - ${srv.serviceName}`,
+          type: 'servicio',
+          amount: effectiveAmt,
+          paymentMethodType: 'tarjeta_credito',
+          creditCardId: srv.creditCardId,
+          categoryId: srv.categoryId,
+          status: isPaid ? 'realizado' : 'planificado',
+          origin: `servicio:${srv.id}`,
+          createdAt: srv.createdAt || new Date().toISOString(),
+          updatedAt: srv.updatedAt || new Date().toISOString(),
+        });
+      });
+    });
+
     // Sort descending by date (most recent first)
     return list.sort((a, b) => b.date.localeCompare(a.date));
   }, [
@@ -364,6 +503,7 @@ export const CreditCardStatementsView: React.FC = () => {
     activeCards,
     subscriptions,
     services,
+    liquidityStartDate,
   ]);
 
   // 2. Filtered list for UI display according to type, status, and search query

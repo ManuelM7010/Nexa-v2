@@ -208,13 +208,24 @@ interface FinanceContextType {
   saveSubscription: (sub: Partial<Subscription> & { concept: string; amount: number }) => Promise<void>;
   deleteSubscription: (id: string) => Promise<void>;
   toggleSubscriptionMonthlyPause: (subId: string, monthKey: string) => Promise<void>;
+  updateSubscriptionMonthlyException: (
+    subId: string,
+    monthKey: string,
+    data: { paused?: boolean; overrideAmount?: number; overrideDate?: string }
+  ) => Promise<void>;
 
   saveService: (srv: Partial<ServiceItem> & { company: string; serviceName: string }) => Promise<void>;
   deleteService: (id: string) => Promise<void>;
   updateServiceMonthlyRecord: (
     serviceId: string,
     monthKey: string,
-    data: { actualAmount?: number; status?: 'pendiente' | 'pagado'; paidDate?: string }
+    data: {
+      budgetedAmount?: number;
+      actualAmount?: number;
+      status?: 'pendiente' | 'pagado';
+      paidDate?: string;
+      customDate?: string;
+    }
   ) => Promise<void>;
 
   updateInitialPosition: (pos: InitialPosition) => Promise<void>;
@@ -1284,27 +1295,36 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ) => {
     const now = new Date().toISOString();
     const id = itemData.id || `inst_${Date.now()}`;
-    const totalInstallments = itemData.totalInstallments || 12;
+    const existing = itemData.id ? installmentPurchases.find((i) => i.id === id) : undefined;
+    const totalInstallments = itemData.totalInstallments || existing?.totalInstallments || 12;
     const installmentAmount =
       itemData.installmentAmount || Math.round(itemData.totalAmount / totalInstallments);
-    const firstPaymentDate = itemData.firstPaymentDate || todayStr;
+    const firstPaymentDate = itemData.firstPaymentDate || existing?.firstPaymentDate || todayStr;
 
     const baseItem: InstallmentPurchase = {
       id,
       concept: itemData.concept,
-      purchaseDate: itemData.purchaseDate || todayStr,
+      purchaseDate: itemData.purchaseDate || existing?.purchaseDate || todayStr,
       totalAmount: itemData.totalAmount,
-      creditCardId: itemData.creditCardId || creditCards[0]?.id || '',
+      creditCardId: itemData.creditCardId || existing?.creditCardId || creditCards[0]?.id || '',
       totalInstallments,
       installmentAmount,
       firstPaymentDate,
-      frequency: itemData.frequency || 'mensual',
-      paidInstallmentsCount: itemData.paidInstallmentsCount || 0,
+      frequency: itemData.frequency || existing?.frequency || 'mensual',
+      paidInstallmentsCount: itemData.paidInstallmentsCount ?? existing?.paidInstallmentsCount ?? 0,
       remainingInstallmentsCount: itemData.remainingInstallmentsCount || totalInstallments,
       pendingBalance:
         itemData.pendingBalance !== undefined ? itemData.pendingBalance : itemData.totalAmount,
-      notes: itemData.notes,
-      createdAt: itemData.createdAt || now,
+      installmentDateOverrides:
+        itemData.installmentDateOverrides !== undefined
+          ? itemData.installmentDateOverrides
+          : existing?.installmentDateOverrides,
+      installmentAmountOverrides:
+        itemData.installmentAmountOverrides !== undefined
+          ? itemData.installmentAmountOverrides
+          : existing?.installmentAmountOverrides,
+      notes: itemData.notes !== undefined ? itemData.notes : existing?.notes,
+      createdAt: itemData.createdAt || existing?.createdAt || now,
       updatedAt: now,
     };
 
@@ -1326,6 +1346,41 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       return [...prev, newItem];
     });
+
+    // Synchronize any materialized transactions linked to this installment purchase
+    if (existing) {
+      const schedule = NexaFinancialEngine.getInstallmentSchedule(newItem);
+      const linkedTxs = transactions.filter(
+        (t) =>
+          t.status !== 'cancelado' &&
+          (t.installmentPurchaseId === id || t.origin?.startsWith(`cuota:${id}`))
+      );
+      if (linkedTxs.length > 0) {
+        const updatedTxs: Transaction[] = [];
+        for (const tx of linkedTxs) {
+          let matchedInst = schedule.find((s) => tx.origin === `cuota:${id}:${s.installmentNumber}`);
+          if (!matchedInst && tx.expectedDate) {
+            matchedInst = schedule.find((s) => s.date.slice(0, 7) === tx.expectedDate?.slice(0, 7));
+          }
+          const updated: Transaction = {
+            ...tx,
+            creditCardId: newItem.creditCardId,
+            paymentMethodType: 'tarjeta_credito',
+            concept: matchedInst
+              ? `Cuota ${matchedInst.installmentNumber}/${matchedInst.totalInstallments}: ${newItem.concept}`
+              : tx.concept,
+            date: matchedInst ? matchedInst.date : tx.date,
+            amount: matchedInst && tx.status === 'planificado' ? matchedInst.amount : tx.amount,
+            updatedAt: now,
+          };
+          updatedTxs.push(updated);
+        }
+        await storage.putBatch('transactions', updatedTxs);
+        setTransactions((prev) =>
+          prev.map((t) => updatedTxs.find((u) => u.id === t.id) || t)
+        );
+      }
+    }
   };
 
   const deleteInstallmentPurchase = async (id: string) => {
@@ -1468,23 +1523,27 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ) => {
     const now = new Date().toISOString();
     const id = subData.id || `sub_${Date.now()}`;
+    const existing = subData.id ? subscriptions.find((s) => s.id === id) : undefined;
     const newSub: Subscription = {
       id,
       concept: subData.concept,
       amount: subData.amount,
-      billingDay: subData.billingDay || 15,
-      frequency: subData.frequency || 'mensual',
-      paymentMethodType: subData.paymentMethodType || 'tarjeta_credito',
+      billingDay: subData.billingDay || existing?.billingDay || 15,
+      frequency: subData.frequency || existing?.frequency || 'mensual',
+      paymentMethodType: subData.paymentMethodType || existing?.paymentMethodType || 'tarjeta_credito',
       accountId: subData.accountId,
       creditCardId: subData.creditCardId,
-      categoryId: subData.categoryId || 'cat_suscripciones',
-      status: subData.status || 'activa',
-      isIndefinite: subData.isIndefinite !== undefined ? subData.isIndefinite : true,
+      categoryId: subData.categoryId || existing?.categoryId || 'cat_suscripciones',
+      status: subData.status || existing?.status || 'activa',
+      isIndefinite: subData.isIndefinite !== undefined ? subData.isIndefinite : (existing?.isIndefinite !== undefined ? existing.isIndefinite : true),
       startDate: subData.startDate,
       endDate: subData.endDate,
-      monthlyExceptions: subData.monthlyExceptions || {},
+      monthlyExceptions:
+        subData.monthlyExceptions !== undefined
+          ? subData.monthlyExceptions
+          : (existing?.monthlyExceptions || {}),
       notes: subData.notes,
-      createdAt: subData.createdAt || now,
+      createdAt: subData.createdAt || existing?.createdAt || now,
       updatedAt: now,
     };
     await storage.put('subscriptions', newSub);
@@ -1497,6 +1556,48 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       return [...prev, newSub];
     });
+
+    // Synchronize existing materialized transactions for this subscription so edits reflect immediately
+    if (existing) {
+      const linkedTxs = transactions.filter(
+        (t) =>
+          t.status !== 'cancelado' &&
+          (t.origin === `suscripcion:${id}` || t.origin === `sub:${id}`)
+      );
+      if (linkedTxs.length > 0) {
+        const updatedTxs: Transaction[] = linkedTxs.map((tx) => {
+          const mKey = (tx.expectedDate || tx.date).slice(0, 7);
+          const ex = newSub.monthlyExceptions?.[mKey];
+          const [yStr, mStr] = tx.date.split('-');
+          const yNum = Number(yStr);
+          const mNum = Number(mStr);
+          const maxD = new Date(yNum, mNum, 0).getDate();
+          const newDay = Math.min(newSub.billingDay || 15, maxD);
+          const recomputedDate = `${yStr}-${mStr}-${String(newDay).padStart(2, '0')}`;
+          return {
+            ...tx,
+            concept: `Suscripción: ${newSub.concept}`,
+            categoryId: newSub.categoryId,
+            paymentMethodType: newSub.paymentMethodType,
+            accountId: newSub.paymentMethodType === 'tarjeta_credito' ? undefined : newSub.accountId,
+            creditCardId: newSub.paymentMethodType === 'tarjeta_credito' ? newSub.creditCardId : undefined,
+            amount:
+              tx.status === 'planificado' && ex?.overrideAmount === undefined
+                ? newSub.amount
+                : tx.amount,
+            date:
+              tx.status === 'planificado' && !ex?.overrideDate && existing.billingDay !== newSub.billingDay
+                ? recomputedDate
+                : tx.date,
+            updatedAt: now,
+          };
+        });
+        await storage.putBatch('transactions', updatedTxs);
+        setTransactions((prev) =>
+          prev.map((t) => updatedTxs.find((u) => u.id === t.id) || t)
+        );
+      }
+    }
   };
 
   const deleteSubscription = async (id: string) => {
@@ -1528,27 +1629,83 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSubscriptions((prev) => prev.map((s) => (s.id === subId ? updatedSub : s)));
   };
 
+  const updateSubscriptionMonthlyException = async (
+    subId: string,
+    monthKey: string,
+    data: { paused?: boolean; overrideAmount?: number; overrideDate?: string }
+  ) => {
+    const sub = subscriptions.find((s) => s.id === subId);
+    if (!sub) return;
+
+    const now = new Date().toISOString();
+    const currentEx = sub.monthlyExceptions?.[monthKey] || {};
+    const updatedEx = {
+      ...currentEx,
+      ...data,
+    };
+
+    const updatedSub: Subscription = {
+      ...sub,
+      monthlyExceptions: {
+        ...sub.monthlyExceptions,
+        [monthKey]: updatedEx,
+      },
+      updatedAt: now,
+    };
+
+    await storage.put('subscriptions', updatedSub);
+    setSubscriptions((prev) => prev.map((s) => (s.id === subId ? updatedSub : s)));
+
+    // Sync materialized transactions matching this subscription & month
+    const matchingTxs = transactions.filter(
+      (t) =>
+        t.status !== 'cancelado' &&
+        (t.origin === `suscripcion:${subId}` || t.origin === `sub:${subId}`) &&
+        (t.date.startsWith(monthKey) || t.expectedDate?.startsWith(monthKey))
+    );
+    if (matchingTxs.length > 0) {
+      const updatedTxs = matchingTxs.map((tx) => ({
+        ...tx,
+        date: data.overrideDate || tx.date,
+        amount: data.overrideAmount !== undefined ? data.overrideAmount : tx.amount,
+        updatedAt: now,
+      }));
+      await storage.putBatch('transactions', updatedTxs);
+      setTransactions((prev) => prev.map((t) => updatedTxs.find((u) => u.id === t.id) || t));
+    }
+  };
+
   const saveService = async (
     srvData: Partial<ServiceItem> & { company: string; serviceName: string }
   ) => {
     const now = new Date().toISOString();
     const id = srvData.id || `srv_${Date.now()}`;
+    const existing = srvData.id ? services.find((s) => s.id === id) : undefined;
     const newSrv: ServiceItem = {
       id,
       company: srvData.company,
       serviceName: srvData.serviceName,
-      budgetedAmount: srvData.budgetedAmount || 3000,
-      estimatedDay: srvData.estimatedDay || 20,
-      paymentMethodType: srvData.paymentMethodType || 'banco',
+      budgetedAmount:
+        srvData.budgetedAmount !== undefined
+          ? srvData.budgetedAmount
+          : (existing?.budgetedAmount ?? 3000),
+      estimatedDay: srvData.estimatedDay || existing?.estimatedDay || 20,
+      paymentMethodType: srvData.paymentMethodType || existing?.paymentMethodType || 'banco',
       accountId: srvData.accountId,
       creditCardId: srvData.creditCardId,
-      categoryId: srvData.categoryId || 'cat_servicios',
-      isIndefinite: srvData.isIndefinite !== undefined ? srvData.isIndefinite : true,
+      categoryId: srvData.categoryId || existing?.categoryId || 'cat_servicios',
+      isIndefinite:
+        srvData.isIndefinite !== undefined
+          ? srvData.isIndefinite
+          : (existing?.isIndefinite !== undefined ? existing.isIndefinite : true),
       startDate: srvData.startDate,
       endDate: srvData.endDate,
-      monthlyRecords: srvData.monthlyRecords || {},
+      monthlyRecords:
+        srvData.monthlyRecords !== undefined
+          ? srvData.monthlyRecords
+          : (existing?.monthlyRecords || {}),
       notes: srvData.notes,
-      createdAt: srvData.createdAt || now,
+      createdAt: srvData.createdAt || existing?.createdAt || now,
       updatedAt: now,
     };
     await storage.put('services', newSrv);
@@ -1561,6 +1718,50 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       return [...prev, newSrv];
     });
+
+    // Synchronize existing materialized/edited transactions linked to this service so editing never drops or desyncs them
+    if (existing) {
+      const linkedTxs = transactions.filter(
+        (t) =>
+          t.status !== 'cancelado' &&
+          (t.origin === `servicio:${id}` || t.origin === `srv:${id}`)
+      );
+      if (linkedTxs.length > 0) {
+        const updatedTxs: Transaction[] = linkedTxs.map((tx) => {
+          const mKey = (tx.expectedDate || tx.date).slice(0, 7);
+          const rec = newSrv.monthlyRecords?.[mKey];
+          const [yStr, mStr] = tx.date.split('-');
+          const yNum = Number(yStr);
+          const mNum = Number(mStr);
+          const maxD = new Date(yNum, mNum, 0).getDate();
+          const newDay = Math.min(newSrv.estimatedDay || 20, maxD);
+          const recomputedDate = `${yStr}-${mStr}-${String(newDay).padStart(2, '0')}`;
+          const hasCustomDate = Boolean(rec?.customDate || rec?.paidDate);
+          const hasCustomAmount = rec?.actualAmount !== undefined;
+          return {
+            ...tx,
+            concept: `Servicio: ${newSrv.company} - ${newSrv.serviceName}`,
+            categoryId: newSrv.categoryId,
+            paymentMethodType: newSrv.paymentMethodType,
+            accountId: newSrv.paymentMethodType === 'tarjeta_credito' ? undefined : newSrv.accountId,
+            creditCardId: newSrv.paymentMethodType === 'tarjeta_credito' ? newSrv.creditCardId : undefined,
+            amount:
+              tx.status === 'planificado' && !hasCustomAmount
+                ? newSrv.budgetedAmount
+                : tx.amount,
+            date:
+              tx.status === 'planificado' && !hasCustomDate && existing.estimatedDay !== newSrv.estimatedDay
+                ? recomputedDate
+                : tx.date,
+            updatedAt: now,
+          };
+        });
+        await storage.putBatch('transactions', updatedTxs);
+        setTransactions((prev) =>
+          prev.map((t) => updatedTxs.find((u) => u.id === t.id) || t)
+        );
+      }
+    }
   };
 
   const deleteService = async (id: string) => {
@@ -1571,14 +1772,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const updateServiceMonthlyRecord = async (
     serviceId: string,
     monthKey: string,
-    data: { actualAmount?: number; status?: 'pendiente' | 'pagado'; paidDate?: string }
+    data: {
+      budgetedAmount?: number;
+      actualAmount?: number;
+      status?: 'pendiente' | 'pagado';
+      paidDate?: string;
+      customDate?: string;
+    }
   ) => {
     const srv = services.find((s) => s.id === serviceId);
     if (!srv) return;
 
+    const now = new Date().toISOString();
     const existingRecord = srv.monthlyRecords?.[monthKey] || {
       budgetedAmount: srv.budgetedAmount,
-      status: 'pendiente',
+      status: 'pendiente' as const,
     };
 
     const updatedRecord = {
@@ -1592,11 +1800,37 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ...srv.monthlyRecords,
         [monthKey]: updatedRecord,
       },
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     };
 
     await storage.put('services', updatedSrv);
     setServices((prev) => prev.map((s) => (s.id === serviceId ? updatedSrv : s)));
+
+    // Keep any materialized transaction for this service & month in sync
+    const matchingTxs = transactions.filter(
+      (t) =>
+        t.status !== 'cancelado' &&
+        (t.origin === `servicio:${serviceId}` || t.origin === `srv:${serviceId}`) &&
+        (t.date.startsWith(monthKey) || t.expectedDate?.startsWith(monthKey))
+    );
+    if (matchingTxs.length > 0) {
+      const nextDate = data.customDate || data.paidDate;
+      const updatedTxs = matchingTxs.map((tx) => ({
+        ...tx,
+        date: nextDate || tx.date,
+        realDate: data.status === 'pagado' ? (nextDate || tx.realDate || tx.date) : tx.realDate,
+        amount:
+          data.actualAmount !== undefined
+            ? data.actualAmount
+            : data.budgetedAmount !== undefined
+            ? data.budgetedAmount
+            : tx.amount,
+        status: data.status ? (data.status === 'pagado' ? ('realizado' as const) : ('planificado' as const)) : tx.status,
+        updatedAt: now,
+      }));
+      await storage.putBatch('transactions', updatedTxs);
+      setTransactions((prev) => prev.map((t) => updatedTxs.find((u) => u.id === t.id) || t));
+    }
   };
 
   const updateInitialPosition = async (pos: InitialPosition) => {
@@ -2033,7 +2267,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `nexa-finance-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const now = new Date();
+    const datePart = now.toISOString().slice(0, 10);
+    const timePart = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+    a.download = `valora-respaldo-${datePart}_${timePart}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2199,6 +2436,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         saveSubscription,
         deleteSubscription,
         toggleSubscriptionMonthlyPause,
+        updateSubscriptionMonthlyException,
         saveService,
         deleteService,
         updateServiceMonthlyRecord,

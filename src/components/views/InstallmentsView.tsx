@@ -11,9 +11,9 @@ import {
   CheckCircle2,
   Trash2,
   Edit2,
-  Percent,
   Clock,
   Check,
+  RotateCcw,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
@@ -35,11 +35,17 @@ export const InstallmentsView: React.FC = () => {
   const [hidePriorInstallments, setHidePriorInstallments] = useState(true);
   const liquidityStart = settings.liquidityStartDate || '2026-09-15';
 
+  // Inline cuota date/amount editor state
+  const [editingCuota, setEditingCuota] = useState<{ itemId: string; num: number } | null>(null);
+  const [cuotaDateStr, setCuotaDateStr] = useState('');
+  const [cuotaAmountStr, setCuotaAmountStr] = useState('');
+
   const [concept, setConcept] = useState('');
   const [totalAmountStr, setTotalAmountStr] = useState('');
   const [cardId, setCardId] = useState(creditCards[0]?.id || '');
   const [totalInstallments, setTotalInstallments] = useState(12);
   const [paidInstallments, setPaidInstallments] = useState(0);
+  const [purchaseDate, setPurchaseDate] = useState(todayStr);
   const [firstPaymentDate, setFirstPaymentDate] = useState(todayStr);
   const [notes, setNotes] = useState('');
 
@@ -50,6 +56,7 @@ export const InstallmentsView: React.FC = () => {
     setCardId(creditCards[0]?.id || '');
     setTotalInstallments(12);
     setPaidInstallments(0);
+    setPurchaseDate(todayStr);
     setFirstPaymentDate(todayStr);
     setNotes('');
     setIsModalOpen(true);
@@ -62,6 +69,7 @@ export const InstallmentsView: React.FC = () => {
     setCardId(item.creditCardId);
     setTotalInstallments(item.totalInstallments);
     setPaidInstallments(item.paidInstallmentsCount);
+    setPurchaseDate(item.purchaseDate || item.firstPaymentDate || todayStr);
     setFirstPaymentDate(item.firstPaymentDate);
     setNotes(item.notes || '');
     setIsModalOpen(true);
@@ -77,6 +85,7 @@ export const InstallmentsView: React.FC = () => {
     await saveInstallmentPurchase({
       id: editingItem?.id,
       concept: concept.trim(),
+      purchaseDate: purchaseDate || firstPaymentDate || todayStr,
       totalAmount: totalCents,
       creditCardId: cardId,
       totalInstallments,
@@ -87,6 +96,50 @@ export const InstallmentsView: React.FC = () => {
     });
 
     setIsModalOpen(false);
+  };
+
+  const handleSaveCuotaOverride = async (item: InstallmentPurchase, instNum: number) => {
+    const nextDateOverrides = { ...(item.installmentDateOverrides || {}) };
+    if (cuotaDateStr) {
+      nextDateOverrides[instNum] = cuotaDateStr;
+    } else {
+      delete nextDateOverrides[instNum];
+    }
+
+    const nextAmountOverrides = { ...(item.installmentAmountOverrides || {}) };
+    const parsedCents = dollarsToCents(cuotaAmountStr || 0);
+    if (parsedCents > 0 && parsedCents !== item.installmentAmount) {
+      nextAmountOverrides[instNum] = parsedCents;
+    } else {
+      delete nextAmountOverrides[instNum];
+    }
+
+    await saveInstallmentPurchase({
+      ...item,
+      installmentDateOverrides: nextDateOverrides,
+      installmentAmountOverrides: nextAmountOverrides,
+    });
+
+    setEditingCuota(null);
+    setCuotaDateStr('');
+    setCuotaAmountStr('');
+  };
+
+  const handleResetCuotaOverride = async (item: InstallmentPurchase, instNum: number) => {
+    const nextDateOverrides = { ...(item.installmentDateOverrides || {}) };
+    delete nextDateOverrides[instNum];
+    const nextAmountOverrides = { ...(item.installmentAmountOverrides || {}) };
+    delete nextAmountOverrides[instNum];
+
+    await saveInstallmentPurchase({
+      ...item,
+      installmentDateOverrides: nextDateOverrides,
+      installmentAmountOverrides: nextAmountOverrides,
+    });
+
+    setEditingCuota(null);
+    setCuotaDateStr('');
+    setCuotaAmountStr('');
   };
 
   // Status-aware metrics calculation
@@ -305,16 +358,82 @@ export const InstallmentsView: React.FC = () => {
                         </button>
                       </div>
 
-                      <div className="max-h-48 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-slate-950/80 border border-slate-800">
+                      <div className="max-h-60 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-slate-950/80 border border-slate-800">
                         {schedule
                           .filter((inst) => !hidePriorInstallments || inst.date >= liquidityStart)
                           .map((inst) => {
                             const isPriorToLiquidity = inst.date < liquidityStart;
                             const isPaid = inst.date <= todayStr;
+                            const isEditingRow =
+                              editingCuota?.itemId === item.id &&
+                              editingCuota?.num === inst.installmentNumber;
+
+                            if (isEditingRow) {
+                              return (
+                                <div
+                                  key={inst.installmentNumber}
+                                  className="p-2 rounded-lg bg-slate-900 border border-indigo-500/50 space-y-2 text-xs"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-indigo-300">
+                                      Ajustar Cuota {inst.installmentNumber}/{inst.totalInstallments}
+                                    </span>
+                                    {inst.isOverridden && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleResetCuotaOverride(item, inst.installmentNumber)}
+                                        className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-amber-300 cursor-pointer"
+                                      >
+                                        <RotateCcw className="w-3 h-3" />
+                                        <span>Restaurar</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[10px] text-slate-400 mb-0.5">Fecha Registro / Corte</label>
+                                      <input
+                                        type="date"
+                                        value={cuotaDateStr}
+                                        onChange={(e) => setCuotaDateStr(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-slate-400 mb-0.5">Monto ({settings.currencySymbol})</label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={cuotaAmountStr}
+                                        onChange={(e) => setCuotaAmountStr(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingCuota(null)}
+                                      className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300 font-semibold cursor-pointer"
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveCuotaOverride(item, inst.installmentNumber)}
+                                      className="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-[10px] text-white font-bold cursor-pointer"
+                                    >
+                                      Guardar
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            }
+
                             return (
                               <div
                                 key={inst.installmentNumber}
-                                className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg ${
+                                className={`flex items-center justify-between gap-2 text-xs px-2.5 py-1.5 rounded-lg ${
                                   isPriorToLiquidity
                                     ? 'bg-slate-900/30 text-slate-500 border border-dashed border-slate-800'
                                     : isPaid
@@ -322,14 +441,19 @@ export const InstallmentsView: React.FC = () => {
                                     : 'bg-slate-900 text-slate-100 font-medium'
                                 }`}
                               >
-                                <span className="flex items-center gap-1.5">
+                                <span className="flex items-center gap-1.5 min-w-0">
                                   {isPaid ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                                   ) : (
-                                    <span className="w-3.5 h-3.5 rounded-full border border-slate-600 inline-block" />
+                                    <span className="w-3.5 h-3.5 rounded-full border border-slate-600 inline-block shrink-0" />
                                   )}
-                                  <span>
+                                  <span className="truncate">
                                     Cuota {inst.installmentNumber}/{inst.totalInstallments}
+                                    {inst.isOverridden && (
+                                      <span className="ml-1.5 px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] font-bold">
+                                        Ajustada
+                                      </span>
+                                    )}
                                     {isPriorToLiquidity && (
                                       <span className="ml-1 text-[10px] text-indigo-400/80 font-normal">
                                         (Previa a inicio liquidez)
@@ -337,12 +461,26 @@ export const InstallmentsView: React.FC = () => {
                                     )}
                                   </span>
                                 </span>
-                                <span className="text-slate-400 font-mono text-[11px]">
-                                  {formatDateEs(inst.date, { withDayName: false })}
-                                </span>
-                                <span className="font-mono font-bold text-indigo-300">
-                                  {formatMoney(inst.amount, settings.currencySymbol)}
-                                </span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-slate-400 font-mono text-[11px]">
+                                    {formatDateEs(inst.date, { withDayName: false })}
+                                  </span>
+                                  <span className="font-mono font-bold text-indigo-300">
+                                    {formatMoney(inst.amount, settings.currencySymbol)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingCuota({ itemId: item.id, num: inst.installmentNumber });
+                                      setCuotaDateStr(inst.date);
+                                      setCuotaAmountStr(centsToDollars(inst.amount).toFixed(2));
+                                    }}
+                                    className="p-1 rounded text-slate-400 hover:text-indigo-300 hover:bg-slate-800 transition cursor-pointer"
+                                    title="Cambiar fecha o monto de esta cuota"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                </div>
                               </div>
                             );
                           })}
@@ -433,15 +571,27 @@ export const InstallmentsView: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 mb-1 font-semibold">Fecha de Primera Cuota</label>
-                <input
-                  type="date"
-                  required
-                  value={firstPaymentDate}
-                  onChange={(e) => setFirstPaymentDate(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold">Fecha de Compra</label>
+                  <input
+                    type="date"
+                    required
+                    value={purchaseDate}
+                    onChange={(e) => setPurchaseDate(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 mb-1 font-semibold">Fecha de Primera Cuota</label>
+                  <input
+                    type="date"
+                    required
+                    value={firstPaymentDate}
+                    onChange={(e) => setFirstPaymentDate(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
               </div>
 
               <div>

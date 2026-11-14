@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { ServiceItem } from '../../types';
-import { formatMoney, dollarsToCents, centsToDollars, formatDateEs } from '../../utils/formatters';
+import { formatMoney, dollarsToCents, centsToDollars, formatDateEs, daysInMonth } from '../../utils/formatters';
 import {
   Zap,
   Plus,
@@ -9,9 +9,11 @@ import {
   Edit2,
   CheckCircle2,
   Clock,
-  ArrowRight,
-  TrendingUp,
   Tag,
+  Calendar,
+  CreditCard,
+  Building2,
+  RotateCcw,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
 import { NewCategoryModal } from '../common/NewCategoryModal';
@@ -34,6 +36,12 @@ export const ServicesView: React.FC = () => {
   const liquidityStart = settings.liquidityStartDate || '2026-09-15';
   const isPriorToStartMonth = currentMonthKey < liquidityStart.slice(0, 7);
 
+  const getDefaultServiceDate = (estimatedDay: number) => {
+    const maxD = daysInMonth(selectedYear, selectedMonth);
+    const day = Math.min(Math.max(1, estimatedDay || 20), maxD);
+    return `${currentMonthKey}-${String(day).padStart(2, '0')}`;
+  };
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
@@ -43,6 +51,7 @@ export const ServicesView: React.FC = () => {
   const [serviceName, setServiceName] = useState('');
   const [budgetedAmountStr, setBudgetedAmountStr] = useState('');
   const [estimatedDay, setEstimatedDay] = useState(20);
+  const [monthCustomDateStr, setMonthCustomDateStr] = useState('');
   const [paymentMethodType, setPaymentMethodType] = useState<'banco' | 'efectivo' | 'tarjeta_credito'>('banco');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [creditCardId, setCreditCardId] = useState(creditCards[0]?.id || '');
@@ -52,9 +61,10 @@ export const ServicesView: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Quick edit monthly bill state
+  // Quick edit monthly bill & date state
   const [billingServiceId, setBillingServiceId] = useState<string | null>(null);
   const [actualAmountStr, setActualAmountStr] = useState('');
+  const [customDateStr, setCustomDateStr] = useState('');
 
   const openNewModal = () => {
     setEditingService(null);
@@ -62,6 +72,7 @@ export const ServicesView: React.FC = () => {
     setServiceName('');
     setBudgetedAmountStr('40');
     setEstimatedDay(20);
+    setMonthCustomDateStr('');
     setPaymentMethodType('banco');
     setAccountId(accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || '');
     setCreditCardId(creditCards[0]?.id || '');
@@ -79,9 +90,24 @@ export const ServicesView: React.FC = () => {
     setServiceName(srv.serviceName);
     setBudgetedAmountStr(centsToDollars(srv.budgetedAmount).toFixed(2));
     setEstimatedDay(srv.estimatedDay);
-    setPaymentMethodType(srv.paymentMethodType);
-    setAccountId(srv.accountId || accounts[0]?.id || '');
-    setCreditCardId(srv.creditCardId || creditCards[0]?.id || '');
+    const rec = srv.monthlyRecords?.[currentMonthKey];
+    setMonthCustomDateStr(rec?.customDate || rec?.paidDate || '');
+    const method = srv.paymentMethodType || 'banco';
+    setPaymentMethodType(method);
+    const matchingAccs = accounts.filter((a) =>
+      method === 'efectivo' ? a.type === 'efectivo' : a.type === 'banco'
+    );
+    const validAccount =
+      (srv.accountId && accounts.some((a) => a.id === srv.accountId) ? srv.accountId : '') ||
+      matchingAccs[0]?.id ||
+      accounts[0]?.id ||
+      '';
+    setAccountId(validAccount);
+    const validCard =
+      (srv.creditCardId && creditCards.some((c) => c.id === srv.creditCardId) ? srv.creditCardId : '') ||
+      creditCards[0]?.id ||
+      '';
+    setCreditCardId(validCard);
     setCategoryId(srv.categoryId || 'cat_servicios');
     setIsIndefinite(srv.isIndefinite !== false);
     setStartDate(srv.startDate || '');
@@ -93,6 +119,26 @@ export const ServicesView: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!company.trim() || !serviceName.trim()) return;
+
+    const existingRecords = editingService?.monthlyRecords ? { ...editingService.monthlyRecords } : undefined;
+    if (editingService && existingRecords !== undefined) {
+      const defDate = getDefaultServiceDate(estimatedDay);
+      const prevRec = existingRecords[currentMonthKey];
+      if (monthCustomDateStr && monthCustomDateStr !== defDate) {
+        existingRecords[currentMonthKey] = {
+          budgetedAmount: prevRec?.budgetedAmount ?? dollarsToCents(budgetedAmountStr || 0),
+          actualAmount: prevRec?.actualAmount,
+          status: prevRec?.status || 'pendiente',
+          paidDate: prevRec?.status === 'pagado' ? monthCustomDateStr : prevRec?.paidDate,
+          customDate: monthCustomDateStr,
+        };
+      } else if (prevRec) {
+        existingRecords[currentMonthKey] = {
+          ...prevRec,
+          customDate: undefined,
+        };
+      }
+    }
 
     await saveService({
       id: editingService?.id,
@@ -107,20 +153,28 @@ export const ServicesView: React.FC = () => {
       isIndefinite,
       startDate: !isIndefinite && startDate ? startDate : undefined,
       endDate: !isIndefinite && endDate ? endDate : undefined,
+      monthlyRecords: existingRecords,
       notes: notes.trim() || undefined,
     });
 
     setIsModalOpen(false);
   };
 
-  const handleUpdateBill = async (srvId: string) => {
+  const handleUpdateBill = async (srv: ServiceItem) => {
     const actCents = dollarsToCents(actualAmountStr || 0);
-    await updateServiceMonthlyRecord(srvId, currentMonthKey, {
+    const defDate = getDefaultServiceDate(srv.estimatedDay);
+    const isPaid = srv.monthlyRecords?.[currentMonthKey]?.status === 'pagado';
+    const nextCustomDate = customDateStr && customDateStr !== defDate ? customDateStr : undefined;
+
+    await updateServiceMonthlyRecord(srv.id, currentMonthKey, {
       actualAmount: actCents > 0 ? actCents : undefined,
-      status: 'pendiente',
+      customDate: nextCustomDate,
+      paidDate: isPaid ? (nextCustomDate || defDate) : undefined,
+      status: srv.monthlyRecords?.[currentMonthKey]?.status || 'pendiente',
     });
     setBillingServiceId(null);
     setActualAmountStr('');
+    setCustomDateStr('');
   };
 
   const handleTogglePaid = async (srv: ServiceItem) => {
@@ -227,6 +281,11 @@ export const ServicesView: React.FC = () => {
           const isPaid = rec?.status === 'pagado';
           const variance = actual !== undefined ? actual - budgeted : 0;
           const isEditingThisBill = billingServiceId === srv.id;
+          const defaultDate = getDefaultServiceDate(srv.estimatedDay);
+          const effectiveDate = rec?.customDate || rec?.paidDate || defaultDate;
+          const hasCustomDate = Boolean(rec?.customDate && rec.customDate !== defaultDate);
+          const linkedCard = creditCards.find((c) => c.id === srv.creditCardId);
+          const linkedAccount = accounts.find((a) => a.id === srv.accountId);
 
           return (
             <div
@@ -235,7 +294,7 @@ export const ServicesView: React.FC = () => {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-sm font-bold text-white">{srv.serviceName}</h3>
                     {srv.isIndefinite !== false ? (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
@@ -249,6 +308,17 @@ export const ServicesView: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs text-slate-400">{srv.company}</span>
+                    {srv.paymentMethodType === 'tarjeta_credito' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-rose-300">
+                        <CreditCard className="w-3 h-3 text-rose-400" />
+                        <span>{linkedCard ? linkedCard.name : 'Tarjeta'}</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-blue-300">
+                        <Building2 className="w-3 h-3 text-blue-400" />
+                        <span>{linkedAccount ? linkedAccount.name : srv.paymentMethodType === 'efectivo' ? 'Efectivo' : 'Banco'}</span>
+                      </span>
+                    )}
                     {(() => {
                       const cat = categories.find((c) => c.id === srv.categoryId);
                       return cat ? (
@@ -264,13 +334,15 @@ export const ServicesView: React.FC = () => {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => openEditModal(srv)}
-                    className="p-1 rounded text-slate-400 hover:text-white"
+                    className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
+                    title="Editar servicio"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteService(srv.id)}
-                    className="p-1 rounded text-slate-400 hover:text-rose-400"
+                    className="p-1 rounded text-slate-400 hover:text-rose-400 cursor-pointer"
+                    title="Eliminar servicio"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -299,9 +371,19 @@ export const ServicesView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Variance & Due day */}
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">Vence: Día {srv.estimatedDay}</span>
+              {/* Variance & Effective Date */}
+              <div className="flex items-center justify-between text-xs gap-2 flex-wrap">
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <Calendar className="w-3 h-3 text-sky-400" />
+                  <span>Fecha: <strong className="text-slate-200">{formatDateEs(effectiveDate, { withDayName: false })}</strong></span>
+                  {hasCustomDate ? (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] font-bold">
+                      Ajustada
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-500">(Día {srv.estimatedDay})</span>
+                  )}
+                </span>
                 {actual !== undefined && (
                   <span
                     className={`text-[11px] font-bold ${
@@ -317,56 +399,90 @@ export const ServicesView: React.FC = () => {
                 )}
               </div>
 
-              {/* Status and Action button */}
-              <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                <button
-                  onClick={() => handleTogglePaid(srv)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition cursor-pointer ${
-                    isPaid
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                  }`}
-                >
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>{isPaid ? 'Pagado' : 'Pendiente'}</span>
-                </button>
-
-                {isEditingThisBill ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      step="0.01"
-                      autoFocus
-                      value={actualAmountStr}
-                      onChange={(e) => setActualAmountStr(e.target.value)}
-                      placeholder="Monto"
-                      className="w-16 bg-slate-950 border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white"
-                    />
-                    <button
-                      onClick={() => handleUpdateBill(srv.id)}
-                      className="px-2 py-0.5 bg-blue-600 rounded text-[10px] text-white font-bold"
-                    >
-                      OK
-                    </button>
-                    <button
-                      onClick={() => setBillingServiceId(null)}
-                      className="px-1.5 py-0.5 bg-slate-800 rounded text-[10px] text-slate-300"
-                    >
-                      X
-                    </button>
+              {/* Status and Inline Date/Amount Editor */}
+              {isEditingThisBill ? (
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Monto Real</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        autoFocus
+                        value={actualAmountStr}
+                        onChange={(e) => setActualAmountStr(e.target.value)}
+                        placeholder="Monto"
+                        className="w-full bg-slate-950 border border-blue-500/60 rounded-lg px-2 py-1 text-xs text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Fecha Registro / Corte</label>
+                      <input
+                        type="date"
+                        value={customDateStr}
+                        onChange={(e) => setCustomDateStr(e.target.value)}
+                        className="w-full bg-slate-950 border border-blue-500/60 rounded-lg px-2 py-1 text-xs text-white"
+                      />
+                    </div>
                   </div>
-                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    {customDateStr !== defaultDate ? (
+                      <button
+                        type="button"
+                        onClick={() => setCustomDateStr(defaultDate)}
+                        className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-amber-300 cursor-pointer"
+                        title="Restaurar al día habitual"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Restaurar fecha</span>
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setBillingServiceId(null)}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-slate-300 font-semibold cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateBill(srv)}
+                        className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded-lg text-[10px] text-white font-bold cursor-pointer"
+                      >
+                        Guardar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => handleTogglePaid(srv)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition cursor-pointer ${
+                      isPaid
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>{isPaid ? 'Pagado' : 'Pendiente'}</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       setBillingServiceId(srv.id);
                       setActualAmountStr(actual !== undefined ? centsToDollars(actual).toFixed(2) : centsToDollars(budgeted).toFixed(2));
+                      setCustomDateStr(effectiveDate);
                     }}
-                    className="text-[11px] text-blue-400 hover:underline font-semibold"
+                    className="text-[11px] text-blue-400 hover:underline font-semibold cursor-pointer"
                   >
-                    {actual !== undefined ? 'Modificar factura' : 'Ingresar factura'}
+                    {actual !== undefined || hasCustomDate ? 'Ajustar fecha / factura' : 'Ajustar fecha / factura'}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -375,7 +491,7 @@ export const ServicesView: React.FC = () => {
       {/* Modal Add/Edit Service */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100">
             <h3 className="text-base font-bold text-white mb-4">
               {editingService ? 'Editar Servicio' : 'Nuevo Servicio'}
             </h3>
@@ -419,7 +535,7 @@ export const ServicesView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 mb-1 font-semibold">Día de Vencimiento</label>
+                  <label className="block text-slate-300 mb-1 font-semibold">Día Habitual (1-31)</label>
                   <input
                     type="number"
                     min="1"
@@ -432,11 +548,53 @@ export const ServicesView: React.FC = () => {
                 </div>
               </div>
 
+              {editingService && (
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-semibold text-sky-300">
+                      Fecha específica en {currentMonthKey} (opcional para corte TDC)
+                    </label>
+                    {monthCustomDateStr && (
+                      <button
+                        type="button"
+                        onClick={() => setMonthCustomDateStr('')}
+                        className="text-[10px] text-slate-400 hover:text-amber-300 cursor-pointer"
+                      >
+                        Usar día {estimatedDay}
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={monthCustomDateStr || getDefaultServiceDate(estimatedDay)}
+                    onChange={(e) => setMonthCustomDateStr(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-300 mb-1 font-semibold">Medio de Pago</label>
                 <select
                   value={paymentMethodType}
-                  onChange={(e) => setPaymentMethodType(e.target.value as any)}
+                  onChange={(e) => {
+                    const nextType = e.target.value as 'banco' | 'efectivo' | 'tarjeta_credito';
+                    setPaymentMethodType(nextType);
+                    if (nextType === 'tarjeta_credito') {
+                      if (!creditCardId || !creditCards.some((c) => c.id === creditCardId)) {
+                        setCreditCardId(creditCards[0]?.id || '');
+                      }
+                    } else {
+                      const matching = accounts.filter((a) =>
+                        nextType === 'efectivo' ? a.type === 'efectivo' : a.type === 'banco'
+                      );
+                      if (matching.length > 0 && !matching.some((a) => a.id === accountId)) {
+                        setAccountId(matching[0].id);
+                      } else if (!accountId && accounts[0]) {
+                        setAccountId(accounts[0].id);
+                      }
+                    }
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                 >
                   <option value="banco">Cuenta Bancaria</option>

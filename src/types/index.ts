@@ -180,6 +180,8 @@ export interface InstallmentPurchase {
   paidInstallmentsCount: number; // e.g. 4
   remainingInstallmentsCount: number; // e.g. 8
   pendingBalance: number; // in cents (e.g. 40000)
+  installmentDateOverrides?: Record<number, string>; // installmentNumber -> YYYY-MM-DD
+  installmentAmountOverrides?: Record<number, number>; // installmentNumber -> cents
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -232,7 +234,7 @@ export interface Subscription {
   isIndefinite?: boolean; // true if it projects indefinitely every month/year
   startDate?: string; // YYYY-MM-DD or YYYY-MM
   endDate?: string; // YYYY-MM-DD or YYYY-MM
-  monthlyExceptions: Record<string, { paused?: boolean; overrideAmount?: number }>; // key: YYYY-MM
+  monthlyExceptions: Record<string, { paused?: boolean; overrideAmount?: number; overrideDate?: string }>; // key: YYYY-MM
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -259,6 +261,7 @@ export interface ServiceItem {
       budgetedAmount: number;
       actualAmount?: number;
       paidDate?: string;
+      customDate?: string; // explicit date override (YYYY-MM-DD) even when pending
       status: 'pendiente' | 'pagado';
     }
   >; // key: YYYY-MM

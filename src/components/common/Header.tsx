@@ -18,6 +18,7 @@ import {
   Moon,
   Calculator,
   RotateCcw,
+  Save,
 } from 'lucide-react';
 import { formatDateEs } from '../../utils/formatters';
 
@@ -42,6 +43,7 @@ export const Header: React.FC = () => {
     undoStack,
     performUndo,
     lastUndo,
+    exportBackupJSON,
   } = useFinance();
 
   const [isOnline, setIsOnline] = useState(
@@ -49,6 +51,15 @@ export const Header: React.FC = () => {
   );
   const [privacyToast, setPrivacyToast] = useState<string | null>(null);
   const [themeToast, setThemeToast] = useState<string | null>(null);
+  const [backupToast, setBackupToast] = useState<string | null>(null);
+
+  const handleQuickBackup = async () => {
+    await exportBackupJSON();
+    setBackupToast('💾 Respaldo descargado correctamente');
+    setTimeout(() => {
+      setBackupToast(null);
+    }, 2400);
+  };
 
   const handleToggleTheme = async () => {
     const isCurrentlyDark = settings.theme !== 'fintech-light';
@@ -272,6 +283,32 @@ export const Header: React.FC = () => {
             <span className="hidden xl:inline">¿Puedo pagarlo?</span>
           </button>
 
+          {/* Quick Movimientos navigation button */}
+          <button
+            id="btn-header-movimientos"
+            onClick={() => setActiveTab('movimientos')}
+            className={`flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold cursor-pointer transition active:scale-95 ${
+              activeTab === 'movimientos'
+                ? 'bg-sky-500/20 border-sky-500/50 text-sky-300 shadow-sm'
+                : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Ir rápido a Movimientos"
+          >
+            <ArrowLeftRight className="w-4 h-4 text-sky-400" />
+            <span className="hidden lg:inline">Movimientos</span>
+          </button>
+
+          {/* Quick JSON Backup Save button */}
+          <button
+            id="btn-header-backup"
+            onClick={handleQuickBackup}
+            className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-2 rounded-xl bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/40 text-emerald-300 text-xs font-semibold cursor-pointer transition active:scale-95"
+            title="Guardar y descargar respaldo JSON de la versión actual"
+          >
+            <Save className="w-4 h-4 text-emerald-400" />
+            <span className="hidden xl:inline">Respaldo</span>
+          </button>
+
           {/* PWA Install Button */}
           <PWAInstallButton />
 
@@ -309,6 +346,13 @@ export const Header: React.FC = () => {
       {themeToast && (
         <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 px-4 py-2 rounded-full bg-slate-900/95 border border-blue-500/50 text-blue-300 text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 pointer-events-none transition animate-in fade-in slide-in-from-top-2">
           <span>{themeToast}</span>
+        </div>
+      )}
+
+      {/* Floating Backup Downloaded Toast */}
+      {backupToast && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 px-4 py-2 rounded-full bg-slate-900/95 border border-emerald-500/50 text-emerald-300 text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 pointer-events-none transition animate-in fade-in slide-in-from-top-2">
+          <span>{backupToast}</span>
         </div>
       )}
     </header>

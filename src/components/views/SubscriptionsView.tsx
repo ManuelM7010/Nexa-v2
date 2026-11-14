@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { Subscription } from '../../types';
-import { formatMoney, dollarsToCents, centsToDollars, formatDateEs } from '../../utils/formatters';
+import { formatMoney, dollarsToCents, centsToDollars, formatDateEs, daysInMonth } from '../../utils/formatters';
 import {
   Tv,
   Plus,
@@ -12,9 +12,9 @@ import {
   Calendar,
   CreditCard,
   Building2,
-  CheckCircle2,
   Clock,
   Tag,
+  RotateCcw,
 } from 'lucide-react';
 import { CalculatorButton } from '../common/CalculatorButton';
 import { NewCategoryModal } from '../common/NewCategoryModal';
@@ -28,6 +28,7 @@ export const SubscriptionsView: React.FC = () => {
     saveSubscription,
     deleteSubscription,
     toggleSubscriptionMonthlyPause,
+    updateSubscriptionMonthlyException,
     selectedYear,
     selectedMonth,
     settings,
@@ -37,6 +38,12 @@ export const SubscriptionsView: React.FC = () => {
   const liquidityStart = settings.liquidityStartDate || '2026-09-15';
   const isPriorToStartMonth = currentMonthKey < liquidityStart.slice(0, 7);
 
+  const getDefaultSubDate = (billingDay: number) => {
+    const maxD = daysInMonth(selectedYear, selectedMonth);
+    const day = Math.min(Math.max(1, billingDay || 15), maxD);
+    return `${currentMonthKey}-${String(day).padStart(2, '0')}`;
+  };
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
@@ -45,6 +52,7 @@ export const SubscriptionsView: React.FC = () => {
   const [concept, setConcept] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [billingDay, setBillingDay] = useState(15);
+  const [monthOverrideDateStr, setMonthOverrideDateStr] = useState('');
   const [paymentMethodType, setPaymentMethodType] = useState<'tarjeta_credito' | 'banco' | 'efectivo'>('tarjeta_credito');
   const [creditCardId, setCreditCardId] = useState(creditCards[0]?.id || '');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
@@ -54,14 +62,20 @@ export const SubscriptionsView: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Inline quick override state for current month (date + amount)
+  const [editingMonthSubId, setEditingMonthSubId] = useState<string | null>(null);
+  const [overrideAmountStr, setOverrideAmountStr] = useState('');
+  const [overrideDateStr, setOverrideDateStr] = useState('');
+
   const openNewModal = () => {
     setEditingSub(null);
     setConcept('');
     setAmountStr('');
     setBillingDay(15);
+    setMonthOverrideDateStr('');
     setPaymentMethodType('tarjeta_credito');
     setCreditCardId(creditCards[0]?.id || '');
-    setAccountId(accounts[0]?.id || '');
+    setAccountId(accounts.find((a) => a.type === 'banco')?.id || accounts[0]?.id || '');
     setCategoryId('cat_suscripciones');
     setIsIndefinite(true);
     setStartDate('');
@@ -75,9 +89,24 @@ export const SubscriptionsView: React.FC = () => {
     setConcept(sub.concept);
     setAmountStr(centsToDollars(sub.amount).toFixed(2));
     setBillingDay(sub.billingDay);
-    setPaymentMethodType(sub.paymentMethodType || 'tarjeta_credito');
-    setCreditCardId(sub.creditCardId || creditCards[0]?.id || '');
-    setAccountId(sub.accountId || accounts[0]?.id || '');
+    const ex = sub.monthlyExceptions?.[currentMonthKey];
+    setMonthOverrideDateStr(ex?.overrideDate || '');
+    const method = sub.paymentMethodType || 'tarjeta_credito';
+    setPaymentMethodType(method);
+    const validCard =
+      (sub.creditCardId && creditCards.some((c) => c.id === sub.creditCardId) ? sub.creditCardId : '') ||
+      creditCards[0]?.id ||
+      '';
+    setCreditCardId(validCard);
+    const matchingAccs = accounts.filter((a) =>
+      method === 'efectivo' ? a.type === 'efectivo' : a.type === 'banco'
+    );
+    const validAcc =
+      (sub.accountId && accounts.some((a) => a.id === sub.accountId) ? sub.accountId : '') ||
+      matchingAccs[0]?.id ||
+      accounts[0]?.id ||
+      '';
+    setAccountId(validAcc);
     setCategoryId(sub.categoryId);
     setIsIndefinite(sub.isIndefinite !== false);
     setStartDate(sub.startDate || '');
@@ -90,6 +119,23 @@ export const SubscriptionsView: React.FC = () => {
     e.preventDefault();
     if (!concept.trim() || !amountStr) return;
 
+    const existingExceptions = editingSub?.monthlyExceptions ? { ...editingSub.monthlyExceptions } : undefined;
+    if (editingSub && existingExceptions !== undefined) {
+      const defDate = getDefaultSubDate(billingDay);
+      const prevEx = existingExceptions[currentMonthKey];
+      if (monthOverrideDateStr && monthOverrideDateStr !== defDate) {
+        existingExceptions[currentMonthKey] = {
+          ...prevEx,
+          overrideDate: monthOverrideDateStr,
+        };
+      } else if (prevEx) {
+        existingExceptions[currentMonthKey] = {
+          ...prevEx,
+          overrideDate: undefined,
+        };
+      }
+    }
+
     await saveSubscription({
       id: editingSub?.id,
       concept: concept.trim(),
@@ -97,23 +143,53 @@ export const SubscriptionsView: React.FC = () => {
       billingDay,
       paymentMethodType,
       creditCardId: paymentMethodType === 'tarjeta_credito' ? creditCardId : undefined,
-      accountId: paymentMethodType === 'banco' ? accountId : undefined,
+      accountId: paymentMethodType === 'banco' || paymentMethodType === 'efectivo' ? accountId : undefined,
       categoryId,
       isIndefinite,
       startDate: !isIndefinite && startDate ? startDate : undefined,
       endDate: !isIndefinite && endDate ? endDate : undefined,
+      monthlyExceptions: existingExceptions,
       notes: notes.trim() || undefined,
     });
 
     setIsModalOpen(false);
   };
 
+  const handleSaveMonthOverride = async (sub: Subscription) => {
+    const defDate = getDefaultSubDate(sub.billingDay);
+    const parsedCents = dollarsToCents(overrideAmountStr || 0);
+    const nextAmount = parsedCents > 0 && parsedCents !== sub.amount ? parsedCents : undefined;
+    const nextDate = overrideDateStr && overrideDateStr !== defDate ? overrideDateStr : undefined;
+
+    await updateSubscriptionMonthlyException(sub.id, currentMonthKey, {
+      paused: false,
+      overrideAmount: nextAmount,
+      overrideDate: nextDate,
+    });
+    setEditingMonthSubId(null);
+    setOverrideAmountStr('');
+    setOverrideDateStr('');
+  };
+
+  const handleResetMonthOverride = async (sub: Subscription) => {
+    await updateSubscriptionMonthlyException(sub.id, currentMonthKey, {
+      paused: false,
+      overrideAmount: undefined,
+      overrideDate: undefined,
+    });
+    setEditingMonthSubId(null);
+    setOverrideAmountStr('');
+    setOverrideDateStr('');
+  };
+
   // Calculate monthly total and annual projected
   const activeMonthlyTotal = isPriorToStartMonth
     ? 0
     : subscriptions.reduce((acc, s) => {
-        const isPaused = s.monthlyExceptions?.[currentMonthKey]?.paused || s.status !== 'activa';
-        return isPaused ? acc : acc + s.amount;
+        const ex = s.monthlyExceptions?.[currentMonthKey];
+        const isPaused = ex?.paused || s.status !== 'activa';
+        if (isPaused) return acc;
+        return acc + (ex?.overrideAmount !== undefined ? ex.overrideAmount : s.amount);
       }, 0);
 
   const annualProjected = (isPriorToStartMonth
@@ -192,9 +268,16 @@ export const SubscriptionsView: React.FC = () => {
       {/* Subscriptions Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {subscriptions.map((sub) => {
-          const isPausedThisMonth = sub.monthlyExceptions?.[currentMonthKey]?.paused;
+          const ex = sub.monthlyExceptions?.[currentMonthKey];
+          const isPausedThisMonth = ex?.paused;
           const card = creditCards.find((c) => c.id === sub.creditCardId);
           const acc = accounts.find((a) => a.id === sub.accountId);
+          const defaultDate = getDefaultSubDate(sub.billingDay);
+          const effectiveDate = ex?.overrideDate || defaultDate;
+          const hasCustomDate = Boolean(ex?.overrideDate && ex.overrideDate !== defaultDate);
+          const effectiveAmount = !isPausedThisMonth && ex?.overrideAmount !== undefined ? ex.overrideAmount : sub.amount;
+          const hasCustomAmount = Boolean(!isPausedThisMonth && ex?.overrideAmount !== undefined && ex.overrideAmount !== sub.amount);
+          const isEditingThisMonth = editingMonthSubId === sub.id;
 
           return (
             <div
@@ -235,7 +318,7 @@ export const SubscriptionsView: React.FC = () => {
                     ) : (
                       <>
                         <Building2 className="w-3.5 h-3.5 text-blue-400" />
-                        <span>{acc ? acc.name : 'Banco'}</span>
+                        <span>{acc ? acc.name : sub.paymentMethodType === 'efectivo' ? 'Efectivo' : 'Banco'}</span>
                       </>
                     )}
                     {(() => {
@@ -253,60 +336,150 @@ export const SubscriptionsView: React.FC = () => {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => openEditModal(sub)}
-                    className="p-1 rounded text-slate-400 hover:text-white"
+                    className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
+                    title="Editar suscripción"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteSubscription(sub.id)}
-                    className="p-1 rounded text-slate-400 hover:text-rose-400"
+                    className="p-1 rounded text-slate-400 hover:text-rose-400 cursor-pointer"
+                    title="Eliminar suscripción"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              {/* Amount and Billing Day */}
+              {/* Amount and Billing Date */}
               <div className="flex items-baseline justify-between pt-1">
                 <div>
-                  <span className="text-[10px] text-slate-400 block font-semibold">MONTO HABITUAL</span>
-                  <span
-                    className={`text-xl font-black font-mono ${
-                      isPausedThisMonth ? 'line-through text-slate-500' : 'text-purple-300'
-                    }`}
-                  >
-                    {formatMoney(sub.amount, settings.currencySymbol)}
+                  <span className="text-[10px] text-slate-400 block font-semibold">
+                    {hasCustomAmount ? `MONTO (${currentMonthKey})` : 'MONTO HABITUAL'}
                   </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`text-xl font-black font-mono ${
+                        isPausedThisMonth ? 'line-through text-slate-500' : 'text-purple-300'
+                      }`}
+                    >
+                      {formatMoney(effectiveAmount, settings.currencySymbol)}
+                    </span>
+                    {hasCustomAmount && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                        Ajustado
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-slate-400 block font-semibold">DÍA DE COBRO</span>
-                  <span className="text-xs font-bold text-white">Día {sub.billingDay}</span>
+                  <span className="text-[10px] text-slate-400 block font-semibold">FECHA COBRO</span>
+                  <div className="flex items-center justify-end gap-1">
+                    <span className="text-xs font-bold text-white">
+                      {formatDateEs(effectiveDate, { withDayName: false })}
+                    </span>
+                    {hasCustomDate && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                        Ajustada
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Pause this month button (Requirement 17: Pausa mensual puntual) */}
-              <div className="pt-2 border-t border-slate-800/80">
-                <button
-                  onClick={() => toggleSubscriptionMonthlyPause(sub.id, currentMonthKey)}
-                  className={`w-full py-1.5 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                    isPausedThisMonth
-                      ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30'
-                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  {isPausedThisMonth ? (
-                    <>
-                      <Play className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Reanudar para {currentMonthKey}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Pausar solo en {currentMonthKey} ($0)</span>
-                    </>
-                  )}
-                </button>
-              </div>
+              {/* Inline per-month date & amount adjustment */}
+              {isEditingThisMonth ? (
+                <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Monto ({currentMonthKey})</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        autoFocus
+                        value={overrideAmountStr}
+                        onChange={(e) => setOverrideAmountStr(e.target.value)}
+                        className="w-full bg-slate-950 border border-purple-500/60 rounded-lg px-2 py-1 text-xs text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">Fecha Registro / Corte</label>
+                      <input
+                        type="date"
+                        value={overrideDateStr}
+                        onChange={(e) => setOverrideDateStr(e.target.value)}
+                        className="w-full bg-slate-950 border border-purple-500/60 rounded-lg px-2 py-1 text-xs text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    {(hasCustomDate || hasCustomAmount) ? (
+                      <button
+                        type="button"
+                        onClick={() => handleResetMonthOverride(sub)}
+                        className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-amber-300 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Restaurar</span>
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditingMonthSubId(null)}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] text-slate-300 font-semibold cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveMonthOverride(sub)}
+                        className="px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded-lg text-[10px] text-white font-bold cursor-pointer"
+                      >
+                        Guardar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingMonthSubId(sub.id);
+                      setOverrideAmountStr(centsToDollars(effectiveAmount).toFixed(2));
+                      setOverrideDateStr(effectiveDate);
+                    }}
+                    className="w-full py-1.5 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/25 transition cursor-pointer"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Ajustar Fecha / Monto ({currentMonthKey})</span>
+                  </button>
+
+                  <button
+                    onClick={() => toggleSubscriptionMonthlyPause(sub.id, currentMonthKey)}
+                    className={`w-full py-1.5 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      isPausedThisMonth
+                        ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30'
+                        : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {isPausedThisMonth ? (
+                      <>
+                        <Play className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Reanudar para {currentMonthKey}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Pause className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Pausar solo en {currentMonthKey} ($0)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -315,7 +488,7 @@ export const SubscriptionsView: React.FC = () => {
       {/* Modal Add/Edit */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100">
             <h3 className="text-base font-bold text-white mb-4">
               {editingSub ? 'Editar Suscripción' : 'Nueva Suscripción'}
             </h3>
@@ -347,7 +520,7 @@ export const SubscriptionsView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 mb-1 font-semibold">Día de Cobro (1-31)</label>
+                  <label className="block text-slate-300 mb-1 font-semibold">Día Habitual (1-31)</label>
                   <input
                     type="number"
                     min="1"
@@ -360,13 +533,43 @@ export const SubscriptionsView: React.FC = () => {
                 </div>
               </div>
 
+              {editingSub && (
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-semibold text-purple-300">
+                      Fecha específica en {currentMonthKey} (opcional para corte TDC)
+                    </label>
+                    {monthOverrideDateStr && (
+                      <button
+                        type="button"
+                        onClick={() => setMonthOverrideDateStr('')}
+                        className="text-[10px] text-slate-400 hover:text-amber-300 cursor-pointer"
+                      >
+                        Usar día {billingDay}
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={monthOverrideDateStr || getDefaultSubDate(billingDay)}
+                    onChange={(e) => setMonthOverrideDateStr(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-300 mb-1 font-semibold">Medio de Pago</label>
                 <div className="grid grid-cols-3 gap-2 mb-2">
                   <button
                     type="button"
-                    onClick={() => setPaymentMethodType('tarjeta_credito')}
-                    className={`py-1.5 rounded-lg text-xs font-semibold ${
+                    onClick={() => {
+                      setPaymentMethodType('tarjeta_credito');
+                      if (!creditCardId || !creditCards.some((c) => c.id === creditCardId)) {
+                        setCreditCardId(creditCards[0]?.id || '');
+                      }
+                    }}
+                    className={`py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
                       paymentMethodType === 'tarjeta_credito'
                         ? 'bg-blue-600 text-white'
                         : 'bg-slate-950 text-slate-400 border border-slate-800'
@@ -376,8 +579,16 @@ export const SubscriptionsView: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPaymentMethodType('banco')}
-                    className={`py-1.5 rounded-lg text-xs font-semibold ${
+                    onClick={() => {
+                      setPaymentMethodType('banco');
+                      const bankAccs = accounts.filter((a) => a.type === 'banco');
+                      if (bankAccs.length > 0 && !bankAccs.some((a) => a.id === accountId)) {
+                        setAccountId(bankAccs[0].id);
+                      } else if (!accountId && accounts[0]) {
+                        setAccountId(accounts[0].id);
+                      }
+                    }}
+                    className={`py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
                       paymentMethodType === 'banco'
                         ? 'bg-blue-600 text-white'
                         : 'bg-slate-950 text-slate-400 border border-slate-800'
@@ -387,8 +598,16 @@ export const SubscriptionsView: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPaymentMethodType('efectivo')}
-                    className={`py-1.5 rounded-lg text-xs font-semibold ${
+                    onClick={() => {
+                      setPaymentMethodType('efectivo');
+                      const cashAccs = accounts.filter((a) => a.type === 'efectivo');
+                      if (cashAccs.length > 0 && !cashAccs.some((a) => a.id === accountId)) {
+                        setAccountId(cashAccs[0].id);
+                      } else if (!accountId && accounts[0]) {
+                        setAccountId(accounts[0].id);
+                      }
+                    }}
+                    className={`py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
                       paymentMethodType === 'efectivo'
                         ? 'bg-blue-600 text-white'
                         : 'bg-slate-950 text-slate-400 border border-slate-800'
@@ -412,17 +631,25 @@ export const SubscriptionsView: React.FC = () => {
                   </select>
                 )}
 
-                {paymentMethodType === 'banco' && (
+                {(paymentMethodType === 'banco' || paymentMethodType === 'efectivo') && (
                   <select
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                   >
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
+                    {accounts
+                      .filter((a) => (paymentMethodType === 'efectivo' ? a.type === 'efectivo' : a.type === 'banco'))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    {accounts.filter((a) => (paymentMethodType === 'efectivo' ? a.type === 'efectivo' : a.type === 'banco')).length === 0 &&
+                      accounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
                   </select>
                 )}
               </div>
